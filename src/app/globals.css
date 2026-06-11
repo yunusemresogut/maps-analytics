@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --neon-cyan: #22d3ee;
+  --neon-green: #34d399;
+  --neon-red: #f87171;
 }
 
 @theme inline {
@@ -12,15 +15,38 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.maplibregl-ctrl-group {
+  background: rgba(9, 9, 11, 0.85) !important;
+  border: 1px solid rgba(63, 63, 70, 0.6) !important;
+  border-radius: 0.75rem !important;
+  backdrop-filter: blur(12px);
+}
+
+.maplibregl-ctrl-group button {
+  filter: invert(1) brightness(0.8);
+}
+
+.maplibregl-ctrl-group button:hover {
+  background: rgba(34, 211, 238, 0.1) !important;
+}
+
+@keyframes slide-in-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-in {
+  animation: slide-in-from-right 0.25s ease-out;
 }
