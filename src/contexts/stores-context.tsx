@@ -7,35 +7,44 @@ import {
   useEffect,
   useState,
 } from "react";
-import { lcwStores } from "@/data/stores";
-import type { Store } from "@/types";
+import { demoStores } from "@/data/stores";
+import { migrateStore } from "@/lib/migrations";
+import { STORAGE_KEYS } from "@/lib/storage-keys";
+import type { Store, StoreInput } from "@/types";
 
 type StoresContextValue = {
   stores: Store[];
-  addStore: (store: Omit<Store, "id" | "isCustom">) => Store;
-  updateStore: (id: string, data: Partial<Store>) => void;
+  addStore: (
+    store: StoreInput,
+    meta: { userId: string; userName: string }
+  ) => Store;
+  updateStore: (
+    id: string,
+    data: Partial<Store>,
+    meta?: { userId: string; userName: string }
+  ) => void;
   deleteStore: (id: string) => void;
   getStore: (id: string) => Store | undefined;
 };
 
 const StoresContext = createContext<StoresContextValue | null>(null);
 
-const STORES_KEY = "lcw-map-stores-v2";
-
 function loadStores(): Store[] {
-  if (typeof window === "undefined") return lcwStores;
-  const stored = localStorage.getItem(STORES_KEY);
-  if (stored) return JSON.parse(stored);
-  localStorage.setItem(STORES_KEY, JSON.stringify(lcwStores));
-  return lcwStores;
+  if (typeof window === "undefined") return demoStores;
+  const stored = localStorage.getItem(STORAGE_KEYS.stores);
+  if (stored) {
+    return (JSON.parse(stored) as Record<string, unknown>[]).map(migrateStore);
+  }
+  localStorage.setItem(STORAGE_KEYS.stores, JSON.stringify(demoStores));
+  return demoStores;
 }
 
 function saveStores(stores: Store[]) {
-  localStorage.setItem(STORES_KEY, JSON.stringify(stores));
+  localStorage.setItem(STORAGE_KEYS.stores, JSON.stringify(stores));
 }
 
 export function StoresProvider({ children }: { children: React.ReactNode }) {
-  const [stores, setStores] = useState<Store[]>(lcwStores);
+  const [stores, setStores] = useState<Store[]>(demoStores);
 
   useEffect(() => {
     setStores(loadStores());
@@ -47,11 +56,15 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addStore = useCallback(
-    (data: Omit<Store, "id" | "isCustom">) => {
+    (data: StoreInput, meta: { userId: string; userName: string }) => {
+      const now = new Date().toISOString();
       const store: Store = {
         ...data,
         id: `custom-${Date.now()}`,
         isCustom: true,
+        createdBy: meta.userId,
+        createdByName: meta.userName,
+        createdAt: now,
       };
       const next = [...stores, store];
       persist(next);
@@ -61,8 +74,26 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateStore = useCallback(
-    (id: string, data: Partial<Store>) => {
-      const next = stores.map((s) => (s.id === id ? { ...s, ...data } : s));
+    (
+      id: string,
+      data: Partial<Store>,
+      meta?: { userId: string; userName: string }
+    ) => {
+      const now = new Date().toISOString();
+      const next = stores.map((s) => {
+        if (s.id !== id) return s;
+        return {
+          ...s,
+          ...data,
+          ...(meta
+            ? {
+                updatedBy: meta.userId,
+                updatedByName: meta.userName,
+                updatedAt: now,
+              }
+            : {}),
+        };
+      });
       persist(next);
     },
     [stores, persist]
@@ -70,8 +101,6 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
 
   const deleteStore = useCallback(
     (id: string) => {
-      const store = stores.find((s) => s.id === id);
-      if (!store?.isCustom) return;
       persist(stores.filter((s) => s.id !== id));
     },
     [stores, persist]

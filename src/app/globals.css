@@ -6,6 +6,9 @@
   --neon-cyan: #22d3ee;
   --neon-green: #34d399;
   --neon-red: #f87171;
+  --scrollbar-thumb: rgba(82, 82, 91, 0.85);
+  --scrollbar-thumb-hover: rgba(113, 113, 122, 0.95);
+  --scrollbar-track: transparent;
 }
 
 @theme inline {
@@ -21,6 +24,40 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+/* Themed scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 9999px;
+  border: 1px solid rgba(9, 9, 11, 0.4);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.scrollbar-themed {
+  scrollbar-gutter: stable;
+}
+
 .maplibregl-ctrl-group {
   background: rgba(9, 9, 11, 0.85) !important;
   border: 1px solid rgba(63, 63, 70, 0.6) !important;
@@ -34,6 +71,21 @@ body {
 
 .maplibregl-ctrl-group button:hover {
   background: rgba(34, 211, 238, 0.1) !important;
+}
+
+@keyframes slide-in-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.slide-in-from-left {
+  animation: slide-in-from-left 0.25s ease-out;
 }
 
 @keyframes slide-in-from-right {

@@ -1,18 +1,20 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Map, { NavigationControl } from "react-map-gl/maplibre";
 import type { MapMouseEvent } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Plus, X } from "lucide-react";
-import Link from "next/link";
-import { useAuth } from "@/contexts/auth-context";
+import { findRegionForCity } from "@/data/regions";
+import { useRegions } from "@/contexts/regions-context";
 import { useStores } from "@/contexts/stores-context";
+import { usePermissions } from "@/hooks/use-permissions";
 import { StoreMarker } from "@/components/map/store-marker";
 import { StoreDetailPanel } from "@/components/map/store-detail-panel";
 import { AddStorePanel } from "@/components/map/add-store-panel";
+import { RegionFilterPanel } from "@/components/map/region-filter-panel";
+import { getOpeningAlert } from "@/lib/opening-dates";
 import { projectStatusConfig } from "@/lib/project-status";
-import { getOpeningStatus } from "@/lib/store-status";
 import { Button } from "@/components/ui/button";
 import type { ProjectStatus } from "@/types";
 
@@ -22,8 +24,10 @@ const DARK_MAP_STYLE =
 const TURKEY_CENTER = { longitude: 35.2433, latitude: 38.9637, zoom: 5.5 };
 
 export function StoreMap() {
-  const { user } = useAuth();
+  const { canAdd } = usePermissions();
   const { stores, getStore } = useStores();
+  const { regions, isRegionVisible } = useRegions();
+
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [addMode, setAddMode] = useState(false);
   const [pendingCoords, setPendingCoords] = useState<{
@@ -31,26 +35,31 @@ export function StoreMap() {
     longitude: number;
   } | null>(null);
 
+  const visibleStores = useMemo(() => {
+    return stores.filter((store) => {
+      const region = findRegionForCity(store.city, regions);
+      if (!region) return true;
+      return isRegionVisible(region.id);
+    });
+  }, [stores, regions, isRegionVisible]);
+
   const selectedStore = selectedStoreId ? getStore(selectedStoreId) : null;
 
-  const statusCounts = stores.reduce(
+  const statusCounts = visibleStores.reduce(
     (acc, store) => {
-      acc[store.projectStatus]++;
+      acc[store.projectStatus] = (acc[store.projectStatus] ?? 0) + 1;
       return acc;
     },
-    { tamamlandi: 0, santiye: 0, proje: 0, beklemede: 0 } as Record<
-      ProjectStatus,
-      number
-    >
+    {} as Record<ProjectStatus, number>
   );
 
-  const openingSoonCount = stores.filter(
-    (s) => getOpeningStatus(s.openingDate) === "opening_soon"
+  const openingSoonCount = visibleStores.filter(
+    (s) => getOpeningAlert(s.openingDate).isOpeningSoon
   ).length;
 
   const handleMapClick = useCallback(
     (e: MapMouseEvent) => {
-      if (addMode && user) {
+      if (addMode && canAdd) {
         setPendingCoords({
           latitude: e.lngLat.lat,
           longitude: e.lngLat.lng,
@@ -61,7 +70,7 @@ export function StoreMap() {
       setSelectedStoreId(null);
       setPendingCoords(null);
     },
-    [addMode, user]
+    [addMode, canAdd]
   );
 
   const exitAddMode = () => {
@@ -70,7 +79,9 @@ export function StoreMap() {
   };
 
   return (
-    <div className={`relative h-full w-full ${addMode ? "cursor-crosshair" : ""}`}>
+    <div
+      className={`relative h-full w-full ${addMode ? "cursor-crosshair" : ""}`}
+    >
       <Map
         initialViewState={TURKEY_CENTER}
         mapStyle={DARK_MAP_STYLE}
@@ -80,7 +91,7 @@ export function StoreMap() {
       >
         <NavigationControl position="top-right" showCompass={false} />
 
-        {stores.map((store) => (
+        {visibleStores.map((store) => (
           <StoreMarker
             key={store.id}
             store={store}
@@ -98,15 +109,15 @@ export function StoreMap() {
         <div className="pointer-events-none absolute inset-0 z-[5] border-2 border-dashed border-cyan-500/40 bg-cyan-500/5" />
       )}
 
-      <div className="pointer-events-none absolute left-4 top-4 z-10 flex flex-col gap-2">
+      <div className="pointer-events-none absolute left-4 top-4 z-10 flex w-[220px] flex-col gap-2">
         <div className="pointer-events-auto rounded-xl border border-zinc-700/60 bg-zinc-950/80 p-4 backdrop-blur-md">
           <h2 className="text-sm font-semibold text-zinc-100">
-            LC Waikiki Mağazaları
+            Mağaza Haritası
           </h2>
           <p className="mt-1 text-xs text-zinc-500">
-            {stores.length} mağaza · Türkiye
+            {visibleStores.length} / {stores.length} görünür
           </p>
-          <div className="mt-3 space-y-1.5">
+          <div className="scrollbar-themed mt-3 max-h-52 space-y-1.5 overflow-y-auto pr-1">
             {(Object.keys(projectStatusConfig) as ProjectStatus[]).map(
               (status) => (
                 <div
@@ -119,7 +130,8 @@ export function StoreMap() {
                       backgroundColor: projectStatusConfig[status].marker,
                     }}
                   />
-                  {projectStatusConfig[status].label} ({statusCounts[status]})
+                  {projectStatusConfig[status].label} (
+                  {statusCounts[status] ?? 0})
                 </div>
               )
             )}
@@ -132,9 +144,9 @@ export function StoreMap() {
           </div>
         </div>
 
-        <div className="pointer-events-auto">
-          {user ? (
-            addMode ? (
+        {canAdd && (
+          <div className="pointer-events-auto">
+            {addMode ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -145,20 +157,17 @@ export function StoreMap() {
                 Konum Seçimini İptal Et
               </Button>
             ) : (
-              <Button size="sm" onClick={() => setAddMode(true)} className="w-full">
+              <Button
+                size="sm"
+                onClick={() => setAddMode(true)}
+                className="w-full"
+              >
                 <Plus className="h-3.5 w-3.5" />
                 Yeni Konum Ekle
               </Button>
-            )
-          ) : (
-            <Link href="/login">
-              <Button size="sm" variant="outline" className="w-full">
-                <Plus className="h-3.5 w-3.5" />
-                Eklemek için Giriş Yap
-              </Button>
-            </Link>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {addMode && !pendingCoords && (
           <p className="pointer-events-none rounded-lg border border-cyan-500/30 bg-zinc-950/90 px-3 py-2 text-xs text-cyan-300 backdrop-blur-md">
@@ -185,6 +194,8 @@ export function StoreMap() {
           }}
         />
       )}
+
+      <RegionFilterPanel />
     </div>
   );
 }

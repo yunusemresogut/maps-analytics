@@ -1,8 +1,8 @@
 "use client";
 
 import { Marker } from "react-map-gl/maplibre";
+import { getOpeningAlert, shouldHighlightRed } from "@/lib/opening-dates";
 import { projectStatusConfig } from "@/lib/project-status";
-import { getOpeningStatus } from "@/lib/store-status";
 import type { Store } from "@/types";
 
 type StoreMarkerProps = {
@@ -13,10 +13,10 @@ type StoreMarkerProps = {
 
 export function StoreMarker({ store, isSelected, onClick }: StoreMarkerProps) {
   const projectConfig = projectStatusConfig[store.projectStatus];
-  const openingStatus = getOpeningStatus(store.openingDate);
-  const isOpeningSoon = openingStatus === "opening_soon";
+  const openingAlert = getOpeningAlert(store.openingDate);
+  const isRed = shouldHighlightRed(store.openingDate);
 
-  const markerColor = isOpeningSoon ? "#f87171" : projectConfig.marker;
+  const markerColor = isRed ? "#f87171" : projectConfig.marker;
 
   return (
     <Marker
@@ -32,9 +32,10 @@ export function StoreMarker({ store, isSelected, onClick }: StoreMarkerProps) {
         type="button"
         onClick={onClick}
         className="group relative flex items-center justify-center"
-        aria-label={store.name}
+        aria-label={`${store.name}${openingAlert.isOpeningSoon ? " — yakında açılıyor" : ""}`}
+        title={openingAlert.label}
       >
-        {isOpeningSoon && (
+        {isRed && (
           <span
             className="absolute h-10 w-10 rounded-full opacity-50 animate-pulse"
             style={{ backgroundColor: "#f87171" }}

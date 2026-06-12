@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LCW Maps Analytics",
-  description: "LC Waikiki mağaza haritası ve analitik paneli",
+  title: "Maps Analytics",
+  description: "Çok markalı mağaza haritası ve analitik paneli",
 };
 
 export default function RootLayout({

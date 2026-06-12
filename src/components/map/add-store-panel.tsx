@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { MapPin, X } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useStores } from "@/contexts/stores-context";
-import { Button } from "@/components/ui/button";
 import {
   StoreFormFields,
   emptyStoreForm,
   formToStoreData,
 } from "@/components/map/store-form-fields";
+import { Button } from "@/components/ui/button";
+import { MapPin, X } from "lucide-react";
+import { useState } from "react";
 
 type AddStorePanelProps = {
   coords: { latitude: number; longitude: number };
@@ -25,7 +25,10 @@ export function AddStorePanel({ coords, onClose, onSaved }: AddStorePanelProps) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    const store = addStore(formToStoreData(form, coords, user.id));
+    const store = addStore(formToStoreData(form, coords), {
+      userId: user.id,
+      userName: user.name,
+    });
     onSaved(store.id);
   };
 
@@ -52,7 +55,7 @@ export function AddStorePanel({ coords, onClose, onSaved }: AddStorePanelProps) 
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="scrollbar-themed flex-1 overflow-y-auto p-4">
           <StoreFormFields form={form} onChange={setForm} />
         </div>
 

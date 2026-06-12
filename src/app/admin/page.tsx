@@ -1,129 +1,83 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { UserPlus, Users } from "lucide-react";
-import { useAuth } from "@/contexts/auth-context";
+import { useState } from "react";
+import Link from "next/link";
+import { BarChart3, Users, MapPin } from "lucide-react";
+import { AdminGuard } from "@/components/auth/admin-guard";
+import { AdminRegionsPanel } from "@/components/admin/admin-regions-panel";
+import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+
+type AdminTab = "users" | "regions";
 
 export default function AdminPage() {
-  const { user, isLoading, users, addUser } = useAuth();
-  const router = useRouter();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "admin")) {
-      router.push("/login");
-    }
-  }, [user, isLoading, router]);
-
-  const handleAddUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage("");
-    const success = addUser({ name, email, password });
-    if (success) {
-      setMessage("Kullanıcı başarıyla eklendi");
-      setName("");
-      setEmail("");
-      setPassword("");
-    } else {
-      setMessage("Bu e-posta zaten kayıtlı");
-    }
-  };
-
-  if (isLoading || !user || user.role !== "admin") {
-    return (
-      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
-      </div>
-    );
-  }
-
-  const regularUsers = users.filter((u) => u.role === "user");
+  const [tab, setTab] = useState<AdminTab>("users");
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-zinc-100">Admin Paneli</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Harita erişimi olan kullanıcıları yönetin
-        </p>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
-          <div className="mb-4 flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-cyan-400" />
-            <h2 className="font-medium text-zinc-200">Yeni Kullanıcı</h2>
+    <AdminGuard>
+      <div className="mx-auto max-w-5xl p-6">
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-zinc-100">
+              Admin Paneli
+            </h1>
+            <p className="mt-1 text-sm text-zinc-500">
+              Kullanıcı, yetki ve bölge yönetimi
+            </p>
           </div>
-          <form onSubmit={handleAddUser} className="space-y-3">
-            <Input
-              placeholder="Ad Soyad"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-            <Input
-              type="email"
-              placeholder="E-posta"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <Input
-              type="password"
-              placeholder="Şifre"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            {message && (
-              <p
-                className={`text-sm ${
-                  message.includes("başarı") ? "text-emerald-400" : "text-red-400"
-                }`}
-              >
-                {message}
-              </p>
-            )}
-            <Button type="submit" className="w-full">
-              Kullanıcı Ekle
+          <Link href="/dashboard">
+            <Button variant="outline" size="sm">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Dashboard
             </Button>
-          </form>
+          </Link>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
-          <div className="mb-4 flex items-center gap-2">
-            <Users className="h-5 w-5 text-cyan-400" />
-            <h2 className="font-medium text-zinc-200">
-              Kullanıcılar ({regularUsers.length})
-            </h2>
-          </div>
-          <ul className="space-y-2">
-            {regularUsers.length === 0 && (
-              <li className="text-sm text-zinc-600">Henüz kullanıcı yok</li>
-            )}
-            {regularUsers.map((u) => (
-              <li
-                key={u.id}
-                className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-3"
-              >
-                <div>
-                  <p className="text-sm font-medium text-zinc-200">{u.name}</p>
-                  <p className="text-xs text-zinc-500">{u.email}</p>
-                </div>
-                <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-400">
-                  Aktif
-                </span>
-              </li>
-            ))}
-          </ul>
+        <div className="mb-6 flex gap-1 rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+          <TabButton
+            active={tab === "users"}
+            onClick={() => setTab("users")}
+            icon={Users}
+            label="Kullanıcılar"
+          />
+          <TabButton
+            active={tab === "regions"}
+            onClick={() => setTab("regions")}
+            icon={MapPin}
+            label="Bölgeler"
+          />
         </div>
+
+        {tab === "users" && <AdminUsersPanel />}
+        {tab === "regions" && <AdminRegionsPanel />}
       </div>
-    </div>
+    </AdminGuard>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+        active
+          ? "bg-cyan-500/20 text-cyan-300"
+          : "text-zinc-500 hover:text-zinc-300"
+      }`}
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </button>
   );
 }

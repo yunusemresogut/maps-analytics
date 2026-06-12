@@ -8,37 +8,51 @@ import {
   useState,
 } from "react";
 import { useAuth } from "@/contexts/auth-context";
-import type { StoreFile, StoreNote, StoreUserData } from "@/types";
+import { isAllowedFileType } from "@/lib/file-types";
+import type { ParsedMaterialRow } from "@/lib/excel-materials";
+import { getStoreDataKey } from "@/lib/storage-keys";
+import type { StoreFile, StoreMaterial, StoreNote, StoreUserData } from "@/types";
 
 type StoreDataContextValue = {
   getStoreData: (storeId: string) => StoreUserData;
   addNote: (storeId: string, content: string) => void;
   deleteNote: (storeId: string, noteId: string) => void;
   updateSpecialNote: (storeId: string, note: string) => void;
-  addFile: (storeId: string, file: File) => Promise<void>;
+  addFile: (storeId: string, file: File) => Promise<{ success: boolean; error?: string }>;
   deleteFile: (storeId: string, fileId: string) => void;
+  importMaterials: (
+    storeId: string,
+    rows: ParsedMaterialRow[],
+    mode?: "append" | "replace"
+  ) => number;
+  deleteMaterial: (storeId: string, materialId: string) => void;
+  clearMaterials: (storeId: string) => void;
 };
 
 const StoreDataContext = createContext<StoreDataContextValue | null>(null);
 
-const DATA_KEY = "lcw-map-store-data";
-
-function storageKey(userId: string) {
-  return `${DATA_KEY}:${userId}`;
-}
-
 function loadAll(userId: string): Record<string, StoreUserData> {
   if (typeof window === "undefined") return {};
-  const raw = localStorage.getItem(storageKey(userId));
+  const raw = localStorage.getItem(getStoreDataKey(userId));
   if (!raw) return {};
 
-  const parsed = JSON.parse(raw) as Record<string, StoreUserData & { customFields?: Record<string, string> }>;
+  const parsed = JSON.parse(raw) as Record<
+    string,
+    StoreUserData & { customFields?: Record<string, string> }
+  >;
   const migrated: Record<string, StoreUserData> = {};
 
   for (const [id, entry] of Object.entries(parsed)) {
     migrated[id] = {
-      notes: entry.notes ?? [],
-      files: entry.files ?? [],
+      notes: (entry.notes ?? []).map((n) => ({
+        ...n,
+        userName: n.userName ?? "Bilinmeyen",
+      })),
+      files: (entry.files ?? []).map((f) => ({
+        ...f,
+        userName: f.userName ?? "Bilinmeyen",
+      })),
+      materials: entry.materials ?? [],
       specialNote: entry.specialNote ?? entry.customFields?.responsible ?? "",
     };
   }
@@ -47,12 +61,13 @@ function loadAll(userId: string): Record<string, StoreUserData> {
 }
 
 function saveAll(userId: string, data: Record<string, StoreUserData>) {
-  localStorage.setItem(storageKey(userId), JSON.stringify(data));
+  localStorage.setItem(getStoreDataKey(userId), JSON.stringify(data));
 }
 
 const emptyData = (): StoreUserData => ({
   notes: [],
   files: [],
+  materials: [],
   specialNote: "",
 });
 
@@ -89,12 +104,16 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         id: `note-${Date.now()}`,
         storeId,
         userId: user.id,
+        userName: user.name,
         content,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       const current = data[storeId] ?? emptyData();
-      persist({ ...data, [storeId]: { ...current, notes: [...current.notes, note] } });
+      persist({
+        ...data,
+        [storeId]: { ...current, notes: [...current.notes, note] },
+      });
     },
     [user, data, persist]
   );
@@ -126,7 +145,14 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
 
   const addFile = useCallback(
     async (storeId: string, file: File) => {
-      if (!user) return;
+      if (!user) return { success: false, error: "Giriş gerekli" };
+      if (!isAllowedFileType(file.name)) {
+        return {
+          success: false,
+          error: "Desteklenmeyen dosya türü",
+        };
+      }
+
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
@@ -138,6 +164,7 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         id: `file-${Date.now()}`,
         storeId,
         userId: user.id,
+        userName: user.name,
         name: file.name,
         size: file.size,
         type: file.type,
@@ -150,6 +177,7 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         ...data,
         [storeId]: { ...current, files: [...current.files, storeFile] },
       });
+      return { success: true };
     },
     [user, data, persist]
   );
@@ -168,6 +196,65 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
     [data, persist]
   );
 
+  const importMaterials = useCallback(
+    (
+      storeId: string,
+      rows: ParsedMaterialRow[],
+      mode: "append" | "replace" = "replace"
+    ) => {
+      if (!user) return 0;
+      const now = new Date().toISOString();
+      const imported: StoreMaterial[] = rows.map((row, i) => ({
+        id: `material-${Date.now()}-${i}`,
+        storeId,
+        userId: user.id,
+        name: row.name,
+        quantity: row.quantity,
+        unitPrice: row.unitPrice,
+        importedAt: now,
+      }));
+
+      const current = data[storeId] ?? emptyData();
+      const materials =
+        mode === "append"
+          ? [...current.materials, ...imported]
+          : imported;
+
+      persist({
+        ...data,
+        [storeId]: { ...current, materials },
+      });
+
+      return imported.length;
+    },
+    [user, data, persist]
+  );
+
+  const deleteMaterial = useCallback(
+    (storeId: string, materialId: string) => {
+      const current = data[storeId] ?? emptyData();
+      persist({
+        ...data,
+        [storeId]: {
+          ...current,
+          materials: current.materials.filter((m) => m.id !== materialId),
+        },
+      });
+    },
+    [data, persist]
+  );
+
+  const clearMaterials = useCallback(
+    (storeId: string) => {
+      const current = data[storeId] ?? emptyData();
+      persist({
+        ...data,
+        [storeId]: { ...current, materials: [] },
+      });
+    },
+    [data, persist]
+  );
+
   return (
     <StoreDataContext.Provider
       value={{
@@ -177,6 +264,9 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         updateSpecialNote,
         addFile,
         deleteFile,
+        importMaterials,
+        deleteMaterial,
+        clearMaterials,
       }}
     >
       {children}
@@ -186,6 +276,7 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
 
 export function useStoreData() {
   const ctx = useContext(StoreDataContext);
-  if (!ctx) throw new Error("useStoreData must be used within StoreDataProvider");
+  if (!ctx)
+    throw new Error("useStoreData must be used within StoreDataProvider");
   return ctx;
 }

@@ -4,25 +4,40 @@ export const projectStatusConfig: Record<
   ProjectStatus,
   { label: string; color: string; marker: string }
 > = {
-  tamamlandi: {
-    label: "Tamamlandı",
-    color: "text-emerald-400",
-    marker: "#34d399",
+  proje: {
+    label: "Proje",
+    color: "text-cyan-400",
+    marker: "#22d3ee",
+  },
+  ihale: {
+    label: "İhale",
+    color: "text-violet-400",
+    marker: "#a78bfa",
   },
   santiye: {
     label: "Şantiye",
     color: "text-amber-400",
     marker: "#fbbf24",
   },
-  proje: {
-    label: "Proje",
-    color: "text-cyan-400",
-    marker: "#22d3ee",
+  acilis: {
+    label: "Açılış",
+    color: "text-emerald-400",
+    marker: "#34d399",
   },
-  beklemede: {
-    label: "Beklemede",
-    color: "text-zinc-400",
-    marker: "#a1a1aa",
+  hakedis: {
+    label: "Hakediş",
+    color: "text-orange-400",
+    marker: "#fb923c",
+  },
+  fatura: {
+    label: "Fatura",
+    color: "text-pink-400",
+    marker: "#f472b6",
+  },
+  yakinda_aciliyor: {
+    label: "Yakında Açılıyor",
+    color: "text-red-400",
+    marker: "#f87171",
   },
 };
 
@@ -32,3 +47,27 @@ export const projectStatusOptions = (
   value,
   label: projectStatusConfig[value].label,
 }));
+
+/** İhale ve Proje durumlarında Excel import desteklenir */
+export const EXCEL_IMPORT_STATUSES: ProjectStatus[] = ["proje", "ihale"];
+
+export function supportsExcelImport(status: ProjectStatus): boolean {
+  return EXCEL_IMPORT_STATUSES.includes(status);
+}
+
+export function supportsOrderReminder(status: ProjectStatus): boolean {
+  return status === "ihale";
+}
+
+/** Eski durum değerlerini yeniye map et */
+const LEGACY_STATUS_MAP: Record<string, ProjectStatus> = {
+  tamamlandi: "acilis",
+  beklemede: "proje",
+  santiye: "santiye",
+  proje: "proje",
+};
+
+export function migrateProjectStatus(status: string): ProjectStatus {
+  if (status in projectStatusConfig) return status as ProjectStatus;
+  return LEGACY_STATUS_MAP[status] ?? "proje";
+}
