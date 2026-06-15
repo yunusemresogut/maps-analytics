@@ -6,6 +6,7 @@ export const ALLOWED_FILE_EXTENSIONS = [
   ".csv",
   ".doc",
   ".docx",
+  ".msg",
   ".png",
   ".jpg",
   ".jpeg",
@@ -15,7 +16,7 @@ export const ALLOWED_FILE_EXTENSIONS = [
 export const ALLOWED_FILE_ACCEPT = ALLOWED_FILE_EXTENSIONS.join(",");
 
 export const ALLOWED_FILE_LABELS =
-  "PDF, DWG, XLSX, CSV, DOC, DOCX, PNG, JPG, MP4";
+  "PDF, DWG, XLSX, CSV, DOC, DOCX, MSG, PNG, JPG, MP4";
 
 export function isAllowedFileType(fileName: string): boolean {
   const lower = fileName.toLowerCase();

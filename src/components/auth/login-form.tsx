@@ -21,7 +21,7 @@ export function LoginForm({ mode }: LoginFormProps) {
   useEffect(() => {
     if (isLoading || !user) return;
     if (mode === "admin" && user.role === "admin") {
-      router.replace("/admin");
+      router.replace("/admin/dashboard");
     } else if (mode === "user" && user.role === "user") {
       router.replace("/map");
     }
@@ -34,13 +34,11 @@ export function LoginForm({ mode }: LoginFormProps) {
     const expectedRole = mode === "admin" ? "admin" : "user";
     const success = login(email, password, expectedRole);
 
-    if (success) {
-      router.push(mode === "admin" ? "/admin" : "/map");
-    } else {
+    if (!success) {
       setError(
         mode === "admin"
           ? "Admin girişi başarısız. Sadece admin hesapları girebilir."
-          : "E-posta veya şifre hatalı"
+          : "E-posta veya şifre hatalı, ya da hesabınız kısıtlanmış olabilir"
       );
     }
   };

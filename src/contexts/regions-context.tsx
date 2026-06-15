@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { defaultRegions } from "@/data/regions";
+import { appendActivityLog } from "@/lib/activity-log";
 import { STORAGE_KEYS } from "@/lib/storage-keys";
 import type { Region } from "@/types";
 
@@ -75,6 +76,13 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
     (data: Omit<Region, "id">) => {
       const region: Region = { ...data, id: `region-${Date.now()}` };
       persist([...regions, region]);
+      appendActivityLog({
+        category: "region",
+        action: "create",
+        message: `Bölge oluşturuldu: ${region.name}`,
+        targetId: region.id,
+        targetLabel: region.name,
+      });
       return region;
     },
     [regions, persist]
@@ -89,18 +97,29 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
 
   const deleteRegion = useCallback(
     (id: string) => {
+      const target = regions.find((r) => r.id === id);
       persist(regions.filter((r) => r.id !== id));
       setVisibleRegions((prev) => {
         const next = { ...prev };
         delete next[id];
         return next;
       });
+      if (target) {
+        appendActivityLog({
+          category: "region",
+          action: "delete",
+          message: `Bölge silindi: ${target.name}`,
+          targetId: id,
+          targetLabel: target.name,
+        });
+      }
     },
     [regions, persist]
   );
 
   const addCityToRegion = useCallback(
     (regionId: string, city: string) => {
+      const region = regions.find((r) => r.id === regionId);
       persist(
         regions.map((r) =>
           r.id === regionId && !r.cities.includes(city)
@@ -108,12 +127,22 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
             : r
         )
       );
+      if (region) {
+        appendActivityLog({
+          category: "region",
+          action: "add_city",
+          message: `${city} şehri ${region.name} bölgesine eklendi`,
+          targetId: regionId,
+          targetLabel: region.name,
+        });
+      }
     },
     [regions, persist]
   );
 
   const removeCityFromRegion = useCallback(
     (regionId: string, city: string) => {
+      const region = regions.find((r) => r.id === regionId);
       persist(
         regions.map((r) =>
           r.id === regionId
@@ -121,6 +150,15 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
             : r
         )
       );
+      if (region) {
+        appendActivityLog({
+          category: "region",
+          action: "remove_city",
+          message: `${city} şehri ${region.name} bölgesinden kaldırıldı`,
+          targetId: regionId,
+          targetLabel: region.name,
+        });
+      }
     },
     [regions, persist]
   );

@@ -1,26 +1,24 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
-import { Bell, Layers } from "lucide-react";
-import { useStores } from "@/contexts/stores-context";
+import { useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { Bell, Layers, Store } from "lucide-react";
+import { useNotifications } from "@/contexts/notifications-context";
 import { useRegions } from "@/contexts/regions-context";
-import { computeStoreNotifications } from "@/lib/notifications";
+import { useMapUi } from "@/contexts/map-ui-context";
 import { Button } from "@/components/ui/button";
 import { NotificationsPanel } from "@/components/layout/notifications-panel";
+import type { AppNotification } from "@/types";
 
 export function MapHeaderActions() {
   const pathname = usePathname();
-  const { stores } = useStores();
+  const router = useRouter();
   const { isPanelOpen, setPanelOpen } = useRegions();
+  const { isStoreListOpen, setStoreListOpen } = useMapUi();
+  const { notifications, dismiss } = useNotifications();
   const [notifOpen, setNotifOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const bellRef = useRef<HTMLDivElement>(null);
-
-  const notifications = useMemo(
-    () => computeStoreNotifications(stores),
-    [stores]
-  );
 
   if (pathname !== "/map") return null;
 
@@ -36,15 +34,41 @@ export function MapHeaderActions() {
     setNotifOpen(true);
   };
 
+  const closeNotifications = () => {
+    setNotifOpen(false);
+    setAnchorRect(null);
+  };
+
+  const handleSelectNotification = (notif: AppNotification) => {
+    dismiss(notif.id);
+    closeNotifications();
+    router.push(`/map?store=${notif.storeId}`);
+  };
+
   return (
     <>
       <Button
         variant={isPanelOpen ? "default" : "ghost"}
         size="sm"
-        onClick={() => setPanelOpen(!isPanelOpen)}
+        onClick={() => {
+          setStoreListOpen(false);
+          setPanelOpen(!isPanelOpen);
+        }}
       >
         <Layers className="h-3.5 w-3.5" />
-        Bölgeler
+        <span className="hidden sm:inline">Bölgeler</span>
+      </Button>
+
+      <Button
+        variant={isStoreListOpen ? "default" : "ghost"}
+        size="sm"
+        onClick={() => {
+          setPanelOpen(false);
+          setStoreListOpen(!isStoreListOpen);
+        }}
+      >
+        <Store className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Mağazalar</span>
       </Button>
 
       <div ref={bellRef} className="relative">
@@ -67,10 +91,9 @@ export function MapHeaderActions() {
         <NotificationsPanel
           notifications={notifications}
           anchorRect={anchorRect}
-          onClose={() => {
-            setNotifOpen(false);
-            setAnchorRect(null);
-          }}
+          onClose={closeNotifications}
+          onDismiss={dismiss}
+          onSelect={handleSelectNotification}
         />
       )}
     </>

@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { demoStores } from "@/data/stores";
+import { appendActivityLog } from "@/lib/activity-log";
 import { migrateStore } from "@/lib/migrations";
 import { STORAGE_KEYS } from "@/lib/storage-keys";
 import type { Store, StoreInput } from "@/types";
@@ -68,6 +69,15 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
       };
       const next = [...stores, store];
       persist(next);
+      appendActivityLog({
+        category: "store",
+        action: "create",
+        message: `Yeni konum eklendi: ${store.name}`,
+        actorId: meta.userId,
+        actorName: meta.userName,
+        targetId: store.id,
+        targetLabel: store.name,
+      });
       return store;
     },
     [stores, persist]
@@ -80,6 +90,7 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
       meta?: { userId: string; userName: string }
     ) => {
       const now = new Date().toISOString();
+      const target = stores.find((s) => s.id === id);
       const next = stores.map((s) => {
         if (s.id !== id) return s;
         return {
@@ -95,13 +106,34 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
         };
       });
       persist(next);
+      if (target) {
+        appendActivityLog({
+          category: "store",
+          action: "update",
+          message: `Konum güncellendi: ${target.name}`,
+          actorId: meta?.userId,
+          actorName: meta?.userName,
+          targetId: id,
+          targetLabel: target.name,
+        });
+      }
     },
     [stores, persist]
   );
 
   const deleteStore = useCallback(
     (id: string) => {
+      const target = stores.find((s) => s.id === id);
       persist(stores.filter((s) => s.id !== id));
+      if (target) {
+        appendActivityLog({
+          category: "store",
+          action: "delete",
+          message: `Konum silindi: ${target.name}`,
+          targetId: id,
+          targetLabel: target.name,
+        });
+      }
     },
     [stores, persist]
   );

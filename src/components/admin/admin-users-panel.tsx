@@ -1,12 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { UserPlus } from "lucide-react";
+import {
+  Ban,
+  Pencil,
+  Shield,
+  Trash2,
+  UserPlus,
+  UserCheck,
+} from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { DEFAULT_USER_PERMISSIONS } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { PermissionAction, User, UserPermissions } from "@/types";
+import type { PermissionAction, User } from "@/types";
 
 const PERMISSION_LABELS: Record<PermissionAction, string> = {
   view: "Görüntüleme",
@@ -16,15 +23,16 @@ const PERMISSION_LABELS: Record<PermissionAction, string> = {
 };
 
 export function AdminUsersPanel() {
-  const { users, addUser, updateUserPermissions } = useAuth();
+  const { users, addUser, updateUser, deleteUser, setUserRestricted } =
+    useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editPerms, setEditPerms] = useState<UserPermissions>(
-    DEFAULT_USER_PERMISSIONS
-  );
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPassword, setEditPassword] = useState("");
 
   const regularUsers = users.filter((u) => u.role === "user");
 
@@ -42,21 +50,48 @@ export function AdminUsersPanel() {
     }
   };
 
-  const startEditPermissions = (user: User) => {
-    setEditingId(user.id);
-    setEditPerms({ ...user.permissions });
+  const startEdit = (u: User) => {
+    setEditingUser(u);
+    setEditName(u.name);
+    setEditEmail(u.email);
+    setEditPassword("");
+    setMessage("");
   };
 
-  const savePermissions = () => {
-    if (!editingId) return;
-    updateUserPermissions(editingId, editPerms);
-    setEditingId(null);
-    setMessage("Yetkiler güncellendi");
+  const saveEdit = () => {
+    if (!editingUser) return;
+    const success = updateUser(editingUser.id, {
+      name: editName.trim(),
+      email: editEmail.trim(),
+      ...(editPassword ? { password: editPassword } : {}),
+    });
+    if (success) {
+      setMessage("Kullanıcı güncellendi");
+      setEditingUser(null);
+    } else {
+      setMessage("Güncelleme başarısız — e-posta kullanımda olabilir");
+    }
+  };
+
+  const handleDelete = (u: User) => {
+    if (!confirm(`"${u.name}" kullanıcısı silinsin mi?`)) return;
+    if (deleteUser(u.id)) {
+      setMessage("Kullanıcı silindi");
+      if (editingUser?.id === u.id) setEditingUser(null);
+    }
+  };
+
+  const handleRestrict = (u: User) => {
+    const next = !u.restricted;
+    const label = next ? "kısıtlansın" : "kısıtlaması kaldırılsın";
+    if (!confirm(`"${u.name}" ${label} mı?`)) return;
+    setUserRestricted(u.id, next);
+    setMessage(next ? "Kullanıcı kısıtlandı" : "Kısıtlama kaldırıldı");
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
+    <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
         <div className="mb-4 flex items-center gap-2">
           <UserPlus className="h-5 w-5 text-cyan-400" />
           <h2 className="font-medium text-zinc-200">Yeni Kullanıcı</h2>
@@ -82,10 +117,14 @@ export function AdminUsersPanel() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-          {message && (
+          {message && !editingUser && (
             <p
               className={`text-sm ${
-                message.includes("başarı") || message.includes("güncellendi")
+                message.includes("başarı") ||
+                message.includes("güncellendi") ||
+                message.includes("silindi") ||
+                message.includes("kısıt") ||
+                message.includes("kaldırıldı")
                   ? "text-emerald-400"
                   : "text-red-400"
               }`}
@@ -99,86 +138,131 @@ export function AdminUsersPanel() {
         </form>
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
-        <h2 className="mb-4 font-medium text-zinc-200">
-          Kullanıcılar ({regularUsers.length})
-        </h2>
-        <ul className="space-y-3">
-          {regularUsers.length === 0 && (
-            <li className="text-sm text-zinc-600">Henüz kullanıcı yok</li>
-          )}
-          {regularUsers.map((u) => (
-            <li
-              key={u.id}
-              className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-zinc-200">{u.name}</p>
-                  <p className="text-xs text-zinc-500">{u.email}</p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => startEditPermissions(u)}
-                >
-                  Yetkiler
-                </Button>
-              </div>
+      <div className="space-y-4">
+        {editingUser && (
+          <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-5">
+            <h3 className="mb-3 text-sm font-medium text-cyan-300">
+              Kullanıcı Düzenle
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input
+                placeholder="Ad Soyad"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+              <Input
+                type="email"
+                placeholder="E-posta"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+              />
+              <Input
+                type="password"
+                placeholder="Yeni şifre (boş bırakılabilir)"
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+                className="sm:col-span-2"
+              />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" onClick={saveEdit}>
+                Kaydet
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setEditingUser(null)}
+              >
+                İptal
+              </Button>
+            </div>
+          </div>
+        )}
 
-              {editingId === u.id ? (
-                <div className="mt-3 space-y-2 border-t border-zinc-800 pt-3">
-                  {(Object.keys(PERMISSION_LABELS) as PermissionAction[]).map(
-                    (action) => (
-                      <label
-                        key={action}
-                        className="flex items-center gap-2 text-sm text-zinc-400"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={editPerms[action]}
-                          onChange={(e) =>
-                            setEditPerms((prev) => ({
-                              ...prev,
-                              [action]: e.target.checked,
-                            }))
-                          }
-                          className="rounded border-zinc-600 bg-zinc-900"
-                        />
-                        {PERMISSION_LABELS[action]}
-                      </label>
-                    )
-                  )}
-                  <div className="flex gap-2 pt-2">
-                    <Button size="sm" onClick={savePermissions}>
-                      Kaydet
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+          <h2 className="mb-4 font-medium text-zinc-200">
+            Kullanıcılar ({regularUsers.length})
+          </h2>
+          <ul className="space-y-3">
+            {regularUsers.length === 0 && (
+              <li className="text-sm text-zinc-600">Henüz kullanıcı yok</li>
+            )}
+            {regularUsers.map((u) => (
+              <li
+                key={u.id}
+                className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium text-zinc-200">
+                        {u.name}
+                      </p>
+                      {u.restricted && (
+                        <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-400">
+                          Kısıtlı
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate text-xs text-zinc-500">{u.email}</p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {(Object.keys(PERMISSION_LABELS) as PermissionAction[])
+                        .filter((a) => u.permissions[a])
+                        .map((a) => (
+                          <span
+                            key={a}
+                            className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-400"
+                          >
+                            {PERMISSION_LABELS[a]}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => startEdit(u)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Düzenle
+                    </Button>
+                    <Link href={`/admin/permissions?user=${u.id}`}>
+                      <Button size="sm" variant="outline">
+                        <Shield className="h-3.5 w-3.5" />
+                        Yetkiler
+                      </Button>
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRestrict(u)}
+                    >
+                      {u.restricted ? (
+                        <>
+                          <UserCheck className="h-3.5 w-3.5" />
+                          Aç
+                        </>
+                      ) : (
+                        <>
+                          <Ban className="h-3.5 w-3.5" />
+                          Kısıtla
+                        </>
+                      )}
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setEditingId(null)}
+                      onClick={() => handleDelete(u)}
                     >
-                      İptal
+                      <Trash2 className="h-3.5 w-3.5 text-red-400/80" />
                     </Button>
                   </div>
                 </div>
-              ) : (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {(Object.keys(PERMISSION_LABELS) as PermissionAction[])
-                    .filter((a) => u.permissions[a])
-                    .map((a) => (
-                      <span
-                        key={a}
-                        className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-400"
-                      >
-                        {PERMISSION_LABELS[a]}
-                      </span>
-                    ))}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );

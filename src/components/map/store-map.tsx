@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Map, { NavigationControl } from "react-map-gl/maplibre";
-import type { MapMouseEvent } from "react-map-gl/maplibre";
+import type { MapMouseEvent, MapRef } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Plus, X } from "lucide-react";
 import { findRegionForCity } from "@/data/regions";
@@ -13,6 +14,7 @@ import { StoreMarker } from "@/components/map/store-marker";
 import { StoreDetailPanel } from "@/components/map/store-detail-panel";
 import { AddStorePanel } from "@/components/map/add-store-panel";
 import { RegionFilterPanel } from "@/components/map/region-filter-panel";
+import { StoreListPanel } from "@/components/map/store-list-panel";
 import { getOpeningAlert } from "@/lib/opening-dates";
 import { projectStatusConfig } from "@/lib/project-status";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,8 @@ const DARK_MAP_STYLE =
 const TURKEY_CENTER = { longitude: 35.2433, latitude: 38.9637, zoom: 5.5 };
 
 export function StoreMap() {
+  const searchParams = useSearchParams();
+  const mapRef = useRef<MapRef>(null);
   const { canAdd } = usePermissions();
   const { stores, getStore } = useStores();
   const { regions, isRegionVisible } = useRegions();
@@ -57,6 +61,31 @@ export function StoreMap() {
     (s) => getOpeningAlert(s.openingDate).isOpeningSoon
   ).length;
 
+  const focusStore = useCallback(
+    (storeId: string) => {
+      const store = getStore(storeId);
+      if (!store) return;
+
+      setAddMode(false);
+      setPendingCoords(null);
+      setSelectedStoreId(storeId);
+
+      mapRef.current?.flyTo({
+        center: [store.longitude, store.latitude],
+        zoom: 12,
+        duration: 1200,
+      });
+    },
+    [getStore]
+  );
+
+  useEffect(() => {
+    const storeId = searchParams.get("store");
+    if (storeId && getStore(storeId)) {
+      focusStore(storeId);
+    }
+  }, [searchParams, getStore, focusStore]);
+
   const handleMapClick = useCallback(
     (e: MapMouseEvent) => {
       if (addMode && canAdd) {
@@ -83,6 +112,7 @@ export function StoreMap() {
       className={`relative h-full w-full ${addMode ? "cursor-crosshair" : ""}`}
     >
       <Map
+        ref={mapRef}
         initialViewState={TURKEY_CENTER}
         mapStyle={DARK_MAP_STYLE}
         onClick={handleMapClick}
@@ -109,7 +139,7 @@ export function StoreMap() {
         <div className="pointer-events-none absolute inset-0 z-[5] border-2 border-dashed border-cyan-500/40 bg-cyan-500/5" />
       )}
 
-      <div className="pointer-events-none absolute left-4 top-4 z-10 flex w-[220px] flex-col gap-2">
+      <div className="pointer-events-none absolute left-2 top-2 z-10 flex w-[min(220px,calc(100vw-1rem))] flex-col gap-2 sm:left-4 sm:top-4">
         <div className="pointer-events-auto rounded-xl border border-zinc-700/60 bg-zinc-950/80 p-4 backdrop-blur-md">
           <h2 className="text-sm font-semibold text-zinc-100">
             Mağaza Haritası
@@ -196,6 +226,12 @@ export function StoreMap() {
       )}
 
       <RegionFilterPanel />
+
+      <StoreListPanel
+        stores={visibleStores}
+        selectedStoreId={selectedStoreId}
+        onSelect={focusStore}
+      />
     </div>
   );
 }

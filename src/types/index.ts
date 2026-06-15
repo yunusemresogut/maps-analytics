@@ -75,6 +75,7 @@ export type User = {
   name: string;
   role: UserRole;
   permissions: UserPermissions;
+  restricted?: boolean;
 };
 
 export type StoreMaterial = {
@@ -83,7 +84,20 @@ export type StoreMaterial = {
   userId: string;
   name: string;
   quantity: number;
+  unit: string;
   unitPrice: number;
+  importedAt: string;
+};
+
+export type StoreWorkPlanItem = {
+  id: string;
+  storeId: string;
+  userId: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  responsible: string;
+  status: string;
   importedAt: string;
 };
 
@@ -91,6 +105,7 @@ export type StoreUserData = {
   notes: StoreNote[];
   files: StoreFile[];
   materials: StoreMaterial[];
+  workPlan: StoreWorkPlanItem[];
   specialNote: string;
 };
 
@@ -116,6 +131,26 @@ export type AppNotification = {
   read: boolean;
 };
 
+export type ActivityCategory =
+  | "auth"
+  | "user"
+  | "permission"
+  | "region"
+  | "store"
+  | "system";
+
+export type ActivityLogEntry = {
+  id: string;
+  category: ActivityCategory;
+  action: string;
+  message: string;
+  actorId: string;
+  actorName: string;
+  targetId?: string;
+  targetLabel?: string;
+  createdAt: string;
+};
+
 /** Supabase tablo isimleri — ileride migration için referans */
 export const DB_TABLES = {
   stores: "stores",
@@ -124,5 +159,6 @@ export const DB_TABLES = {
   notes: "store_notes",
   files: "store_files",
   materials: "store_materials",
+  workPlan: "store_work_plan",
   notifications: "notifications",
 } as const;

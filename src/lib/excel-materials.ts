@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 export type ParsedMaterialRow = {
   name: string;
   quantity: number;
+  unit: string;
   unitPrice: number;
 };
 
@@ -12,6 +13,7 @@ export type ExcelParseResult = {
   matchedColumns: {
     description?: string;
     quantity?: string;
+    unit?: string;
     unitPrice?: string;
   };
 };
@@ -69,6 +71,10 @@ export async function parseMaterialsFromExcel(
 
   const descriptionCol = findColumn(headers, (h) => h.includes("aciklama"));
   const quantityCol = findColumn(headers, (h) => h.includes("miktar"));
+  const unitCol = findColumn(
+    headers,
+    (h) => h.includes("birim") && !h.includes("fiyat")
+  );
   const unitPriceCol = findColumn(
     headers,
     (h) => h.includes("birim") && h.includes("fiyat")
@@ -77,6 +83,7 @@ export async function parseMaterialsFromExcel(
   const matchedColumns = {
     description: descriptionCol,
     quantity: quantityCol,
+    unit: unitCol,
     unitPrice: unitPriceCol,
   };
 
@@ -95,9 +102,12 @@ export async function parseMaterialsFromExcel(
     if (!name) continue;
 
     const quantity = parseNumber(row[quantityCol]);
+    const unit = unitCol
+      ? String(row[unitCol] ?? "").trim()
+      : "";
     const unitPrice = parseNumber(row[unitPriceCol]);
 
-    materials.push({ name, quantity, unitPrice });
+    materials.push({ name, quantity, unit, unitPrice });
   }
 
   if (materials.length === 0) {

@@ -124,7 +124,8 @@ export function AdminRegionsPanel() {
               </Button>
             </div>
 
-            <ul className="flex flex-wrap gap-1.5">
+            <div className="scrollbar-themed max-h-36 overflow-y-auto">
+              <ul className="flex flex-wrap gap-1.5">
               {region.cities.length === 0 && (
                 <li className="text-xs text-zinc-600">Henüz şehir yok</li>
               )}
@@ -143,7 +144,8 @@ export function AdminRegionsPanel() {
                   </button>
                 </li>
               ))}
-            </ul>
+              </ul>
+            </div>
           </div>
         ))}
       </div>

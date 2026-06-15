@@ -1,23 +1,25 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FileSpreadsheet, Upload } from "lucide-react";
+import { CalendarRange, Upload } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import {
-  parseMaterialsFromExcel,
-  type ParsedMaterialRow,
-} from "@/lib/excel-materials";
+  parseWorkPlanFromExcel,
+  type ParsedWorkPlanRow,
+} from "@/lib/excel-work-plan";
 import { Button } from "@/components/ui/button";
 
-type ExcelImportPanelProps = {
-  onImport: (materials: ParsedMaterialRow[]) => void;
+type ExcelWorkPlanImportPanelProps = {
+  onImport: (items: ParsedWorkPlanRow[]) => void;
 };
 
-export function ExcelImportPanel({ onImport }: ExcelImportPanelProps) {
+export function ExcelWorkPlanImportPanel({
+  onImport,
+}: ExcelWorkPlanImportPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [preview, setPreview] = useState<ParsedMaterialRow[]>([]);
+  const [preview, setPreview] = useState<ParsedWorkPlanRow[]>([]);
   const [matchedInfo, setMatchedInfo] = useState("");
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,9 +31,9 @@ export function ExcelImportPanel({ onImport }: ExcelImportPanelProps) {
     setMatchedInfo("");
 
     try {
-      const result = await parseMaterialsFromExcel(file);
+      const result = await parseWorkPlanFromExcel(file);
 
-      if (result.errors.length > 0 && result.materials.length === 0) {
+      if (result.errors.length > 0 && result.items.length === 0) {
         setError(result.errors.join(" · "));
         e.target.value = "";
         return;
@@ -40,19 +42,21 @@ export function ExcelImportPanel({ onImport }: ExcelImportPanelProps) {
       const cols = [
         result.matchedColumns.description &&
           `Açıklama → ${result.matchedColumns.description}`,
-        result.matchedColumns.quantity &&
-          `Miktar → ${result.matchedColumns.quantity}`,
-        result.matchedColumns.unit &&
-          `Birim → ${result.matchedColumns.unit}`,
-        result.matchedColumns.unitPrice &&
-          `Birim Fiyat → ${result.matchedColumns.unitPrice}`,
+        result.matchedColumns.startDate &&
+          `Başlangıç → ${result.matchedColumns.startDate}`,
+        result.matchedColumns.endDate &&
+          `Bitiş → ${result.matchedColumns.endDate}`,
+        result.matchedColumns.responsible &&
+          `Sorumlu → ${result.matchedColumns.responsible}`,
+        result.matchedColumns.status &&
+          `Durum → ${result.matchedColumns.status}`,
       ]
         .filter(Boolean)
         .join(" · ");
 
       setMatchedInfo(cols);
-      setPreview(result.materials);
-      setMessage(`${result.materials.length} malzeme okundu`);
+      setPreview(result.items);
+      setMessage(`${result.items.length} iş kalemi okundu`);
     } catch {
       setError("Excel dosyası okunamadı");
     }
@@ -61,12 +65,12 @@ export function ExcelImportPanel({ onImport }: ExcelImportPanelProps) {
   };
 
   return (
-    <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3">
+    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <FileSpreadsheet className="h-4 w-4 text-violet-400" />
-          <span className="text-xs font-medium text-violet-300">
-            Malzeme Excel Import
+          <CalendarRange className="h-4 w-4 text-emerald-400" />
+          <span className="text-xs font-medium text-emerald-300">
+            İş Planı Excel Import
           </span>
         </div>
         <Button
@@ -87,7 +91,7 @@ export function ExcelImportPanel({ onImport }: ExcelImportPanelProps) {
       </div>
 
       <p className="mt-2 text-xs text-zinc-500">
-        Sütun başlıkları: Açıklama, Miktar, Birim, Birim Fiyat
+        Sütunlar: Açıklama, Başlangıç, Bitiş, Sorumlu, Durum
       </p>
 
       {matchedInfo && (
@@ -101,29 +105,33 @@ export function ExcelImportPanel({ onImport }: ExcelImportPanelProps) {
       {preview.length > 0 && (
         <div className="mt-3">
           <div className="scrollbar-themed max-h-48 overflow-auto rounded border border-zinc-800 bg-zinc-950/50">
-            <table className="w-full min-w-[320px] text-xs">
+            <table className="w-full min-w-[360px] text-xs">
               <thead className="sticky top-0 bg-zinc-900/95 text-zinc-500">
                 <tr>
                   <th className="px-2 py-1.5 text-left font-medium">Açıklama</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Miktar</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Birim</th>
-                  <th className="px-2 py-1.5 text-right font-medium">B.Fiyat</th>
+                  <th className="px-2 py-1.5 text-left font-medium">Başlangıç</th>
+                  <th className="px-2 py-1.5 text-left font-medium">Bitiş</th>
+                  <th className="px-2 py-1.5 text-left font-medium">Sorumlu</th>
+                  <th className="px-2 py-1.5 text-left font-medium">Durum</th>
                 </tr>
               </thead>
               <tbody>
                 {preview.slice(0, 10).map((row, i) => (
                   <tr key={i} className="border-t border-zinc-800/60">
-                    <td className="max-w-[140px] px-2 py-1.5 text-zinc-300">
-                      <TruncateWithTooltip text={row.name} />
-                    </td>
-                    <td className="px-2 py-1.5 text-right text-zinc-400">
-                      {row.quantity}
+                    <td className="max-w-[120px] px-2 py-1.5 text-zinc-300">
+                      <TruncateWithTooltip text={row.description} />
                     </td>
                     <td className="max-w-[72px] px-2 py-1.5 text-zinc-400">
-                      <TruncateWithTooltip text={row.unit || "—"} />
+                      <TruncateWithTooltip text={row.startDate || "—"} />
                     </td>
-                    <td className="px-2 py-1.5 text-right text-zinc-400">
-                      {row.unitPrice.toLocaleString("tr-TR")}
+                    <td className="max-w-[72px] px-2 py-1.5 text-zinc-400">
+                      <TruncateWithTooltip text={row.endDate || "—"} />
+                    </td>
+                    <td className="max-w-[80px] px-2 py-1.5 text-zinc-400">
+                      <TruncateWithTooltip text={row.responsible || "—"} />
+                    </td>
+                    <td className="max-w-[72px] px-2 py-1.5 text-zinc-400">
+                      <TruncateWithTooltip text={row.status || "—"} />
                     </td>
                   </tr>
                 ))}
@@ -140,11 +148,11 @@ export function ExcelImportPanel({ onImport }: ExcelImportPanelProps) {
             className="mt-2 w-full"
             onClick={() => {
               onImport(preview);
-              setMessage(`${preview.length} malzeme eklendi`);
+              setMessage(`${preview.length} iş kalemi eklendi`);
               setPreview([]);
             }}
           >
-            Malzemeleri İçe Aktar
+            İş Planını İçe Aktar
           </Button>
         </div>
       )}

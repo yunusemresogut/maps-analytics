@@ -2,8 +2,8 @@ import type { AppNotification, Store } from "@/types";
 import { getOpeningAlert } from "@/lib/opening-dates";
 import { supportsOrderReminder } from "@/lib/project-status";
 
-/** Bildirim altyapısı — şimdilik pasif, sadece hesaplama yapar */
-export const NOTIFICATIONS_ENABLED = false;
+/** Bildirim altyapısı */
+export const NOTIFICATIONS_ENABLED = true;
 
 export function computeStoreNotifications(stores: Store[]): AppNotification[] {
   const notifications: AppNotification[] = [];

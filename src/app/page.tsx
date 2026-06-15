@@ -13,7 +13,7 @@ export default function RootPage() {
     if (!user) {
       router.replace("/login");
     } else if (user.role === "admin") {
-      router.replace("/admin");
+      router.replace("/admin/dashboard");
     } else {
       router.replace("/map");
     }

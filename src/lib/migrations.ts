@@ -43,6 +43,7 @@ export function migrateUser(raw: Record<string, unknown>): User & { password: st
       role === "admin"
         ? getAdminPermissions()
         : ((raw.permissions as User["permissions"]) ?? DEFAULT_USER_PERMISSIONS),
+    restricted: (raw.restricted as boolean) ?? false,
     password: raw.password as string,
   };
 }

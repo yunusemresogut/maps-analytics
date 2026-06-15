@@ -21,6 +21,12 @@ export const DEFAULT_USER_PERMISSIONS: UserPermissions = {
   delete: false,
 };
 
+export const PERMISSION_PRESETS = {
+  full: { label: "Tam Yetki", permissions: FULL_PERMISSIONS },
+  default: { label: "Varsayılan", permissions: DEFAULT_USER_PERMISSIONS },
+  viewOnly: { label: "Sadece Görüntüleme", permissions: VIEW_ONLY_PERMISSIONS },
+} as const;
+
 export function getAdminPermissions(): UserPermissions {
   return { ...FULL_PERMISSIONS };
 }

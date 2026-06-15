@@ -1,12 +1,12 @@
 "use client";
 
 import { AuthGuard } from "@/components/auth/auth-guard";
-import { DashboardPlaceholder } from "@/components/dashboard/dashboard-placeholder";
+import { UserDashboard } from "@/components/dashboard/user-dashboard";
 
 export default function DashboardPage() {
   return (
     <AuthGuard allowedRoles={["user", "admin"]}>
-      <DashboardPlaceholder />
+      <UserDashboard />
     </AuthGuard>
   );
 }

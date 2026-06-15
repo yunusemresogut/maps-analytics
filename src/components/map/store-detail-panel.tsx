@@ -5,6 +5,7 @@ import { format, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import {
   AlertTriangle,
+  CalendarRange,
   ChevronLeft,
   Download,
   FileText,
@@ -22,8 +23,11 @@ import { useStores } from "@/contexts/stores-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { AuditLogSection } from "@/components/map/audit-log-section";
 import { ExcelImportPanel } from "@/components/map/excel-import-panel";
+import { ExcelWorkPlanImportPanel } from "@/components/map/excel-work-plan-import-panel";
 import { MaterialsPanel } from "@/components/map/materials-panel";
+import { WorkPlanPanel } from "@/components/map/work-plan-panel";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
+import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
 import {
   StoreFormFields,
   formToStoreData,
@@ -69,10 +73,14 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
     importMaterials,
     deleteMaterial,
     clearMaterials,
+    importWorkPlan,
+    deleteWorkPlanItem,
+    clearWorkPlan,
   } = useStoreData();
 
   const [isEditing, setIsEditing] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
+  const [workPlanOpen, setWorkPlanOpen] = useState(false);
   const [form, setForm] = useState<StoreFormData>(storeToForm(store));
   const [noteText, setNoteText] = useState("");
   const [saved, setSaved] = useState(false);
@@ -84,6 +92,7 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
     setIsEditing(false);
     setSaved(false);
     setMaterialsOpen(false);
+    setWorkPlanOpen(false);
   }, [store]);
 
   const projectConfig = projectStatusConfig[store.projectStatus];
@@ -146,12 +155,34 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
     setMaterialsOpen(true);
   };
 
+  const handleWorkPlanImport = (rows: ParsedWorkPlanRow[]) => {
+    if (!isEditing || rows.length === 0) return;
+    importWorkPlan(store.id, rows, "replace");
+    setWorkPlanOpen(true);
+  };
+
   const showMaterialsTab =
     supportsExcelImport(store.projectStatus) ||
     userData.materials.length > 0;
 
+  const showWorkPlanTab =
+    supportsExcelImport(store.projectStatus) ||
+    userData.workPlan.length > 0;
+
+  const hasSideTab = showMaterialsTab || showWorkPlanTab;
+
+  const openMaterials = () => {
+    setWorkPlanOpen(false);
+    setMaterialsOpen(true);
+  };
+
+  const openWorkPlan = () => {
+    setMaterialsOpen(false);
+    setWorkPlanOpen(true);
+  };
+
   return (
-    <div className="absolute bottom-4 right-4 z-20 flex items-end animate-in">
+    <div className="absolute bottom-2 right-2 left-2 z-20 flex items-end animate-in sm:bottom-4 sm:left-auto sm:right-4">
       {materialsOpen ? (
         <MaterialsPanel
           materials={userData.materials}
@@ -160,28 +191,56 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
           onDelete={(id) => deleteMaterial(store.id, id)}
           onClear={() => clearMaterials(store.id)}
         />
+      ) : workPlanOpen ? (
+        <WorkPlanPanel
+          items={userData.workPlan}
+          isEditing={isEditing}
+          onClose={() => setWorkPlanOpen(false)}
+          onDelete={(id) => deleteWorkPlanItem(store.id, id)}
+          onClear={() => clearWorkPlan(store.id)}
+        />
       ) : (
-        showMaterialsTab && (
-          <button
-            type="button"
-            onClick={() => setMaterialsOpen(true)}
-            className="flex shrink-0 items-center gap-1.5 self-end rounded-l-lg border border-r-0 border-zinc-700/60 bg-zinc-950/95 px-2.5 py-2.5 text-xs font-medium text-zinc-300 shadow-[-8px_0_24px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-zinc-900 hover:text-cyan-300"
-          >
-            <ChevronLeft className="h-3 w-3" />
-            <Package className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Malzemeler</span>
-            {userData.materials.length > 0 && (
-              <span className="rounded-full bg-violet-500/20 px-1.5 text-[10px] text-violet-300">
-                {userData.materials.length}
-              </span>
+        hasSideTab && (
+          <div className="flex shrink-0 flex-col gap-1 self-end">
+            {showMaterialsTab && (
+              <button
+                type="button"
+                onClick={openMaterials}
+                className="flex items-center gap-1.5 rounded-l-lg border border-r-0 border-zinc-700/60 bg-zinc-950/95 px-2.5 py-2.5 text-xs font-medium text-zinc-300 shadow-[-8px_0_24px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-zinc-900 hover:text-cyan-300"
+              >
+                <ChevronLeft className="h-3 w-3" />
+                <Package className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Malzemeler</span>
+                {userData.materials.length > 0 && (
+                  <span className="rounded-full bg-violet-500/20 px-1.5 text-[10px] text-violet-300">
+                    {userData.materials.length}
+                  </span>
+                )}
+              </button>
             )}
-          </button>
+            {showWorkPlanTab && (
+              <button
+                type="button"
+                onClick={openWorkPlan}
+                className="flex items-center gap-1.5 rounded-l-lg border border-r-0 border-zinc-700/60 bg-zinc-950/95 px-2.5 py-2.5 text-xs font-medium text-zinc-300 shadow-[-8px_0_24px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-zinc-900 hover:text-emerald-300"
+              >
+                <ChevronLeft className="h-3 w-3" />
+                <CalendarRange className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">İş Planı</span>
+                {userData.workPlan.length > 0 && (
+                  <span className="rounded-full bg-emerald-500/20 px-1.5 text-[10px] text-emerald-300">
+                    {userData.workPlan.length}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
         )
       )}
 
       <div
-        className={`flex max-h-[calc(100vh-6rem)] w-full max-w-md shrink-0 flex-col overflow-hidden border border-zinc-700/60 bg-zinc-950/95 backdrop-blur-md shadow-[0_0_40px_rgba(0,0,0,0.5)] ${
-          showMaterialsTab ? "rounded-r-xl rounded-l-none border-l-0" : "rounded-xl"
+        className={`flex max-h-[calc(100vh-5rem)] w-full max-w-none shrink-0 flex-col overflow-hidden border border-zinc-700/60 bg-zinc-950/95 backdrop-blur-md shadow-[0_0_40px_rgba(0,0,0,0.5)] sm:max-h-[calc(100vh-6rem)] sm:max-w-md ${
+          hasSideTab ? "rounded-r-xl rounded-l-none border-l-0" : "rounded-xl"
         }`}
       >
         <div className="flex items-center justify-between border-b border-zinc-800 p-4">
@@ -259,7 +318,10 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
             <>
               <StoreFormFields form={form} onChange={setForm} />
               {supportsExcelImport(store.projectStatus) && (
-                <ExcelImportPanel onImport={handleMaterialImport} />
+                <>
+                  <ExcelImportPanel onImport={handleMaterialImport} />
+                  <ExcelWorkPlanImportPanel onImport={handleWorkPlanImport} />
+                </>
               )}
             </>
           ) : (
