@@ -43,10 +43,12 @@ export const projectStatusConfig: Record<
 
 export const projectStatusOptions = (
   Object.keys(projectStatusConfig) as ProjectStatus[]
-).map((value) => ({
-  value,
-  label: projectStatusConfig[value].label,
-}));
+)
+  .filter((value) => value !== "yakinda_aciliyor")
+  .map((value) => ({
+    value,
+    label: projectStatusConfig[value].label,
+  }));
 
 /** İhale ve Proje durumlarında Excel import desteklenir */
 export const EXCEL_IMPORT_STATUSES: ProjectStatus[] = ["proje", "ihale"];

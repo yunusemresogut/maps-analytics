@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LogOut, Map, Menu, X } from "lucide-react";
+import { BarChart3, LogOut, Map, Menu, Moon, Sun, X } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
+import { useTheme } from "@/contexts/theme-context";
 import { MapHeaderActions } from "@/components/layout/map-header-actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ const USER_LINKS = [
 
 export function Header() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -66,6 +68,20 @@ export function Header() {
                 </Link>
               )}
 
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                title={theme === "light" ? "Karanlık Mod" : "Aydınlık Mod"}
+                className="cursor-pointer mr-1"
+              >
+                {theme === "light" ? (
+                  <Moon className="h-4 w-4 text-violet-400" />
+                ) : (
+                  <Sun className="h-4 w-4 text-amber-400" />
+                )}
+              </Button>
+
               <span className="hidden px-2 text-sm text-zinc-500 xl:inline">
                 {user.name}
               </span>
@@ -96,7 +112,26 @@ export function Header() {
 
       {user && mobileOpen && (
         <div className="border-t border-zinc-800 bg-zinc-950 px-3 py-3 md:hidden">
-          <div className="mb-2 px-2 text-xs text-zinc-500">{user.name}</div>
+          <div className="mb-2 px-2 flex justify-between items-center text-xs text-zinc-500">
+            <span>{user.name}</span>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+            >
+              {theme === "light" ? (
+                <>
+                  <Moon className="h-3.5 w-3.5 text-violet-400" />
+                  Karanlık Mod
+                </>
+              ) : (
+                <>
+                  <Sun className="h-3.5 w-3.5 text-amber-400" />
+                  Aydınlık Mod
+                </>
+              )}
+            </button>
+          </div>
           {user.role === "user" && (
             <div className="space-y-1">
               {USER_LINKS.map(({ href, label, icon: Icon }) => (

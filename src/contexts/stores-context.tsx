@@ -4,13 +4,9 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
-  useState,
 } from "react";
-import { demoStores } from "@/data/stores";
+import { useDb } from "@/contexts/db-context";
 import { appendActivityLog } from "@/lib/activity-log";
-import { migrateStore } from "@/lib/migrations";
-import { STORAGE_KEYS } from "@/lib/storage-keys";
 import type { Store, StoreInput } from "@/types";
 
 type StoresContextValue = {
@@ -30,36 +26,21 @@ type StoresContextValue = {
 
 const StoresContext = createContext<StoresContextValue | null>(null);
 
-function loadStores(): Store[] {
-  if (typeof window === "undefined") return demoStores;
-  const stored = localStorage.getItem(STORAGE_KEYS.stores);
-  if (stored) {
-    return (JSON.parse(stored) as Record<string, unknown>[]).map(migrateStore);
-  }
-  localStorage.setItem(STORAGE_KEYS.stores, JSON.stringify(demoStores));
-  return demoStores;
-}
-
-function saveStores(stores: Store[]) {
-  localStorage.setItem(STORAGE_KEYS.stores, JSON.stringify(stores));
-}
-
 export function StoresProvider({ children }: { children: React.ReactNode }) {
-  const [stores, setStores] = useState<Store[]>(demoStores);
+  const { stores, setStores } = useDb();
 
-  useEffect(() => {
-    setStores(loadStores());
-  }, []);
-
-  const persist = useCallback((next: Store[]) => {
-    setStores(next);
-    saveStores(next);
-  }, []);
+  const persist = useCallback(
+    (next: Store[]) => {
+      setStores(next);
+    },
+    [setStores]
+  );
 
   const addStore = useCallback(
     (data: StoreInput, meta: { userId: string; userName: string }) => {
       const now = new Date().toISOString();
       const store: Store = {
+        totalBudget: 1500000,
         ...data,
         id: `custom-${Date.now()}`,
         isCustom: true,

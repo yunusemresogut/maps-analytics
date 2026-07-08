@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FileSpreadsheet, Upload } from "lucide-react";
+import { Download, FileSpreadsheet, Upload } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import {
+  downloadMaterialsTemplate,
   parseMaterialsFromExcel,
   type ParsedMaterialRow,
 } from "@/lib/excel-materials";
@@ -46,6 +47,8 @@ export function ExcelImportPanel({ onImport }: ExcelImportPanelProps) {
           `Birim → ${result.matchedColumns.unit}`,
         result.matchedColumns.unitPrice &&
           `Birim Fiyat → ${result.matchedColumns.unitPrice}`,
+        result.matchedColumns.status &&
+          `Durum → ${result.matchedColumns.status}`,
       ]
         .filter(Boolean)
         .join(" · ");
@@ -63,20 +66,33 @@ export function ExcelImportPanel({ onImport }: ExcelImportPanelProps) {
   return (
     <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="h-4 w-4 text-violet-400" />
-          <span className="text-xs font-medium text-violet-300">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <FileSpreadsheet className="h-4 w-4 text-violet-400 shrink-0" />
+          <span className="text-xs font-medium text-violet-300 truncate">
             Malzeme Excel Import
           </span>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => inputRef.current?.click()}
-        >
-          <Upload className="h-3.5 w-3.5" />
-          .xlsx Seç
-        </Button>
+        <div className="flex gap-1 shrink-0">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 cursor-pointer"
+            onClick={downloadMaterialsTemplate}
+            title="Şablon İndir"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Şablon
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="cursor-pointer"
+            onClick={() => inputRef.current?.click()}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Seç
+          </Button>
+        </div>
         <input
           ref={inputRef}
           type="file"

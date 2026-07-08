@@ -8,7 +8,7 @@ const buttonVariants = cva(
       variant: {
         default:
           "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)]",
-        ghost: "text-zinc-400 hover:text-zinc-100 hover:bg-white/5",
+        ghost: "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/20",
         outline:
           "border border-zinc-700 bg-transparent text-zinc-300 hover:border-cyan-500/50 hover:text-cyan-300",
         danger:

@@ -185,6 +185,7 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
     <div className="absolute bottom-2 right-2 left-2 z-20 flex items-end animate-in sm:bottom-4 sm:left-auto sm:right-4">
       {materialsOpen ? (
         <MaterialsPanel
+          storeId={store.id}
           materials={userData.materials}
           isEditing={isEditing}
           onClose={() => setMaterialsOpen(false)}
@@ -193,6 +194,7 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
         />
       ) : workPlanOpen ? (
         <WorkPlanPanel
+          storeId={store.id}
           items={userData.workPlan}
           isEditing={isEditing}
           onClose={() => setWorkPlanOpen(false)}

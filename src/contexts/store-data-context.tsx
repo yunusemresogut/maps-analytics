@@ -4,14 +4,12 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
-  useState,
 } from "react";
 import { useAuth } from "@/contexts/auth-context";
+import { useDb } from "@/contexts/db-context";
 import { isAllowedFileType } from "@/lib/file-types";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
-import { getStoreDataKey } from "@/lib/storage-keys";
 import type {
   StoreFile,
   StoreMaterial,
@@ -27,60 +25,43 @@ type StoreDataContextValue = {
   updateSpecialNote: (storeId: string, note: string) => void;
   addFile: (storeId: string, file: File) => Promise<{ success: boolean; error?: string }>;
   deleteFile: (storeId: string, fileId: string) => void;
+  // Materials
   importMaterials: (
     storeId: string,
     rows: ParsedMaterialRow[],
     mode?: "append" | "replace"
   ) => number;
+  addMaterial: (
+    storeId: string,
+    material: Omit<StoreMaterial, "id" | "storeId" | "userId" | "importedAt">
+  ) => void;
+  updateMaterial: (
+    storeId: string,
+    materialId: string,
+    updates: Partial<StoreMaterial>
+  ) => void;
   deleteMaterial: (storeId: string, materialId: string) => void;
   clearMaterials: (storeId: string) => void;
+  // Work Plan
   importWorkPlan: (
     storeId: string,
     rows: ParsedWorkPlanRow[],
     mode?: "append" | "replace"
   ) => number;
+  addWorkPlanItem: (
+    storeId: string,
+    item: Omit<StoreWorkPlanItem, "id" | "storeId" | "userId" | "importedAt">
+  ) => void;
+  updateWorkPlanItem: (
+    storeId: string,
+    itemId: string,
+    updates: Partial<StoreWorkPlanItem>
+  ) => void;
   deleteWorkPlanItem: (storeId: string, itemId: string) => void;
   clearWorkPlan: (storeId: string) => void;
 };
 
 const StoreDataContext = createContext<StoreDataContextValue | null>(null);
-
-function loadAll(userId: string): Record<string, StoreUserData> {
-  if (typeof window === "undefined") return {};
-  const raw = localStorage.getItem(getStoreDataKey(userId));
-  if (!raw) return {};
-
-  const parsed = JSON.parse(raw) as Record<
-    string,
-    StoreUserData & { customFields?: Record<string, string> }
-  >;
-  const migrated: Record<string, StoreUserData> = {};
-
-  for (const [id, entry] of Object.entries(parsed)) {
-    migrated[id] = {
-      notes: (entry.notes ?? []).map((n) => ({
-        ...n,
-        userName: n.userName ?? "Bilinmeyen",
-      })),
-      files: (entry.files ?? []).map((f) => ({
-        ...f,
-        userName: f.userName ?? "Bilinmeyen",
-      })),
-      materials: (entry.materials ?? []).map((m) => ({
-        ...m,
-        unit: m.unit ?? "",
-      })),
-      workPlan: entry.workPlan ?? [],
-      specialNote: entry.specialNote ?? entry.customFields?.responsible ?? "",
-    };
-  }
-
-  return migrated;
-}
-
-function saveAll(userId: string, data: Record<string, StoreUserData>) {
-  localStorage.setItem(getStoreDataKey(userId), JSON.stringify(data));
-}
 
 const emptyData = (): StoreUserData => ({
   notes: [],
@@ -92,23 +73,13 @@ const emptyData = (): StoreUserData => ({
 
 export function StoreDataProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [data, setData] = useState<Record<string, StoreUserData>>({});
-
-  useEffect(() => {
-    if (user) {
-      setData(loadAll(user.id));
-    } else {
-      setData({});
-    }
-  }, [user]);
+  const { storeData: data, setStoreData: setData } = useDb();
 
   const persist = useCallback(
     (next: Record<string, StoreUserData>) => {
-      if (!user) return;
       setData(next);
-      saveAll(user.id, next);
     },
-    [user]
+    [setData]
   );
 
   const getStoreData = useCallback(
@@ -231,6 +202,7 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         quantity: row.quantity,
         unit: row.unit,
         unitPrice: row.unitPrice,
+        status: "bekleniyor",
         importedAt: now,
       }));
 
@@ -248,6 +220,52 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
       return imported.length;
     },
     [user, data, persist]
+  );
+
+  const addMaterial = useCallback(
+    (
+      storeId: string,
+      material: Omit<StoreMaterial, "id" | "storeId" | "userId" | "importedAt">
+    ) => {
+      if (!user) return;
+      const now = new Date().toISOString();
+      const newMaterial: StoreMaterial = {
+        ...material,
+        id: `material-${Date.now()}`,
+        storeId,
+        userId: user.id,
+        importedAt: now,
+      };
+      const current = data[storeId] ?? emptyData();
+      persist({
+        ...data,
+        [storeId]: {
+          ...current,
+          materials: [...current.materials, newMaterial],
+        },
+      });
+    },
+    [user, data, persist]
+  );
+
+  const updateMaterial = useCallback(
+    (
+      storeId: string,
+      materialId: string,
+      updates: Partial<StoreMaterial>
+    ) => {
+      const current = data[storeId] ?? emptyData();
+      persist({
+        ...data,
+        [storeId]: {
+          ...current,
+          materials: current.materials.map((m) =>
+            m.id === materialId ? { ...m, ...updates } : m
+          ),
+        },
+      });
+    },
+    [data, persist]
   );
 
   const deleteMaterial = useCallback(
@@ -291,7 +309,7 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         startDate: row.startDate,
         endDate: row.endDate,
         responsible: row.responsible,
-        status: row.status,
+        status: row.status || "yapilacak",
         importedAt: now,
       }));
 
@@ -307,6 +325,52 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
       return imported.length;
     },
     [user, data, persist]
+  );
+
+  const addWorkPlanItem = useCallback(
+    (
+      storeId: string,
+      item: Omit<StoreWorkPlanItem, "id" | "storeId" | "userId" | "importedAt">
+    ) => {
+      if (!user) return;
+      const now = new Date().toISOString();
+      const newItem: StoreWorkPlanItem = {
+        ...item,
+        id: `workplan-${Date.now()}`,
+        storeId,
+        userId: user.id,
+        importedAt: now,
+      };
+      const current = data[storeId] ?? emptyData();
+      persist({
+        ...data,
+        [storeId]: {
+          ...current,
+          workPlan: [...current.workPlan, newItem],
+        },
+      });
+    },
+    [user, data, persist]
+  );
+
+  const updateWorkPlanItem = useCallback(
+    (
+      storeId: string,
+      itemId: string,
+      updates: Partial<StoreWorkPlanItem>
+    ) => {
+      const current = data[storeId] ?? emptyData();
+      persist({
+        ...data,
+        [storeId]: {
+          ...current,
+          workPlan: current.workPlan.map((w) =>
+            w.id === itemId ? { ...w, ...updates } : w
+          ),
+        },
+      });
+    },
+    [data, persist]
   );
 
   const deleteWorkPlanItem = useCallback(
@@ -344,9 +408,13 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         addFile,
         deleteFile,
         importMaterials,
+        addMaterial,
+        updateMaterial,
         deleteMaterial,
         clearMaterials,
         importWorkPlan,
+        addWorkPlanItem,
+        updateWorkPlanItem,
         deleteWorkPlanItem,
         clearWorkPlan,
       }}

@@ -23,6 +23,7 @@ export function migrateStore(raw: Record<string, unknown>): Store {
     floorCount: (raw.floorCount as number) ?? 1,
     phone: raw.phone as string | undefined,
     isCustom: raw.isCustom as boolean | undefined,
+    totalBudget: (raw.totalBudget as number) ?? 1500000,
     createdBy: (raw.createdBy as string) ?? "system",
     createdByName: (raw.createdByName as string) ?? "Sistem",
     createdAt,

@@ -42,10 +42,13 @@ export type Store = {
   floorCount: number;
   phone?: string;
   isCustom?: boolean;
+  totalBudget: number; // Toplam bütçe (Varsayılan 0)
 } & AuditInfo;
 
 /** Audit alanları hariç mağaza girdisi — create/update formları için */
-export type StoreInput = Omit<Store, "id" | "isCustom" | keyof AuditInfo>;
+export type StoreInput = Omit<Store, "id" | "isCustom" | "totalBudget" | keyof AuditInfo> & {
+  totalBudget?: number;
+};
 
 export type StoreNote = {
   id: string;
@@ -78,6 +81,8 @@ export type User = {
   restricted?: boolean;
 };
 
+export type MaterialStatus = "bekleniyor" | "geldi" | "gitti";
+
 export type StoreMaterial = {
   id: string;
   storeId: string;
@@ -86,8 +91,11 @@ export type StoreMaterial = {
   quantity: number;
   unit: string;
   unitPrice: number;
+  status: MaterialStatus;
   importedAt: string;
 };
+
+export type WorkPlanStatus = "yapilacak" | "devam_ediyor" | "tamamlandi";
 
 export type StoreWorkPlanItem = {
   id: string;
@@ -97,7 +105,7 @@ export type StoreWorkPlanItem = {
   startDate: string;
   endDate: string;
   responsible: string;
-  status: string;
+  status: WorkPlanStatus | string;
   importedAt: string;
 };
 

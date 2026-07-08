@@ -9,6 +9,51 @@
   --scrollbar-thumb: rgba(82, 82, 91, 0.85);
   --scrollbar-thumb-hover: rgba(113, 113, 122, 0.95);
   --scrollbar-track: transparent;
+
+  /* Tailwind Zinc Color Overrides for Dark Mode (default) */
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
+}
+
+.light {
+  --background: #fafbff;
+  --foreground: #09090b;
+  --scrollbar-thumb: rgba(161, 161, 170, 0.5);
+  --scrollbar-thumb-hover: rgba(113, 113, 122, 0.8);
+
+  /* Inverted Zinc Colors for Light Mode */
+  --color-zinc-50: #09090b;
+  --color-zinc-100: #18181b;
+  --color-zinc-200: #27272a;
+  --color-zinc-300: #3f3f46;
+  --color-zinc-400: #52525b;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #a1a1aa;
+  --color-zinc-700: #d4d4d8;
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-900: #f4f4f5;
+  --color-zinc-950: #ffffff;
+
+  /* Overrides for accent colors in Light Mode for high contrast readability */
+  --color-cyan-300: #0e7490;
+  --color-cyan-400: #0f766e;
+  --color-cyan-500: #0d9488;
+
+  --color-amber-400: #b55c09;
+  --color-emerald-400: #047857;
+  --color-orange-400: #c2410c;
+  --color-violet-400: #6d28d9;
+  --color-pink-400: #be185d;
+  --color-red-400: #b91c1c;
 }
 
 @theme inline {
@@ -22,6 +67,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Themed scrollbars */
@@ -43,7 +89,8 @@ body {
 *::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 9999px;
-  border: 1px solid rgba(9, 9, 11, 0.4);
+  border: 1px solid rgba(9, 9, 11, 0.1);
+  transition: background-color 0.2s ease;
 }
 
 *::-webkit-scrollbar-thumb:hover {
@@ -59,13 +106,14 @@ body {
 }
 
 .maplibregl-ctrl-group {
-  background: rgba(9, 9, 11, 0.85) !important;
-  border: 1px solid rgba(63, 63, 70, 0.6) !important;
+  background: var(--color-zinc-950) !important;
+  border: 1px solid var(--color-zinc-800) !important;
   border-radius: 0.75rem !important;
   backdrop-filter: blur(12px);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-.maplibregl-ctrl-group button {
+html:not(.light) .maplibregl-ctrl-group button {
   filter: invert(1) brightness(0.8);
 }
 

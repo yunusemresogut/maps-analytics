@@ -107,12 +107,19 @@ export async function parseWorkPlanFromExcel(
     const description = parseCell(row[descriptionCol]);
     if (!description) continue;
 
+    const rawStatus = statusCol ? parseCell(row[statusCol]).toLowerCase() : "yapilacak";
+    const status = rawStatus.includes("tamam") || rawStatus.includes("done") || rawStatus.includes("bit")
+      ? "tamamlandi"
+      : rawStatus.includes("devam") || rawStatus.includes("progress") || rawStatus.includes("sur")
+        ? "devam_ediyor"
+        : "yapilacak";
+
     items.push({
       description,
       startDate: startDateCol ? parseCell(row[startDateCol]) : "",
       endDate: endDateCol ? parseCell(row[endDateCol]) : "",
-      responsible: responsibleCol ? parseCell(row[responsibleCol]) : "",
-      status: statusCol ? parseCell(row[statusCol]) : "",
+      responsible: responsibleCol ? parseCell(row[responsibleCol]) : "Belirtilmemiş",
+      status,
     });
   }
 
@@ -121,4 +128,25 @@ export async function parseWorkPlanFromExcel(
   }
 
   return { items, errors, matchedColumns };
+}
+
+export function downloadWorkPlanTemplate() {
+  const headers = [["Açıklama", "Başlangıç Tarihi", "Bitiş Tarihi", "Sorumlu", "Durum"]];
+  const sampleData = [
+    ["Kaba İnşaat Başlangıcı", "2026-07-10", "2026-07-25", "Ahmet Yılmaz", "devam_ediyor"],
+    ["Elektrik Kablolama", "2026-07-26", "2026-08-05", "Mehmet Kaya", "yapilacak"],
+    ["İç Cephe Boyası", "2026-08-06", "2026-08-12", "Canan Demir", "yapilacak"],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([...headers, ...sampleData]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "İş Planı");
+
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "is_plani_sablonu.xlsx";
+  link.click();
 }

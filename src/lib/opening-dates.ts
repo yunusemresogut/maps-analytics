@@ -51,5 +51,7 @@ export function getOpeningAlert(openingDate: string): OpeningAlert {
 }
 
 export function shouldHighlightRed(openingDate: string): boolean {
-  return getOpeningAlert(openingDate).isOpeningSoon;
+  const alert = getOpeningAlert(openingDate);
+  // Açılışa 7 gün veya daha az kaldığında kırmızıya düşür
+  return alert.isOpeningSoon && alert.daysUntilOpening <= 7;
 }

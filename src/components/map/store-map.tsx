@@ -6,6 +6,7 @@ import Map, { NavigationControl } from "react-map-gl/maplibre";
 import type { MapMouseEvent, MapRef } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Plus, X } from "lucide-react";
+import { useTheme } from "@/contexts/theme-context";
 import { findRegionForCity } from "@/data/regions";
 import { useRegions } from "@/contexts/regions-context";
 import { useStores } from "@/contexts/stores-context";
@@ -20,12 +21,16 @@ import { projectStatusConfig } from "@/lib/project-status";
 import { Button } from "@/components/ui/button";
 import type { ProjectStatus } from "@/types";
 
+const LIGHT_MAP_STYLE =
+  "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+
 const DARK_MAP_STYLE =
   "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
 const TURKEY_CENTER = { longitude: 35.2433, latitude: 38.9637, zoom: 5.5 };
 
 export function StoreMap() {
+  const { theme } = useTheme();
   const searchParams = useSearchParams();
   const mapRef = useRef<MapRef>(null);
   const { canAdd } = usePermissions();
@@ -114,7 +119,7 @@ export function StoreMap() {
       <Map
         ref={mapRef}
         initialViewState={TURKEY_CENTER}
-        mapStyle={DARK_MAP_STYLE}
+        mapStyle={theme === "light" ? LIGHT_MAP_STYLE : DARK_MAP_STYLE}
         onClick={handleMapClick}
         style={{ width: "100%", height: "100%" }}
         attributionControl={false}

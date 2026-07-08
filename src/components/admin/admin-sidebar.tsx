@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   ClipboardList,
+  Coins,
   LayoutDashboard,
   MapPin,
   ScrollText,
@@ -19,6 +20,11 @@ export const ADMIN_NAV = [
     href: "/admin/dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    href: "/admin/budgets",
+    label: "Bütçe Takibi",
+    icon: Coins,
   },
   {
     href: "/admin/users",

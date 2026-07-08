@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { CalendarRange, Upload } from "lucide-react";
+import { CalendarRange, Download, Upload } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import {
+  downloadWorkPlanTemplate,
   parseWorkPlanFromExcel,
   type ParsedWorkPlanRow,
 } from "@/lib/excel-work-plan";
@@ -67,20 +68,33 @@ export function ExcelWorkPlanImportPanel({
   return (
     <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <CalendarRange className="h-4 w-4 text-emerald-400" />
-          <span className="text-xs font-medium text-emerald-300">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <CalendarRange className="h-4 w-4 text-emerald-400 shrink-0" />
+          <span className="text-xs font-medium text-emerald-300 truncate">
             İş Planı Excel Import
           </span>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => inputRef.current?.click()}
-        >
-          <Upload className="h-3.5 w-3.5" />
-          .xlsx Seç
-        </Button>
+        <div className="flex gap-1 shrink-0">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 cursor-pointer"
+            onClick={downloadWorkPlanTemplate}
+            title="Şablon İndir"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Şablon
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="cursor-pointer"
+            onClick={() => inputRef.current?.click()}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Seç
+          </Button>
+        </div>
         <input
           ref={inputRef}
           type="file"

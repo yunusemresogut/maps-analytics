@@ -5,6 +5,7 @@ export type ParsedMaterialRow = {
   quantity: number;
   unit: string;
   unitPrice: number;
+  status?: string;
 };
 
 export type ExcelParseResult = {
@@ -15,6 +16,7 @@ export type ExcelParseResult = {
     quantity?: string;
     unit?: string;
     unitPrice?: string;
+    status?: string;
   };
 };
 
@@ -69,7 +71,7 @@ export async function parseMaterialsFromExcel(
 
   const headers = Object.keys(rows[0]);
 
-  const descriptionCol = findColumn(headers, (h) => h.includes("aciklama"));
+  const descriptionCol = findColumn(headers, (h) => h.includes("aciklama") || h.includes("ad") || h.includes("isim") || h.includes("tanim"));
   const quantityCol = findColumn(headers, (h) => h.includes("miktar"));
   const unitCol = findColumn(
     headers,
@@ -79,15 +81,17 @@ export async function parseMaterialsFromExcel(
     headers,
     (h) => h.includes("birim") && h.includes("fiyat")
   );
+  const statusCol = findColumn(headers, (h) => h.includes("durum") || h.includes("stat"));
 
   const matchedColumns = {
     description: descriptionCol,
     quantity: quantityCol,
     unit: unitCol,
     unitPrice: unitPriceCol,
+    status: statusCol,
   };
 
-  if (!descriptionCol) errors.push('"Açıklama" sütunu bulunamadı');
+  if (!descriptionCol) errors.push('"Açıklama" veya "Malzeme Adı" sütunu bulunamadı');
   if (!quantityCol) errors.push('"Miktar" sütunu bulunamadı');
   if (!unitPriceCol) errors.push('"Birim Fiyat" sütunu bulunamadı');
 
@@ -106,8 +110,14 @@ export async function parseMaterialsFromExcel(
       ? String(row[unitCol] ?? "").trim()
       : "";
     const unitPrice = parseNumber(row[unitPriceCol]);
+    const rawStatus = statusCol ? String(row[statusCol] ?? "").trim().toLowerCase() : "bekleniyor";
+    const status = rawStatus.includes("geld") || rawStatus === "geldi"
+      ? "geldi"
+      : rawStatus.includes("git") || rawStatus === "gitti"
+        ? "gitti"
+        : "bekleniyor";
 
-    materials.push({ name, quantity, unit, unitPrice });
+    materials.push({ name, quantity, unit, unitPrice, status });
   }
 
   if (materials.length === 0) {
@@ -123,4 +133,25 @@ export function formatCurrency(value: number): string {
     currency: "TRY",
     minimumFractionDigits: 2,
   }).format(value);
+}
+
+export function downloadMaterialsTemplate() {
+  const headers = [["Malzeme Adı", "Miktar", "Birim", "Birim Fiyat", "Durum"]];
+  const sampleData = [
+    ["Cement / Çimento", 150, "torba", 320, "bekleniyor"],
+    ["Steel Bars / İnşaat Demiri", 12, "ton", 28000, "geldi"],
+    ["Copper Pipe / Bakır Boru", 45, "metre", 150, "gitti"],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([...headers, ...sampleData]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Malzemeler");
+
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "malzeme_sablonu.xlsx";
+  link.click();
 }
