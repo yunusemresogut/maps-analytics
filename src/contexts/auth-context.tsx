@@ -7,8 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { mockUsers } from "@/data/users";
-import { migrateUser } from "@/lib/migrations";
+import { useDb } from "@/contexts/db-context";
 import { appendActivityLog } from "@/lib/activity-log";
 import {
   DEFAULT_USER_PERMISSIONS,
@@ -46,40 +45,26 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function loadUsers(): (User & { password: string })[] {
-  if (typeof window === "undefined") return mockUsers;
-  const stored = localStorage.getItem(STORAGE_KEYS.users);
-  if (stored) {
-    return (JSON.parse(stored) as Record<string, unknown>[]).map(migrateUser);
-  }
-  localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(mockUsers));
-  return mockUsers;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [users, setUsers] = useState<(User & { password: string })[]>([]);
+  const { users, setUsers } = useDb();
 
   useEffect(() => {
-    const allUsers = loadUsers();
-    setUsers(allUsers);
-
     const sessionId = localStorage.getItem(STORAGE_KEYS.session);
     if (sessionId) {
-      const found = allUsers.find((u) => u.id === sessionId);
+      const found = users.find((u) => u.id === sessionId);
       if (found) {
         const { password: _, ...safeUser } = found;
         setUser(safeUser);
       }
     }
     setIsLoading(false);
-  }, []);
+  }, [users]);
 
   const login = useCallback(
     (email: string, password: string, expectedRole?: "admin" | "user") => {
-      const allUsers = loadUsers();
-      const found = allUsers.find(
+      const found = users.find(
         (u) => u.email === email && u.password === password
       );
       if (!found) return false;
@@ -100,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       return true;
     },
-    []
+    [users]
   );
 
   const logout = useCallback(() => {
@@ -124,8 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password: string;
       permissions?: UserPermissions;
     }) => {
-      const allUsers = loadUsers();
-      if (allUsers.some((u) => u.email === data.email)) return false;
+      if (users.some((u) => u.email === data.email)) return false;
 
       const newUser: User & { password: string } = {
         id: `user-${Date.now()}`,
@@ -136,8 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password: data.password,
       };
 
-      const updated = [...allUsers, newUser];
-      localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(updated));
+      const updated = [...users, newUser];
       setUsers(updated);
       appendActivityLog({
         category: "user",
@@ -148,17 +131,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       return true;
     },
-    []
+    [users, setUsers]
   );
 
   const updateUserPermissions = useCallback(
     (userId: string, permissions: UserPermissions) => {
-      const allUsers = loadUsers();
-      const target = allUsers.find((u) => u.id === userId);
-      const updated = allUsers.map((u) =>
+      const target = users.find((u) => u.id === userId);
+      const updated = users.map((u) =>
         u.id === userId ? { ...u, permissions } : u
       );
-      localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(updated));
       setUsers(updated);
 
       if (target) {
@@ -176,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(safeUser);
       }
     },
-    [user]
+    [users, setUsers, user]
   );
 
   const updateUser = useCallback(
@@ -184,15 +165,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userId: string,
       data: { name?: string; email?: string; password?: string }
     ) => {
-      const allUsers = loadUsers();
-      const target = allUsers.find((u) => u.id === userId);
+      const target = users.find((u) => u.id === userId);
       if (!target || target.role === "admin") return false;
 
-      if (data.email && allUsers.some((u) => u.email === data.email && u.id !== userId)) {
+      if (data.email && users.some((u) => u.email === data.email && u.id !== userId)) {
         return false;
       }
 
-      const updated = allUsers.map((u) => {
+      const updated = users.map((u) => {
         if (u.id !== userId) return u;
         return {
           ...u,
@@ -202,7 +182,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
-      localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(updated));
       setUsers(updated);
 
       if (target) {
@@ -222,17 +201,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return true;
     },
-    [user]
+    [users, setUsers, user]
   );
 
   const deleteUser = useCallback(
     (userId: string) => {
-      const allUsers = loadUsers();
-      const target = allUsers.find((u) => u.id === userId);
+      const target = users.find((u) => u.id === userId);
       if (!target || target.role === "admin") return false;
 
-      const updated = allUsers.filter((u) => u.id !== userId);
-      localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(updated));
+      const updated = users.filter((u) => u.id !== userId);
       setUsers(updated);
 
       appendActivityLog({
@@ -250,16 +227,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return true;
     },
-    [user]
+    [users, setUsers, user]
   );
 
   const setUserRestricted = useCallback(
     (userId: string, restricted: boolean) => {
-      const allUsers = loadUsers();
-      const target = allUsers.find((u) => u.id === userId);
+      const target = users.find((u) => u.id === userId);
       if (!target || target.role === "admin") return;
 
-      const updated = allUsers.map((u) => {
+      const updated = users.map((u) => {
         if (u.id !== userId) return u;
         return {
           ...u,
@@ -270,7 +246,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
-      localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(updated));
       setUsers(updated);
 
       appendActivityLog({
@@ -288,7 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(safeUser);
       }
     },
-    [user]
+    [users, setUsers, user]
   );
 
   const getUserName = useCallback(

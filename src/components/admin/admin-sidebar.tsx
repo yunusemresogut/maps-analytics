@@ -105,20 +105,6 @@ export function AdminSidebar({ mobileOpen, onMobileClose }: AdminSidebarProps) {
           );
         })}
       </nav>
-
-      <div className="border-t border-zinc-800 p-3">
-        <Link
-          href="/dashboard"
-          onClick={onMobileClose}
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-300"
-        >
-          <BarChart3 className="h-4 w-4 shrink-0" />
-          Kullanıcı Dashboard
-        </Link>
-        <p className="px-3 pt-3 text-[11px] leading-relaxed text-zinc-600">
-          Proje metrikleri ve harita analizleri için kullanıcı görünümüne geçin.
-        </p>
-      </div>
     </>
   );
 

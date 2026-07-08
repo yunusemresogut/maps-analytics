@@ -71,12 +71,26 @@ export function appendActivityLog(input: ActivityLogInput) {
 
   const logs = [entry, ...loadActivityLogs()].slice(0, MAX_LOGS);
   saveActivityLogs(logs);
+
+  // Background sync to cloud database
+  fetch("/api/db/log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry),
+  }).catch((err) => console.error("Bulut log kaydı başarısız:", err));
+
   window.dispatchEvent(new CustomEvent(EVENT_NAME));
 }
 
 export function clearActivityLogs() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(STORAGE_KEYS.activityLogs);
+
+  // Background sync to cloud database
+  fetch("/api/db/log", {
+    method: "DELETE",
+  }).catch((err) => console.error("Bulut log temizleme başarısız:", err));
+
   window.dispatchEvent(new CustomEvent(EVENT_NAME));
 }
 

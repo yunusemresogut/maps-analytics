@@ -3,6 +3,7 @@ import { list, put } from "@vercel/blob";
 import fs from "fs";
 import path from "path";
 import { demoStores } from "@/data/stores";
+import { mockUsers } from "@/data/users";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +11,10 @@ const LOCAL_DB_PATH = path.join(process.cwd(), "src/data/local_db.json");
 
 function getInitialData() {
   return {
-    stores: demoStores,
+    stores: [],
     storeData: {},
+    users: mockUsers,
+    activityLogs: [],
   };
 }
 

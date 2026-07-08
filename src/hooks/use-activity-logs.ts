@@ -1,19 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  loadActivityLogs,
-  subscribeActivityLogs,
-} from "@/lib/activity-log";
-import type { ActivityLogEntry } from "@/types";
+import { useEffect } from "react";
+import { useDb } from "@/contexts/db-context";
+import { subscribeActivityLogs } from "@/lib/activity-log";
 
 export function useActivityLogs() {
-  const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
+  const { activityLogs, refetch } = useDb();
 
   useEffect(() => {
-    setLogs(loadActivityLogs());
-    return subscribeActivityLogs(() => setLogs(loadActivityLogs()));
-  }, []);
+    // Local log event triggers a refetch from DB
+    return subscribeActivityLogs(() => {
+      refetch();
+    });
+  }, [refetch]);
 
-  return logs;
+  return activityLogs;
 }
