@@ -1,4 +1,4 @@
-import { del, list, put } from "@vercel/blob";
+import { del, get, list, put } from "@vercel/blob";
 import fs from "fs";
 import path from "path";
 import { mockUsers } from "@/data/users";
@@ -56,7 +56,7 @@ function isBlobConfigured() {
 async function _readDb(): Promise<any> {
   try {
     if (isBlobConfigured()) {
-      console.log("[DB Server] Reading from Vercel Blob...");
+      console.log("[DB Server] Reading from private Vercel Blob...");
       const { blobs } = await list();
       const dbBlobs = blobs.filter(
         (b) => b.pathname.startsWith("db") && b.pathname.endsWith(".json")
@@ -69,12 +69,13 @@ async function _readDb(): Promise<any> {
             new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
         );
         const latestBlob = dbBlobs[0];
-        console.log("[DB Server] Found latest blob URL:", latestBlob.url);
+        console.log("[DB Server] Found latest private blob URL:", latestBlob.url);
 
-        const response = await fetch(`${latestBlob.url}?t=${Date.now()}`, {
-          cache: "no-store",
-        });
-        return await response.json();
+        // Fetch private blob using get() to authenticate correctly
+        const blobData = await get(latestBlob.url, { access: "private" });
+        if (blobData && blobData.stream) {
+          return await new Response(blobData.stream).json();
+        }
       }
       console.log("[DB Server] No blobs found, returning initial data.");
     } else {
@@ -94,13 +95,13 @@ async function _readDb(): Promise<any> {
 // Private helper to write raw database to source without queueing (caller must queue)
 async function _writeDb(db: any): Promise<void> {
   if (isBlobConfigured()) {
-    console.log("[DB Server] Writing to Vercel Blob...");
-    // Write new blob with a random suffix (guarantees a unique URL that bypasses CDN cache)
+    console.log("[DB Server] Writing to private Vercel Blob...");
+    // Write new blob with private access and a random suffix (guarantees a unique URL that bypasses CDN cache)
     const newBlob = await put("db.json", JSON.stringify(db), {
-      access: "public",
+      access: "private",
       addRandomSuffix: true,
     });
-    console.log("[DB Server] Successfully wrote new blob to URL:", newBlob.url);
+    console.log("[DB Server] Successfully wrote new private blob to URL:", newBlob.url);
 
     // Clean up older database blobs asynchronously to avoid storage bloat
     try {
@@ -118,7 +119,7 @@ async function _writeDb(db: any): Promise<void> {
       // The newest one is dbBlobs[0]. Delete all others.
       const latestUrl = dbBlobs[0]?.url;
       const oldBlobs = dbBlobs.filter((b) => b.url !== latestUrl);
-      console.log(`[DB Server] Cleaning up ${oldBlobs.length} older blobs...`);
+      console.log(`[DB Server] Cleaning up ${oldBlobs.length} older private blobs...`);
       
       for (const old of oldBlobs) {
         try {
