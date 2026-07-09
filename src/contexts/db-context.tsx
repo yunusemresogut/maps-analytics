@@ -27,7 +27,9 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
 
   const fetchData = async () => {
     try {
-      const response = await fetch("/api/db");
+      const response = await fetch(`/api/db?t=${Date.now()}`, {
+        cache: "no-store",
+      });
       if (response.ok) {
         const data = await response.json();
         setStoresState(data.stores ?? []);
