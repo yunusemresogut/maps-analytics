@@ -1,4 +1,4 @@
-import { list, put } from "@vercel/blob";
+import { del, list, put } from "@vercel/blob";
 import fs from "fs";
 import path from "path";
 import { mockUsers } from "@/data/users";
@@ -43,10 +43,19 @@ async function _readDb(): Promise<any> {
   try {
     if (isBlobConfigured()) {
       const { blobs } = await list();
-      const dbBlob = blobs.find((b) => b.pathname === "db.json");
+      const dbBlobs = blobs.filter(
+        (b) => b.pathname.startsWith("db") && b.pathname.endsWith(".json")
+      );
 
-      if (dbBlob) {
-        const response = await fetch(`${dbBlob.url}?t=${Date.now()}`, {
+      if (dbBlobs.length > 0) {
+        // Sort descending by uploadedAt to get the latest version
+        dbBlobs.sort(
+          (a, b) =>
+            new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+        );
+        const latestBlob = dbBlobs[0];
+
+        const response = await fetch(`${latestBlob.url}?t=${Date.now()}`, {
           cache: "no-store",
         });
         return await response.json();
@@ -67,10 +76,39 @@ async function _readDb(): Promise<any> {
 // Private helper to write raw database to source without queueing (caller must queue)
 async function _writeDb(db: any): Promise<void> {
   if (isBlobConfigured()) {
+    // Write new blob with a random suffix (guarantees a unique URL that bypasses CDN cache)
     await put("db.json", JSON.stringify(db), {
       access: "public",
-      addRandomSuffix: false,
+      addRandomSuffix: true,
     });
+
+    // Clean up older database blobs asynchronously to avoid storage bloat
+    try {
+      const { blobs } = await list();
+      const dbBlobs = blobs.filter(
+        (b) => b.pathname.startsWith("db") && b.pathname.endsWith(".json")
+      );
+      
+      // Sort by uploadedAt descending
+      dbBlobs.sort(
+        (a, b) =>
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      );
+      
+      // The newest one is dbBlobs[0]. Delete all others.
+      const latestUrl = dbBlobs[0]?.url;
+      const oldBlobs = dbBlobs.filter((b) => b.url !== latestUrl);
+      
+      for (const old of oldBlobs) {
+        try {
+          await del(old.url);
+        } catch (delErr) {
+          console.error("Error deleting old blob version:", delErr);
+        }
+      }
+    } catch (cleanupErr) {
+      console.error("Error cleaning up old blobs:", cleanupErr);
+    }
   } else {
     const dbPath = getDbPath();
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
