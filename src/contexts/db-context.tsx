@@ -46,22 +46,12 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
     fetchData();
   }, []);
 
-  const saveToDb = async (
-    nextStores: Store[],
-    nextStoreData: Record<string, StoreUserData>,
-    nextUsers: (User & { password: string })[],
-    nextActivityLogs: ActivityLogEntry[]
-  ) => {
+  const saveToDb = async (partialPayload: Record<string, any>) => {
     try {
       await fetch("/api/db", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          stores: nextStores,
-          storeData: nextStoreData,
-          users: nextUsers,
-          activityLogs: nextActivityLogs,
-        }),
+        body: JSON.stringify(partialPayload),
       });
     } catch (err) {
       console.error("Veritabanı kaydedilirken hata oluştu:", err);
@@ -70,22 +60,22 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
 
   const setStores = async (nextStores: Store[]) => {
     setStoresState(nextStores);
-    await saveToDb(nextStores, storeData, users, activityLogs);
+    await saveToDb({ stores: nextStores });
   };
 
   const setStoreData = async (nextStoreData: Record<string, StoreUserData>) => {
     setStoreDataState(nextStoreData);
-    await saveToDb(stores, nextStoreData, users, activityLogs);
+    await saveToDb({ storeData: nextStoreData });
   };
 
   const setUsers = async (nextUsers: (User & { password: string })[]) => {
     setUsersState(nextUsers);
-    await saveToDb(stores, storeData, nextUsers, activityLogs);
+    await saveToDb({ users: nextUsers });
   };
 
   const setActivityLogs = async (nextActivityLogs: ActivityLogEntry[]) => {
     setActivityLogsState(nextActivityLogs);
-    await saveToDb(stores, storeData, users, nextActivityLogs);
+    await saveToDb({ activityLogs: nextActivityLogs });
   };
 
   return (
