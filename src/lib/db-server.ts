@@ -7,6 +7,20 @@ const ROOT_DB_PATH = path.join(process.cwd(), "data/local_db.json");
 const SRC_DB_PATH = path.join(process.cwd(), "src/data/local_db.json");
 
 function getDbPath() {
+  if (process.env.VERCEL) {
+    const tmpPath = "/tmp/local_db.json";
+    if (!fs.existsSync(tmpPath)) {
+      try {
+        if (fs.existsSync(SRC_DB_PATH)) {
+          fs.copyFileSync(SRC_DB_PATH, tmpPath);
+        }
+      } catch (err) {
+        console.error("Failed to copy db to /tmp:", err);
+      }
+    }
+    return tmpPath;
+  }
+
   if (fs.existsSync(ROOT_DB_PATH)) {
     return ROOT_DB_PATH;
   }
