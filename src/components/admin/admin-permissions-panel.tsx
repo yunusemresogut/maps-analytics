@@ -46,9 +46,9 @@ export function AdminPermissionsPanel() {
     }
   }, [selected]);
 
-  const save = () => {
+  const save = async () => {
     if (!selectedId) return;
-    updateUserPermissions(selectedId, draft);
+    await updateUserPermissions(selectedId, draft);
     setMessage("Yetkiler kaydedildi");
     setTimeout(() => setMessage(""), 2000);
   };

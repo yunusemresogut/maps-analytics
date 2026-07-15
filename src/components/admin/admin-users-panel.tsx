@@ -36,17 +36,17 @@ export function AdminUsersPanel() {
 
   const regularUsers = users.filter((u) => u.role === "user");
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage("");
-    const success = addUser({ name, email, password });
+    const success = await addUser({ name, email, password });
     if (success) {
       setMessage("Kullanıcı başarıyla eklendi");
       setName("");
       setEmail("");
       setPassword("");
     } else {
-      setMessage("Bu e-posta zaten kayıtlı");
+      setMessage("Bu e-posta zaten kayıtlı veya eklenemedi");
     }
   };
 
@@ -58,9 +58,9 @@ export function AdminUsersPanel() {
     setMessage("");
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingUser) return;
-    const success = updateUser(editingUser.id, {
+    const success = await updateUser(editingUser.id, {
       name: editName.trim(),
       email: editEmail.trim(),
       ...(editPassword ? { password: editPassword } : {}),
@@ -73,19 +73,20 @@ export function AdminUsersPanel() {
     }
   };
 
-  const handleDelete = (u: User) => {
+  const handleDelete = async (u: User) => {
     if (!confirm(`"${u.name}" kullanıcısı silinsin mi?`)) return;
-    if (deleteUser(u.id)) {
+    const success = await deleteUser(u.id);
+    if (success) {
       setMessage("Kullanıcı silindi");
       if (editingUser?.id === u.id) setEditingUser(null);
     }
   };
 
-  const handleRestrict = (u: User) => {
+  const handleRestrict = async (u: User) => {
     const next = !u.restricted;
     const label = next ? "kısıtlansın" : "kısıtlaması kaldırılsın";
     if (!confirm(`"${u.name}" ${label} mı?`)) return;
-    setUserRestricted(u.id, next);
+    await setUserRestricted(u.id, next);
     setMessage(next ? "Kullanıcı kısıtlandı" : "Kısıtlama kaldırıldı");
   };
 

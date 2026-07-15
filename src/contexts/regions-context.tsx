@@ -7,9 +7,9 @@ import {
   useEffect,
   useState,
 } from "react";
+import { supabase } from "@/lib/supabase";
 import { defaultRegions } from "@/data/regions";
 import { appendActivityLog } from "@/lib/activity-log";
-import { STORAGE_KEYS } from "@/lib/storage-keys";
 import type { Region } from "@/types";
 
 type RegionsContextValue = {
@@ -31,38 +31,40 @@ type RegionsContextValue = {
 
 const RegionsContext = createContext<RegionsContextValue | null>(null);
 
-function loadRegions(): Region[] {
-  if (typeof window === "undefined") return defaultRegions;
-  const stored = localStorage.getItem(STORAGE_KEYS.regions);
-  if (stored) return JSON.parse(stored);
-  localStorage.setItem(STORAGE_KEYS.regions, JSON.stringify(defaultRegions));
-  return defaultRegions;
-}
-
-function saveRegions(regions: Region[]) {
-  localStorage.setItem(STORAGE_KEYS.regions, JSON.stringify(regions));
-}
-
 function buildVisibility(regions: Region[]): Record<string, boolean> {
   return Object.fromEntries(regions.map((r) => [r.id, true]));
 }
 
 export function RegionsProvider({ children }: { children: React.ReactNode }) {
-  const [regions, setRegions] = useState<Region[]>(defaultRegions);
-  const [visibleRegions, setVisibleRegions] = useState<Record<string, boolean>>(
-    {}
-  );
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [visibleRegions, setVisibleRegions] = useState<Record<string, boolean>>({});
   const [isPanelOpen, setPanelOpen] = useState(false);
 
   useEffect(() => {
-    const loaded = loadRegions();
-    setRegions(loaded);
-    setVisibleRegions(buildVisibility(loaded));
+    const fetchRegions = async () => {
+      try {
+        const { data, error } = await supabase.from("regions").select("*");
+        if (error) throw error;
+        if (data && data.length > 0) {
+          setRegions(data);
+          setVisibleRegions(buildVisibility(data));
+        } else {
+          // Auto-seed default regions
+          const { error: seedError } = await supabase.from("regions").insert(defaultRegions);
+          if (!seedError) {
+            setRegions(defaultRegions);
+            setVisibleRegions(buildVisibility(defaultRegions));
+          }
+        }
+      } catch (err) {
+        console.error("Regions fetch error:", err);
+      }
+    };
+    fetchRegions();
   }, []);
 
-  const persist = useCallback((next: Region[]) => {
+  const persist = useCallback((next: Region[], idToSync?: string) => {
     setRegions(next);
-    saveRegions(next);
     setVisibleRegions((prev) => {
       const nextVis: Record<string, boolean> = {};
       for (const r of next) {
@@ -70,12 +72,42 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
       }
       return nextVis;
     });
+
+    if (idToSync) {
+      const targetRegion = next.find((r) => r.id === idToSync);
+      if (targetRegion) {
+        supabase
+          .from("regions")
+          .update({
+            name: targetRegion.name,
+            cities: targetRegion.cities,
+            color: targetRegion.color,
+          })
+          .eq("id", idToSync)
+          .then(({ error }) => {
+            if (error) console.error("Error updating region in Supabase:", error);
+          });
+      }
+    }
   }, []);
 
   const addRegion = useCallback(
     (data: Omit<Region, "id">) => {
       const region: Region = { ...data, id: `region-${Date.now()}` };
-      persist([...regions, region]);
+      const next = [...regions, region];
+      
+      // Update local state immediately
+      setRegions(next);
+      setVisibleRegions((prev) => ({ ...prev, [region.id]: true }));
+
+      // Insert to Supabase in background
+      supabase
+        .from("regions")
+        .insert(region)
+        .then(({ error }) => {
+          if (error) console.error("Error adding region to Supabase:", error);
+        });
+
       appendActivityLog({
         category: "region",
         action: "create",
@@ -85,12 +117,13 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
       });
       return region;
     },
-    [regions, persist]
+    [regions]
   );
 
   const updateRegion = useCallback(
     (id: string, data: Partial<Region>) => {
-      persist(regions.map((r) => (r.id === id ? { ...r, ...data } : r)));
+      const next = regions.map((r) => (r.id === id ? { ...r, ...data } : r));
+      persist(next, id);
     },
     [regions, persist]
   );
@@ -98,12 +131,24 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
   const deleteRegion = useCallback(
     (id: string) => {
       const target = regions.find((r) => r.id === id);
-      persist(regions.filter((r) => r.id !== id));
+      const next = regions.filter((r) => r.id !== id);
+      
+      setRegions(next);
       setVisibleRegions((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
+        const nextVis = { ...prev };
+        delete nextVis[id];
+        return nextVis;
       });
+
+      // Delete from Supabase in background
+      supabase
+        .from("regions")
+        .delete()
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) console.error("Error deleting region from Supabase:", error);
+        });
+
       if (target) {
         appendActivityLog({
           category: "region",
@@ -114,19 +159,18 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
         });
       }
     },
-    [regions, persist]
+    [regions]
   );
 
   const addCityToRegion = useCallback(
     (regionId: string, city: string) => {
       const region = regions.find((r) => r.id === regionId);
-      persist(
-        regions.map((r) =>
-          r.id === regionId && !r.cities.includes(city)
-            ? { ...r, cities: [...r.cities, city] }
-            : r
-        )
+      const next = regions.map((r) =>
+        r.id === regionId && !r.cities.includes(city)
+          ? { ...r, cities: [...r.cities, city] }
+          : r
       );
+      persist(next, regionId);
       if (region) {
         appendActivityLog({
           category: "region",
@@ -143,13 +187,12 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
   const removeCityFromRegion = useCallback(
     (regionId: string, city: string) => {
       const region = regions.find((r) => r.id === regionId);
-      persist(
-        regions.map((r) =>
-          r.id === regionId
-            ? { ...r, cities: r.cities.filter((c) => c !== city) }
-            : r
-        )
+      const next = regions.map((r) =>
+        r.id === regionId
+          ? { ...r, cities: r.cities.filter((c) => c !== city) }
+          : r
       );
+      persist(next, regionId);
       if (region) {
         appendActivityLog({
           category: "region",

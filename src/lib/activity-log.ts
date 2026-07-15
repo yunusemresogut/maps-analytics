@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from "@/lib/storage-keys";
+import { supabase } from "@/lib/supabase";
 import type { ActivityCategory, ActivityLogEntry } from "@/types";
 
 const MAX_LOGS = 500;
@@ -14,27 +15,26 @@ export type ActivityLogInput = {
   targetLabel?: string;
 };
 
-function getSessionActor(): { actorId: string; actorName: string } {
-  if (typeof window === "undefined") {
-    return { actorId: "system", actorName: "Sistem" };
-  }
-  const sessionId = localStorage.getItem(STORAGE_KEYS.session);
-  if (!sessionId) {
-    return { actorId: "system", actorName: "Sistem" };
-  }
-  const usersRaw = localStorage.getItem(STORAGE_KEYS.users);
-  if (!usersRaw) {
-    return { actorId: sessionId, actorName: "Bilinmeyen" };
-  }
+async function getSessionActor(): Promise<{ actorId: string; actorName: string }> {
   try {
-    const users = JSON.parse(usersRaw) as { id: string; name: string }[];
-    const found = users.find((u) => u.id === sessionId);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      return { actorId: "system", actorName: "Sistem" };
+    }
+    
+    // Fetch profile name
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("name")
+      .eq("id", session.user.id)
+      .single();
+      
     return {
-      actorId: sessionId,
-      actorName: found?.name ?? "Bilinmeyen",
+      actorId: session.user.id,
+      actorName: profile?.name ?? session.user.email ?? "Bilinmeyen",
     };
   } catch {
-    return { actorId: sessionId, actorName: "Bilinmeyen" };
+    return { actorId: "system", actorName: "Sistem" };
   }
 }
 
@@ -53,17 +53,25 @@ function saveActivityLogs(logs: ActivityLogEntry[]) {
   localStorage.setItem(STORAGE_KEYS.activityLogs, JSON.stringify(logs));
 }
 
-export function appendActivityLog(input: ActivityLogInput) {
+export async function appendActivityLog(input: ActivityLogInput) {
   if (typeof window === "undefined") return;
 
-  const actor = getSessionActor();
+  let actorId = input.actorId;
+  let actorName = input.actorName;
+
+  if (!actorId || !actorName) {
+    const sessionActor = await getSessionActor();
+    actorId = actorId || sessionActor.actorId;
+    actorName = actorName || sessionActor.actorName;
+  }
+
   const entry: ActivityLogEntry = {
     id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     category: input.category,
     action: input.action,
     message: input.message,
-    actorId: input.actorId ?? actor.actorId,
-    actorName: input.actorName ?? actor.actorName,
+    actorId: actorId!,
+    actorName: actorName!,
     targetId: input.targetId,
     targetLabel: input.targetLabel,
     createdAt: new Date().toISOString(),
@@ -72,24 +80,36 @@ export function appendActivityLog(input: ActivityLogInput) {
   const logs = [entry, ...loadActivityLogs()].slice(0, MAX_LOGS);
   saveActivityLogs(logs);
 
-  // Background sync to cloud database
-  fetch("/api/db/log", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(entry),
-  }).catch((err) => console.error("Bulut log kaydı başarısız:", err));
+  // Sync to Supabase cloud database
+  try {
+    await supabase.from("activity_logs").insert({
+      id: entry.id,
+      category: entry.category,
+      action: entry.action,
+      message: entry.message,
+      actor_id: entry.actorId,
+      actor_name: entry.actorName,
+      target_id: entry.targetId,
+      target_label: entry.targetLabel,
+      created_at: entry.createdAt,
+    });
+  } catch (err) {
+    console.error("Bulut log kaydı başarısız:", err);
+  }
 
   window.dispatchEvent(new CustomEvent(EVENT_NAME));
 }
 
-export function clearActivityLogs() {
+export async function clearActivityLogs() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(STORAGE_KEYS.activityLogs);
 
-  // Background sync to cloud database
-  fetch("/api/db/log", {
-    method: "DELETE",
-  }).catch((err) => console.error("Bulut log temizleme başarısız:", err));
+  // Sync to Supabase cloud database
+  try {
+    await supabase.from("activity_logs").delete().neq("id", "");
+  } catch (err) {
+    console.error("Bulut log temizleme başarısız:", err);
+  }
 
   window.dispatchEvent(new CustomEvent(EVENT_NAME));
 }

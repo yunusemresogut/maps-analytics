@@ -8,13 +8,13 @@ import {
   useState,
 } from "react";
 import { useDb } from "@/contexts/db-context";
+import { supabase } from "@/lib/supabase";
 import { appendActivityLog } from "@/lib/activity-log";
 import {
   DEFAULT_USER_PERMISSIONS,
   getAdminPermissions,
   VIEW_ONLY_PERMISSIONS,
 } from "@/lib/permissions";
-import { STORAGE_KEYS } from "@/lib/storage-keys";
 import type { User, UserPermissions } from "@/types";
 
 type AuthContextValue = {
@@ -24,22 +24,22 @@ type AuthContextValue = {
     email: string,
     password: string,
     expectedRole?: "admin" | "user"
-  ) => boolean;
-  logout: () => void;
+  ) => Promise<boolean>;
+  logout: () => Promise<void>;
   users: User[];
   addUser: (data: {
     email: string;
     name: string;
     password: string;
     permissions?: UserPermissions;
-  }) => boolean;
-  updateUserPermissions: (userId: string, permissions: UserPermissions) => void;
+  }) => Promise<boolean>;
+  updateUserPermissions: (userId: string, permissions: UserPermissions) => Promise<void>;
   updateUser: (
     userId: string,
     data: { name?: string; email?: string; password?: string }
-  ) => boolean;
-  deleteUser: (userId: string) => boolean;
-  setUserRestricted: (userId: string, restricted: boolean) => void;
+  ) => Promise<boolean>;
+  deleteUser: (userId: string) => Promise<boolean>;
+  setUserRestricted: (userId: string, restricted: boolean) => Promise<void>;
   getUserName: (userId: string) => string;
 };
 
@@ -48,47 +48,128 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { users, setUsers } = useDb();
+  const { users, setUsers, refetch: refetchDb } = useDb();
+
+  const fetchProfile = async (uid: string) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", uid)
+        .single();
+
+      if (error) throw error;
+
+      if (profile) {
+        if (profile.restricted) {
+          await supabase.auth.signOut();
+          setUser(null);
+        } else {
+          setUser({
+            id: profile.id,
+            email: profile.email,
+            name: profile.name,
+            role: profile.role as "admin" | "user",
+            permissions: profile.permissions as UserPermissions,
+            restricted: profile.restricted,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching user profile:", err);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const sessionId = localStorage.getItem(STORAGE_KEYS.session);
-    if (sessionId) {
-      const found = users.find((u) => u.id === sessionId);
-      if (found) {
-        const { password: _, ...safeUser } = found;
-        setUser(safeUser);
+    // 1. Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setIsLoading(false);
       }
-    }
-    setIsLoading(false);
-  }, [users]);
+    });
+
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        await fetchProfile(session.user.id);
+      } else {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const login = useCallback(
-    (email: string, password: string, expectedRole?: "admin" | "user") => {
-      const found = users.find(
-        (u) => u.email === email && u.password === password
-      );
-      if (!found) return false;
+    async (email: string, password: string, expectedRole?: "admin" | "user") => {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-      if (expectedRole === "admin" && found.role !== "admin") return false;
-      if (expectedRole === "user" && found.role === "admin") return false;
-      if (found.restricted) return false;
+        if (error) throw error;
+        if (!data.user) return false;
 
-      const { password: _, ...safeUser } = found;
-      setUser(safeUser);
-      localStorage.setItem(STORAGE_KEYS.session, found.id);
-      appendActivityLog({
-        category: "auth",
-        action: "login",
-        message: `${found.name} giriş yaptı`,
-        actorId: found.id,
-        actorName: found.name,
-      });
-      return true;
+        // Fetch user profile from public.profiles to check roles / restriction status
+        const { data: profile, error: profileErr } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
+          .single();
+
+        if (profileErr || !profile) {
+          await supabase.auth.signOut();
+          return false;
+        }
+
+        if (expectedRole === "admin" && profile.role !== "admin") {
+          await supabase.auth.signOut();
+          return false;
+        }
+        if (expectedRole === "user" && profile.role === "admin") {
+          await supabase.auth.signOut();
+          return false;
+        }
+        if (profile.restricted) {
+          await supabase.auth.signOut();
+          return false;
+        }
+
+        setUser({
+          id: profile.id,
+          email: profile.email,
+          name: profile.name,
+          role: profile.role as "admin" | "user",
+          permissions: profile.permissions as UserPermissions,
+          restricted: profile.restricted,
+        });
+
+        appendActivityLog({
+          category: "auth",
+          action: "login",
+          message: `${profile.name} giriş yaptı`,
+          actorId: profile.id,
+          actorName: profile.name,
+        });
+        return true;
+      } catch (err) {
+        console.error("Giriş hatası:", err);
+        return false;
+      }
     },
-    [users]
+    []
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     if (user) {
       appendActivityLog({
         category: "auth",
@@ -98,172 +179,223 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         actorName: user.name,
       });
     }
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem(STORAGE_KEYS.session);
   }, [user]);
 
   const addUser = useCallback(
-    (data: {
+    async (data: {
       email: string;
       name: string;
       password: string;
       permissions?: UserPermissions;
     }) => {
-      if (users.some((u) => u.email === data.email)) return false;
+      try {
+        const response = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: data.email,
+            password: data.password,
+            name: data.name,
+            permissions: data.permissions || { ...DEFAULT_USER_PERMISSIONS },
+          }),
+        });
 
-      const newUser: User & { password: string } = {
-        id: `user-${Date.now()}`,
-        email: data.email,
-        name: data.name,
-        role: "user",
-        permissions: data.permissions ?? { ...DEFAULT_USER_PERMISSIONS },
-        password: data.password,
-      };
+        if (!response.ok) {
+          const errRes = await response.json();
+          throw new Error(errRes.error || "Kullanıcı eklenemedi");
+        }
 
-      const updated = [...users, newUser];
-      setUsers(updated);
-      appendActivityLog({
-        category: "user",
-        action: "create",
-        message: `Yeni kullanıcı oluşturuldu: ${newUser.name}`,
-        targetId: newUser.id,
-        targetLabel: newUser.email,
-      });
-      return true;
+        const resData = await response.json();
+        await refetchDb(); // Reload users list in DbContext
+
+        appendActivityLog({
+          category: "user",
+          action: "create",
+          message: `Yeni kullanıcı oluşturuldu: ${data.name}`,
+          targetId: resData.user.id,
+          targetLabel: data.email,
+        });
+        return true;
+      } catch (err) {
+        console.error("User creation error:", err);
+        return false;
+      }
     },
-    [users, setUsers]
+    [refetchDb]
   );
 
   const updateUserPermissions = useCallback(
-    (userId: string, permissions: UserPermissions) => {
-      const target = users.find((u) => u.id === userId);
-      const updated = users.map((u) =>
-        u.id === userId ? { ...u, permissions } : u
-      );
-      setUsers(updated);
-
-      if (target) {
-        appendActivityLog({
-          category: "permission",
-          action: "update",
-          message: `${target.name} kullanıcısının yetkileri güncellendi`,
-          targetId: userId,
-          targetLabel: target.email,
+    async (userId: string, permissions: UserPermissions) => {
+      try {
+        const response = await fetch("/api/admin/users", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: userId,
+            permissions,
+          }),
         });
-      }
 
-      if (user?.id === userId) {
-        const { password: _, ...safeUser } = updated.find((u) => u.id === userId)!;
-        setUser(safeUser);
+        if (!response.ok) {
+          const errRes = await response.json();
+          throw new Error(errRes.error || "Kullanıcı yetkileri güncellenemedi");
+        }
+
+        const target = users.find((u) => u.id === userId);
+        await refetchDb();
+
+        if (target) {
+          appendActivityLog({
+            category: "permission",
+            action: "update",
+            message: `${target.name} kullanıcısının yetkileri güncellendi`,
+            targetId: userId,
+            targetLabel: target.email,
+          });
+        }
+
+        // If updating currently logged in user's permissions, refresh their local profile state
+        if (user?.id === userId) {
+          await fetchProfile(userId);
+        }
+      } catch (err) {
+        console.error("User permissions update error:", err);
       }
     },
-    [users, setUsers, user]
+    [users, user, refetchDb]
   );
 
   const updateUser = useCallback(
-    (
+    async (
       userId: string,
       data: { name?: string; email?: string; password?: string }
     ) => {
-      const target = users.find((u) => u.id === userId);
-      if (!target || target.role === "admin") return false;
+      try {
+        const target = users.find((u) => u.id === userId);
+        if (!target || target.role === "admin") return false;
 
-      if (data.email && users.some((u) => u.email === data.email && u.id !== userId)) {
+        const response = await fetch("/api/admin/users", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: userId,
+            ...data,
+          }),
+        });
+
+        if (!response.ok) {
+          const errRes = await response.json();
+          throw new Error(errRes.error || "Kullanıcı güncellenemedi");
+        }
+
+        await refetchDb();
+
+        if (target) {
+          appendActivityLog({
+            category: "user",
+            action: "update",
+            message: `Kullanıcı güncellendi: ${target.name}`,
+            targetId: userId,
+            targetLabel: target.email,
+          });
+        }
+
+        if (user?.id === userId) {
+          await fetchProfile(userId);
+        }
+
+        return true;
+      } catch (err) {
+        console.error("User update error:", err);
         return false;
       }
-
-      const updated = users.map((u) => {
-        if (u.id !== userId) return u;
-        return {
-          ...u,
-          ...(data.name !== undefined ? { name: data.name } : {}),
-          ...(data.email !== undefined ? { email: data.email } : {}),
-          ...(data.password ? { password: data.password } : {}),
-        };
-      });
-
-      setUsers(updated);
-
-      if (target) {
-        appendActivityLog({
-          category: "user",
-          action: "update",
-          message: `Kullanıcı güncellendi: ${target.name}`,
-          targetId: userId,
-          targetLabel: target.email,
-        });
-      }
-
-      if (user?.id === userId) {
-        const { password: _, ...safeUser } = updated.find((u) => u.id === userId)!;
-        setUser(safeUser);
-      }
-
-      return true;
     },
-    [users, setUsers, user]
+    [users, user, refetchDb]
   );
 
   const deleteUser = useCallback(
-    (userId: string) => {
-      const target = users.find((u) => u.id === userId);
-      if (!target || target.role === "admin") return false;
+    async (userId: string) => {
+      try {
+        const target = users.find((u) => u.id === userId);
+        if (!target || target.role === "admin") return false;
 
-      const updated = users.filter((u) => u.id !== userId);
-      setUsers(updated);
+        const response = await fetch(`/api/admin/users?id=${userId}`, {
+          method: "DELETE",
+        });
 
-      appendActivityLog({
-        category: "user",
-        action: "delete",
-        message: `Kullanıcı silindi: ${target.name}`,
-        targetId: userId,
-        targetLabel: target.email,
-      });
+        if (!response.ok) {
+          const errRes = await response.json();
+          throw new Error(errRes.error || "Kullanıcı silinemedi");
+        }
 
-      if (user?.id === userId) {
-        setUser(null);
-        localStorage.removeItem(STORAGE_KEYS.session);
+        await refetchDb();
+
+        appendActivityLog({
+          category: "user",
+          action: "delete",
+          message: `Kullanıcı silindi: ${target.name}`,
+          targetId: userId,
+          targetLabel: target.email,
+        });
+
+        if (user?.id === userId) {
+          setUser(null);
+        }
+
+        return true;
+      } catch (err) {
+        console.error("User delete error:", err);
+        return false;
       }
-
-      return true;
     },
-    [users, setUsers, user]
+    [users, user, refetchDb]
   );
 
   const setUserRestricted = useCallback(
-    (userId: string, restricted: boolean) => {
-      const target = users.find((u) => u.id === userId);
-      if (!target || target.role === "admin") return;
+    async (userId: string, restricted: boolean) => {
+      try {
+        const target = users.find((u) => u.id === userId);
+        if (!target || target.role === "admin") return;
 
-      const updated = users.map((u) => {
-        if (u.id !== userId) return u;
-        return {
-          ...u,
-          restricted,
-          permissions: restricted
-            ? { ...VIEW_ONLY_PERMISSIONS }
-            : { ...DEFAULT_USER_PERMISSIONS },
-        };
-      });
+        const response = await fetch("/api/admin/users", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: userId,
+            restricted,
+            permissions: restricted
+              ? { ...VIEW_ONLY_PERMISSIONS }
+              : { ...DEFAULT_USER_PERMISSIONS },
+          }),
+        });
 
-      setUsers(updated);
+        if (!response.ok) {
+          const errRes = await response.json();
+          throw new Error(errRes.error || "Kullanıcı kısıtlanamadı");
+        }
 
-      appendActivityLog({
-        category: "user",
-        action: restricted ? "restrict" : "unrestrict",
-        message: restricted
-          ? `${target.name} kısıtlandı`
-          : `${target.name} kısıtlaması kaldırıldı`,
-        targetId: userId,
-        targetLabel: target.email,
-      });
+        await refetchDb();
 
-      if (user?.id === userId) {
-        const { password: _, ...safeUser } = updated.find((u) => u.id === userId)!;
-        setUser(safeUser);
+        appendActivityLog({
+          category: "user",
+          action: restricted ? "restrict" : "unrestrict",
+          message: restricted
+            ? `${target.name} kısıtlandı`
+            : `${target.name} kısıtlaması kaldırıldı`,
+          targetId: userId,
+          targetLabel: target.email,
+        });
+
+        if (user?.id === userId) {
+          await fetchProfile(userId);
+        }
+      } catch (err) {
+        console.error("User restrict error:", err);
       }
     },
-    [users, setUsers, user]
+    [users, user, refetchDb]
   );
 
   const getUserName = useCallback(
@@ -274,8 +406,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [users]
   );
 
-  const publicUsers = users.map(({ password: _, ...u }) => u);
-
   return (
     <AuthContext.Provider
       value={{
@@ -283,7 +413,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         logout,
-        users: publicUsers,
+        users,
         addUser,
         updateUserPermissions,
         updateUser,

@@ -27,12 +27,12 @@ export function LoginForm({ mode }: LoginFormProps) {
     }
   }, [user, isLoading, mode, router]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     const expectedRole = mode === "admin" ? "admin" : "user";
-    const success = login(email, password, expectedRole);
+    const success = await login(email, password, expectedRole);
 
     if (!success) {
       setError(
@@ -85,18 +85,6 @@ export function LoginForm({ mode }: LoginFormProps) {
           </Link>
         </p>
       )}
-
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 text-xs text-zinc-500">
-        <p className="font-medium text-zinc-400">Demo hesaplar:</p>
-        {mode === "admin" ? (
-          <p className="mt-1">Admin: admin@demo.com / admin123</p>
-        ) : (
-          <>
-            <p className="mt-1">Kullanıcı: ahmet@demo.com / user123</p>
-            <p>Sadece görüntüleme+düzenleme: ayse@demo.com / user123</p>
-          </>
-        )}
-      </div>
     </form>
   );
 }
