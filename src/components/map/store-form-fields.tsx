@@ -1,6 +1,9 @@
 "use client";
 
-import { projectStatusOptions } from "@/lib/project-status";
+import { useT } from "@/contexts/i18n-context";
+import { getProjectStatusOptions } from "@/lib/project-status";
+import { clearFieldError, type FieldErrors } from "@/lib/validation";
+import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,62 +84,53 @@ type StoreFormFieldsProps = {
   form: StoreFormData;
   onChange: (form: StoreFormData) => void;
   readOnly?: boolean;
+  errors?: FieldErrors;
+  onErrorsChange?: (errors: FieldErrors) => void;
 };
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <label className="mb-1.5 block text-xs font-medium text-zinc-400">
-      {children}
-    </label>
-  );
-}
 
 export function StoreFormFields({
   form,
   onChange,
   readOnly = false,
+  errors = {},
+  onErrorsChange,
 }: StoreFormFieldsProps) {
+  const t = useT();
+  const statusOptions = getProjectStatusOptions(t);
+
   const set = <K extends keyof StoreFormData>(
     key: K,
     value: StoreFormData[K]
-  ) => onChange({ ...form, [key]: value });
-
-  const field = (
-    label: string,
-    input: React.ReactNode
-  ) => (
-    <div>
-      <FieldLabel>{label}</FieldLabel>
-      {input}
-    </div>
-  );
+  ) => {
+    onChange({ ...form, [key]: value });
+    if (onErrorsChange && errors[key as string]) {
+      onErrorsChange(clearFieldError(errors, key as string));
+    }
+  };
 
   return (
     <div className="space-y-3">
-      {field(
-        "Mağaza Adı",
+      <FormField label="Mağaza Adı" required error={errors.name}>
         <Input
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
           placeholder="Mağaza adı..."
-          required
           readOnly={readOnly}
+          aria-invalid={!!errors.name}
         />
-      )}
+      </FormField>
 
       <div className="grid grid-cols-2 gap-3">
-        {field(
-          "Şehir",
+        <FormField label="Şehir" required error={errors.city}>
           <Input
             value={form.city}
             onChange={(e) => set("city", e.target.value)}
             placeholder="İstanbul"
-            required
             readOnly={readOnly}
+            aria-invalid={!!errors.city}
           />
-        )}
-        {field(
-          "Durum",
+        </FormField>
+        <FormField label="Durum" required>
           <Select
             value={form.projectStatus}
             onChange={(e) =>
@@ -144,73 +138,67 @@ export function StoreFormFields({
             }
             disabled={readOnly}
           >
-            {projectStatusOptions.map((opt) => (
+            {statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </Select>
-        )}
+        </FormField>
       </div>
 
-      {field(
-        "Adres",
+      <FormField label="Adres" required error={errors.address}>
         <Textarea
           value={form.address}
           onChange={(e) => set("address", e.target.value)}
           placeholder="Tam adres"
           className="min-h-[60px]"
-          required
           readOnly={readOnly}
+          aria-invalid={!!errors.address}
         />
-      )}
+      </FormField>
 
       <div className="grid grid-cols-2 gap-3">
-        {field(
-          "Açılış Tarihi",
+        <FormField label="Açılış Tarihi" required error={errors.openingDate}>
           <Input
             type="date"
             value={form.openingDate}
             onChange={(e) => set("openingDate", e.target.value)}
-            required
             readOnly={readOnly}
+            aria-invalid={!!errors.openingDate}
           />
-        )}
-        {field(
-          "Kabul Tarihi",
+        </FormField>
+        <FormField label="Kabul Tarihi" error={errors.acceptanceDate}>
           <Input
             type="date"
             value={form.acceptanceDate}
             onChange={(e) => set("acceptanceDate", e.target.value)}
             readOnly={readOnly}
           />
-        )}
+        </FormField>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {field(
-          "Yüklenici Firma",
+        <FormField label="Yüklenici Firma">
           <Input
             value={form.contractorCompany}
             onChange={(e) => set("contractorCompany", e.target.value)}
             placeholder="Firma adı"
             readOnly={readOnly}
           />
-        )}
-        {field(
-          "Şantiye Şefi",
+        </FormField>
+        <FormField label="Şantiye Şefi">
           <Input
             value={form.siteManager}
             onChange={(e) => set("siteManager", e.target.value)}
             placeholder="Ad Soyad"
             readOnly={readOnly}
           />
-        )}
+        </FormField>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {field(
-          "Konum Tipi",
+        <FormField label="Konum Tipi" required>
           <Select
             value={form.locationType}
             onChange={(e) =>
@@ -221,42 +209,40 @@ export function StoreFormFields({
             <option value="avm">AVM</option>
             <option value="cadde">Cadde</option>
           </Select>
-        )}
-        {field(
-          "Brüt m²",
+        </FormField>
+        <FormField label="Brüt m²" required error={errors.grossM2}>
           <Input
             type="number"
             min={0}
             value={form.grossM2}
             onChange={(e) => set("grossM2", e.target.value)}
             placeholder="1000"
-            required
             readOnly={readOnly}
+            aria-invalid={!!errors.grossM2}
           />
-        )}
+        </FormField>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {field(
-          "Kat Sayısı",
+        <FormField label="Kat Sayısı" required error={errors.floorCount}>
           <Input
             type="number"
             min={1}
             value={form.floorCount}
             onChange={(e) => set("floorCount", e.target.value)}
-            required
             readOnly={readOnly}
+            aria-invalid={!!errors.floorCount}
           />
-        )}
-        {field(
-          "Telefon (opsiyonel)",
+        </FormField>
+        <FormField label="Telefon" error={errors.phone}>
           <Input
             value={form.phone}
             onChange={(e) => set("phone", e.target.value)}
             placeholder="+90 ..."
             readOnly={readOnly}
+            aria-invalid={!!errors.phone}
           />
-        )}
+        </FormField>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { homePathForRole, isAdmin } from "@/lib/roles";
 
 export function AdminGuard({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -10,8 +11,12 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoading) return;
-    if (!user || user.role !== "admin") {
-      router.replace("/admin/login");
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    if (!isAdmin(user.role)) {
+      router.replace(homePathForRole(user.role));
     }
   }, [user, isLoading, router]);
 
@@ -23,7 +28,6 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user || user.role !== "admin") return null;
-
+  if (!user || !isAdmin(user.role)) return null;
   return <>{children}</>;
 }

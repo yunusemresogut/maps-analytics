@@ -5,13 +5,16 @@ import {
   AdminPageBody,
   AdminPageHeader,
 } from "@/components/admin/admin-page-shell";
+import { useT } from "@/contexts/i18n-context";
 
 export default function AdminUsersPage() {
+  const t = useT();
+
   return (
     <>
       <AdminPageHeader
-        title="Kullanıcılar"
-        description="Yeni kullanıcı ekleyin ve mevcut hesapları yönetin"
+        title={t("adminPages.usersTitle")}
+        description={t("adminPages.usersDescription")}
       />
       <AdminPageBody>
         <AdminUsersPanel />

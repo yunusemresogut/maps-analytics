@@ -1,8 +1,8 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
-import { projectStatusConfig } from "@/lib/project-status";
+import { useI18n, useT } from "@/contexts/i18n-context";
+import { getProjectStatusLabel } from "@/lib/project-status";
 import type { Store } from "@/types";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -19,13 +19,17 @@ type StoreViewFieldsProps = {
 };
 
 export function StoreViewFields({ store }: StoreViewFieldsProps) {
-  const status = projectStatusConfig[store.projectStatus];
+  const t = useT();
+  const { dateLocale } = useI18n();
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Şehir" value={store.city} />
-        <Field label="Durum" value={status.label} />
+        <Field
+          label="Durum"
+          value={getProjectStatusLabel(store.projectStatus, t)}
+        />
       </div>
       <Field label="Adres" value={store.address} />
       <div className="grid grid-cols-2 gap-3">
@@ -34,7 +38,7 @@ export function StoreViewFields({ store }: StoreViewFieldsProps) {
           value={
             store.openingDate
               ? format(parseISO(store.openingDate), "d MMMM yyyy", {
-                  locale: tr,
+                  locale: dateLocale,
                 })
               : "—"
           }
@@ -44,7 +48,7 @@ export function StoreViewFields({ store }: StoreViewFieldsProps) {
           value={
             store.acceptanceDate
               ? format(parseISO(store.acceptanceDate), "d MMMM yyyy", {
-                  locale: tr,
+                  locale: dateLocale,
                 })
               : "—"
           }

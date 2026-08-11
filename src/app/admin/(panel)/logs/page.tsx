@@ -5,13 +5,16 @@ import {
   AdminPageBody,
   AdminPageHeader,
 } from "@/components/admin/admin-page-shell";
+import { useT } from "@/contexts/i18n-context";
 
 export default function AdminLogsPage() {
+  const t = useT();
+
   return (
     <>
       <AdminPageHeader
-        title="Aktivite Logları"
-        description="Sistemdeki kullanıcı, bölge ve konum işlemlerinin kaydı"
+        title={t("adminPages.logsTitle")}
+        description={t("adminPages.logsDescription")}
       />
       <AdminPageBody>
         <AdminLogsPanel />

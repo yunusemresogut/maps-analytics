@@ -8,6 +8,7 @@ import { useRegions } from "@/contexts/regions-context";
 import { useMapUi } from "@/contexts/map-ui-context";
 import { Button } from "@/components/ui/button";
 import { NotificationsPanel } from "@/components/layout/notifications-panel";
+import { useT } from "@/contexts/i18n-context";
 import type { AppNotification } from "@/types";
 
 export function MapHeaderActions() {
@@ -16,6 +17,7 @@ export function MapHeaderActions() {
   const { isPanelOpen, setPanelOpen } = useRegions();
   const { isStoreListOpen, setStoreListOpen } = useMapUi();
   const { notifications, dismiss } = useNotifications();
+  const t = useT();
   const [notifOpen, setNotifOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const bellRef = useRef<HTMLDivElement>(null);
@@ -49,36 +51,40 @@ export function MapHeaderActions() {
     <>
       <Button
         variant={isPanelOpen ? "default" : "ghost"}
-        size="sm"
+        size="icon"
+        title={t("header.regions")}
+        aria-label={t("header.regions")}
         onClick={() => {
           setStoreListOpen(false);
           setPanelOpen(!isPanelOpen);
         }}
       >
-        <Layers className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">Bölgeler</span>
+        <Layers className="h-4 w-4" />
       </Button>
 
       <Button
         variant={isStoreListOpen ? "default" : "ghost"}
-        size="sm"
+        size="icon"
+        title={t("header.stores")}
+        aria-label={t("header.stores")}
         onClick={() => {
           setPanelOpen(false);
           setStoreListOpen(!isStoreListOpen);
         }}
       >
-        <Store className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">Mağazalar</span>
+        <Store className="h-4 w-4" />
       </Button>
 
       <div ref={bellRef} className="relative">
         <Button
           variant={notifOpen ? "default" : "ghost"}
-          size="sm"
+          size="icon"
+          title={t("header.notifications")}
+          aria-label={t("header.notifications")}
           onClick={toggleNotifications}
           className="relative"
         >
-          <Bell className="h-3.5 w-3.5" />
+          <Bell className="h-4 w-4" />
           {notifications.length > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
               {notifications.length > 99 ? "99+" : notifications.length}

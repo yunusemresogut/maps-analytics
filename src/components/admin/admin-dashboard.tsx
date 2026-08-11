@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import {
   ArrowRight,
   MapPin,
@@ -12,11 +11,15 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n, useT } from "@/contexts/i18n-context";
 import { useRegions } from "@/contexts/regions-context";
 import { useStores } from "@/contexts/stores-context";
 import { useActivityLogs } from "@/hooks/use-activity-logs";
 import { computeStoreNotifications } from "@/lib/notifications";
-import { projectStatusConfig } from "@/lib/project-status";
+import {
+  getProjectStatusLabel,
+  projectStatusConfig,
+} from "@/lib/project-status";
 import type { ProjectStatus } from "@/types";
 
 export function AdminDashboard() {
@@ -24,8 +27,10 @@ export function AdminDashboard() {
   const { stores } = useStores();
   const { regions } = useRegions();
   const logs = useActivityLogs();
+  const t = useT();
+  const { dateLocale } = useI18n();
 
-  const regularUsers = users.filter((u) => u.role === "user");
+  const regularUsers = users.filter((u) => u.role !== "admin");
   const notifications = computeStoreNotifications(stores);
   const recentLogs = logs.slice(0, 6);
 
@@ -91,7 +96,7 @@ export function AdminDashboard() {
                       }}
                     />
                     <span className="w-28 text-xs text-zinc-400">
-                      {projectStatusConfig[status].label}
+                      {getProjectStatusLabel(status, t)}
                     </span>
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-800">
                       <div
@@ -138,7 +143,7 @@ export function AdminDashboard() {
                 <p className="mt-1 text-xs text-zinc-600">
                   {log.actorName} ·{" "}
                   {format(parseISO(log.createdAt), "d MMM, HH:mm", {
-                    locale: tr,
+                    locale: dateLocale,
                   })}
                 </p>
               </li>

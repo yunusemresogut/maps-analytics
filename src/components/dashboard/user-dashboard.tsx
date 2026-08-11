@@ -13,9 +13,13 @@ import {
 import { useStores } from "@/contexts/stores-context";
 import { useRegions } from "@/contexts/regions-context";
 import { useDb } from "@/contexts/db-context";
+import { useT } from "@/contexts/i18n-context";
 import { findRegionForCity } from "@/data/regions";
 import { getOpeningAlert } from "@/lib/opening-dates";
-import { projectStatusConfig } from "@/lib/project-status";
+import {
+  getProjectStatusLabel,
+  projectStatusConfig,
+} from "@/lib/project-status";
 import type { ProjectStatus } from "@/types";
 
 const LOCATION_TYPE_LABELS: Record<string, string> = {
@@ -28,6 +32,7 @@ export function UserDashboard() {
   const { stores } = useStores();
   const { regions } = useRegions();
   const { storeData } = useDb();
+  const t = useT();
 
   // Status distributions
   const statusCounts = stores.reduce(
@@ -181,7 +186,7 @@ export function UserDashboard() {
                         }}
                       />
                       <span className="w-24 shrink-0 text-xs text-zinc-400 sm:w-28 truncate">
-                        {projectStatusConfig[status].label}
+                        {getProjectStatusLabel(status, t)}
                       </span>
                       <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-800">
                         <div
@@ -309,7 +314,7 @@ export function UserDashboard() {
                       borderColor: `${projectStatusConfig[store.projectStatus].marker}30`,
                     }}
                   >
-                    {projectStatusConfig[store.projectStatus].label}
+                    {getProjectStatusLabel(store.projectStatus, t)}
                   </span>
                 </li>
               ))}

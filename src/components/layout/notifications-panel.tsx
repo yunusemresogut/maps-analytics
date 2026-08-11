@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import {
   AlertTriangle,
   Bell,
@@ -12,6 +11,7 @@ import {
   ShoppingCart,
   X,
 } from "lucide-react";
+import { useI18n } from "@/contexts/i18n-context";
 import type { AppNotification } from "@/types";
 
 type NotificationsPanelProps = {
@@ -42,6 +42,7 @@ export function NotificationsPanel({
   anchorRect,
 }: NotificationsPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const { t, dateLocale } = useI18n();
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -75,7 +76,9 @@ export function NotificationsPanel({
       <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <div className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-cyan-400" />
-          <span className="text-sm font-medium text-zinc-200">Bildirimler</span>
+          <span className="text-sm font-medium text-zinc-200">
+            {t("notifications.title")}
+          </span>
           {notifications.length > 0 && (
             <span className="rounded-full bg-red-500/20 px-1.5 py-0.5 text-xs text-red-400">
               {notifications.length}
@@ -86,6 +89,7 @@ export function NotificationsPanel({
           type="button"
           onClick={onClose}
           className="rounded-lg p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+          aria-label={t("common.close")}
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -94,7 +98,7 @@ export function NotificationsPanel({
       <ul className="scrollbar-themed max-h-80 overflow-y-auto p-2">
         {notifications.length === 0 && (
           <li className="px-3 py-6 text-center text-sm text-zinc-500">
-            Bildirim yok
+            {t("notifications.empty")}
           </li>
         )}
         {notifications.map((notif) => {
@@ -113,7 +117,7 @@ export function NotificationsPanel({
                     <p className="text-sm text-zinc-300">{notif.message}</p>
                     <p className="mt-1 text-xs text-zinc-600">
                       {format(parseISO(notif.createdAt), "d MMM yyyy, HH:mm", {
-                        locale: tr,
+                        locale: dateLocale,
                       })}
                     </p>
                   </div>
@@ -122,7 +126,7 @@ export function NotificationsPanel({
                   type="button"
                   onClick={() => onDismiss(notif.id)}
                   className="shrink-0 rounded-md p-1.5 text-zinc-600 opacity-70 transition-opacity hover:bg-white/5 hover:text-zinc-300 group-hover:opacity-100"
-                  aria-label="Bildirimi kapat"
+                  aria-label={t("notifications.dismiss")}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -138,7 +142,7 @@ export function NotificationsPanel({
           onClick={onClose}
           className="block rounded-lg px-3 py-2 text-center text-xs font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10"
         >
-          Tüm bildirimleri gör
+          {t("notifications.viewAll")}
         </Link>
       </div>
     </div>,

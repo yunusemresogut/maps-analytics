@@ -1,10 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Search, Store, X } from "lucide-react";
 import { useMapUi } from "@/contexts/map-ui-context";
+import { useT } from "@/contexts/i18n-context";
+import { TablePagination } from "@/components/modules/module-table";
+import { useTableState } from "@/hooks/use-table-state";
 import { getOpeningAlert, shouldHighlightRed } from "@/lib/opening-dates";
-import { projectStatusConfig } from "@/lib/project-status";
+import {
+  getProjectStatusLabel,
+  projectStatusConfig,
+} from "@/lib/project-status";
 import { Input } from "@/components/ui/input";
 import type { ProjectStatus, Store as StoreType } from "@/types";
 
@@ -15,15 +21,7 @@ type StoreListPanelProps = {
 };
 
 type StatusFilter = "all" | "opening_soon" | ProjectStatus;
-
-const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "Tümü" },
-  { value: "opening_soon", label: "Yakında Açılıyor" },
-  ...(Object.keys(projectStatusConfig) as ProjectStatus[]).map((status) => ({
-    value: status as StatusFilter,
-    label: projectStatusConfig[status].label,
-  })),
-];
+type SortKey = "priority";
 
 function getStoreMarkerColor(store: StoreType): string {
   if (shouldHighlightRed(store.openingDate)) return "#f87171";
@@ -36,8 +34,27 @@ export function StoreListPanel({
   onSelect,
 }: StoreListPanelProps) {
   const { isStoreListOpen, setStoreListOpen } = useMapUi();
+  const t = useT();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const statusFilters = useMemo(
+    () =>
+      [
+        { value: "all" as const, label: t("common.all") },
+        {
+          value: "opening_soon" as const,
+          label: t("status.yakinda_aciliyor"),
+        },
+        ...(Object.keys(projectStatusConfig) as ProjectStatus[]).map(
+          (status) => ({
+            value: status as StatusFilter,
+            label: getProjectStatusLabel(status, t),
+          })
+        ),
+      ] satisfies { value: StatusFilter; label: string }[],
+    [t]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -59,13 +76,21 @@ export function StoreListPanel({
       );
     }
 
-    return [...list].sort((a, b) => {
-      const aSoon = getOpeningAlert(a.openingDate).isOpeningSoon ? 0 : 1;
-      const bSoon = getOpeningAlert(b.openingDate).isOpeningSoon ? 0 : 1;
-      if (aSoon !== bSoon) return aSoon - bSoon;
-      return a.name.localeCompare(b.name, "tr");
-    });
+    return list;
   }, [stores, query, statusFilter]);
+
+  const getSortValue = useCallback((store: StoreType, _key: SortKey) => {
+    const soon = getOpeningAlert(store.openingDate).isOpeningSoon ? 0 : 1;
+    return `${soon}-${store.name}`;
+  }, []);
+
+  const table = useTableState<StoreType, SortKey>({
+    items: filtered,
+    initialSort: { key: "priority", direction: "asc" },
+    getSortValue,
+    initialPageSize: 15,
+    resetKey: `${query}|${statusFilter}`,
+  });
 
   if (!isStoreListOpen) return null;
 
@@ -101,7 +126,7 @@ export function StoreListPanel({
           </div>
 
           <div className="scrollbar-themed flex gap-1 overflow-x-auto pb-0.5">
-            {STATUS_FILTERS.map(({ value, label }) => (
+            {statusFilters.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
@@ -121,13 +146,12 @@ export function StoreListPanel({
         </div>
 
         <ul className="scrollbar-themed flex-1 overflow-y-auto p-2">
-          {filtered.length === 0 && (
+          {table.totalItems === 0 && (
             <li className="px-3 py-8 text-center text-sm text-zinc-600">
               Mağaza bulunamadı
             </li>
           )}
-          {filtered.map((store) => {
-            const status = projectStatusConfig[store.projectStatus];
+          {table.pageItems.map((store) => {
             const openingAlert = getOpeningAlert(store.openingDate);
             const isOpeningSoon = openingAlert.isOpeningSoon;
             const markerColor = getStoreMarkerColor(store);
@@ -167,7 +191,8 @@ export function StoreListPanel({
                         {store.name}
                       </p>
                       <p className="truncate text-xs text-zinc-500">
-                        {store.city} · {status.label}
+                        {store.city} ·{" "}
+                        {getProjectStatusLabel(store.projectStatus, t)}
                       </p>
                       {isOpeningSoon && (
                         <p className="mt-0.5 text-xs font-medium text-red-400">
@@ -181,6 +206,18 @@ export function StoreListPanel({
             );
           })}
         </ul>
+
+        <TablePagination
+          page={table.page}
+          totalPages={table.totalPages}
+          totalItems={table.totalItems}
+          rangeStart={table.rangeStart}
+          rangeEnd={table.rangeEnd}
+          onPageChange={table.setPage}
+          pageSize={table.pageSize}
+          onPageSizeChange={table.setPageSize}
+          pageSizeOptions={[15, 30, 50]}
+        />
       </div>
     </div>
   );

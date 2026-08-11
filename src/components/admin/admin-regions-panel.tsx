@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { ALL_TURKEY_CITIES } from "@/data/regions";
 import { useRegions } from "@/contexts/regions-context";
+import { TablePagination } from "@/components/modules/module-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { useTableState } from "@/hooks/use-table-state";
+import type { Region } from "@/types";
 
 const REGION_COLORS = [
   "#22d3ee",
@@ -17,6 +20,8 @@ const REGION_COLORS = [
   "#fb923c",
   "#f472b6",
 ];
+
+type SortKey = "name" | "cities";
 
 export function AdminRegionsPanel() {
   const {
@@ -29,6 +34,18 @@ export function AdminRegionsPanel() {
 
   const [newName, setNewName] = useState("");
   const [selectedCity, setSelectedCity] = useState<Record<string, string>>({});
+
+  const getSortValue = useCallback((region: Region, key: SortKey) => {
+    if (key === "cities") return region.cities.length;
+    return region.name;
+  }, []);
+
+  const table = useTableState<Region, SortKey>({
+    items: regions,
+    initialSort: { key: "name", direction: "asc" },
+    getSortValue,
+    initialPageSize: 6,
+  });
 
   const handleAddRegion = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,8 +76,22 @@ export function AdminRegionsPanel() {
         </Button>
       </form>
 
+      <div className="flex justify-end">
+        <Select
+          value={table.sort.key}
+          onChange={(e) => {
+            const key = e.target.value as SortKey;
+            if (table.sort.key !== key) table.toggleSort(key);
+          }}
+          className="h-9 w-auto min-w-[160px]"
+        >
+          <option value="name">Ada göre</option>
+          <option value="cities">Şehir sayısına göre</option>
+        </Select>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
-        {regions.map((region) => (
+        {table.pageItems.map((region) => (
           <div
             key={region.id}
             className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4"
@@ -124,30 +155,43 @@ export function AdminRegionsPanel() {
               </Button>
             </div>
 
-            <div className="scrollbar-themed max-h-36 overflow-y-auto">
-              <ul className="flex flex-wrap gap-1.5">
-              {region.cities.length === 0 && (
-                <li className="text-xs text-zinc-600">Henüz şehir yok</li>
-              )}
+            <div className="flex flex-wrap gap-1.5">
               {region.cities.map((city) => (
-                <li
+                <span
                   key={city}
-                  className="flex items-center gap-1 rounded-full border border-zinc-700 bg-zinc-950/50 px-2 py-0.5 text-xs text-zinc-300"
+                  className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300"
                 >
                   {city}
                   <button
                     type="button"
                     onClick={() => removeCityFromRegion(region.id, city)}
-                    className="text-zinc-600 hover:text-red-400"
+                    className="text-zinc-500 hover:text-red-400"
+                    aria-label={`${city} kaldır`}
                   >
                     <X className="h-3 w-3" />
                   </button>
-                </li>
+                </span>
               ))}
-              </ul>
+              {region.cities.length === 0 && (
+                <span className="text-xs text-zinc-600">Şehir yok</span>
+              )}
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-zinc-800">
+        <TablePagination
+          page={table.page}
+          totalPages={table.totalPages}
+          totalItems={table.totalItems}
+          rangeStart={table.rangeStart}
+          rangeEnd={table.rangeEnd}
+          onPageChange={table.setPage}
+          pageSize={table.pageSize}
+          onPageSizeChange={table.setPageSize}
+          pageSizeOptions={[6, 12, 24]}
+        />
       </div>
     </div>
   );

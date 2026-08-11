@@ -1,7 +1,8 @@
 "use client";
 
-import { AdminMobileTopBar } from "@/components/admin/admin-sidebar";
-import { useAdminLayout } from "@/contexts/admin-layout-context";
+import { Menu } from "lucide-react";
+import { useSidebar } from "@/contexts/sidebar-context";
+import { useT } from "@/contexts/i18n-context";
 
 type AdminPageHeaderProps = {
   title: string;
@@ -14,11 +15,24 @@ export function AdminPageHeader({
   description,
   children,
 }: AdminPageHeaderProps) {
-  const { openMobileMenu } = useAdminLayout();
+  const { open, isPinned } = useSidebar();
+  const t = useT();
 
   return (
     <>
-      <AdminMobileTopBar title={title} onMenuOpen={openMobileMenu} />
+      <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur-md lg:hidden">
+        {!isPinned && (
+          <button
+            type="button"
+            onClick={open}
+            className="rounded-lg border border-zinc-800 p-2 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+            aria-label={t("nav.openMenu")}
+          >
+            <Menu className="h-4 w-4" />
+          </button>
+        )}
+        <h1 className="truncate text-sm font-medium text-zinc-200">{title}</h1>
+      </div>
       <div className="border-b border-zinc-800/80 px-4 py-5 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">

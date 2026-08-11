@@ -16,8 +16,12 @@ import { StoreDetailPanel } from "@/components/map/store-detail-panel";
 import { AddStorePanel } from "@/components/map/add-store-panel";
 import { RegionFilterPanel } from "@/components/map/region-filter-panel";
 import { StoreListPanel } from "@/components/map/store-list-panel";
+import { useT } from "@/contexts/i18n-context";
 import { getOpeningAlert } from "@/lib/opening-dates";
-import { projectStatusConfig } from "@/lib/project-status";
+import {
+  getProjectStatusLabel,
+  projectStatusConfig,
+} from "@/lib/project-status";
 import { Button } from "@/components/ui/button";
 import type { ProjectStatus } from "@/types";
 
@@ -31,9 +35,10 @@ const TURKEY_CENTER = { longitude: 35.2433, latitude: 38.9637, zoom: 5.5 };
 
 export function StoreMap() {
   const { theme } = useTheme();
+  const t = useT();
   const searchParams = useSearchParams();
   const mapRef = useRef<MapRef>(null);
-  const { canAdd } = usePermissions();
+  const { canAdd } = usePermissions("map");
   const { stores, getStore } = useStores();
   const { regions, isRegionVisible } = useRegions();
 
@@ -165,7 +170,7 @@ export function StoreMap() {
                       backgroundColor: projectStatusConfig[status].marker,
                     }}
                   />
-                  {projectStatusConfig[status].label} (
+                  {getProjectStatusLabel(status, t)} (
                   {statusCounts[status] ?? 0})
                 </div>
               )
@@ -173,7 +178,7 @@ export function StoreMap() {
             {openingSoonCount > 0 && (
               <div className="flex items-center gap-1.5 text-xs text-red-400">
                 <span className="h-2 w-2 rounded-full bg-red-400 animate-pulse" />
-                Yakında Açılıyor ({openingSoonCount})
+                {t("status.yakinda_aciliyor")} ({openingSoonCount})
               </div>
             )}
           </div>
@@ -203,12 +208,6 @@ export function StoreMap() {
             )}
           </div>
         )}
-
-        {addMode && !pendingCoords && (
-          <p className="pointer-events-none rounded-lg border border-cyan-500/30 bg-zinc-950/90 px-3 py-2 text-xs text-cyan-300 backdrop-blur-md">
-            Haritada bir noktaya tıklayın
-          </p>
-        )}
       </div>
 
       {selectedStore && !addMode && (
@@ -218,10 +217,11 @@ export function StoreMap() {
         />
       )}
 
-      {pendingCoords && addMode && (
+      {addMode && (
         <AddStorePanel
           coords={pendingCoords}
-          onClose={() => setPendingCoords(null)}
+          onCoordsChange={setPendingCoords}
+          onClose={exitAddMode}
           onSaved={(id) => {
             setAddMode(false);
             setPendingCoords(null);

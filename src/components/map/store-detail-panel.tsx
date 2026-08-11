@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import {
   AlertTriangle,
   CalendarRange,
   ChevronLeft,
   Download,
+  ExternalLink,
   FileText,
   Package,
   Pencil,
@@ -17,11 +17,14 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n, useT } from "@/contexts/i18n-context";
 import { useStoreData } from "@/contexts/store-data-context";
 import { useStores } from "@/contexts/stores-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { AuditLogSection } from "@/components/map/audit-log-section";
+import { ApprovalSwitches } from "@/components/projects/approval-switches";
 import { ExcelImportPanel } from "@/components/map/excel-import-panel";
 import { ExcelWorkPlanImportPanel } from "@/components/map/excel-work-plan-import-panel";
 import { MaterialsPanel } from "@/components/map/materials-panel";
@@ -42,6 +45,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ALLOWED_FILE_ACCEPT, ALLOWED_FILE_LABELS } from "@/lib/file-types";
 import { getOpeningAlert } from "@/lib/opening-dates";
 import {
+  getProjectStatusLabel,
   projectStatusConfig,
   supportsExcelImport,
   supportsOrderReminder,
@@ -61,7 +65,9 @@ function formatFileSize(bytes: number) {
 
 export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
   const { user } = useAuth();
-  const { canEdit, canDelete } = usePermissions();
+  const t = useT();
+  const { dateLocale } = useI18n();
+  const { canEdit, canDelete } = usePermissions("map");
   const { updateStore, deleteStore } = useStores();
   const {
     getStoreData,
@@ -253,11 +259,11 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
             <Badge
               className={`${projectConfig.color} border border-current/20 bg-current/10`}
             >
-              {projectConfig.label}
+              {getProjectStatusLabel(store.projectStatus, t)}
             </Badge>
             {openingAlert.isOpeningSoon && (
               <Badge className="text-red-400 border border-red-500/20 bg-red-500/10 animate-pulse">
-                Yakında Açılıyor
+                {t("status.yakinda_aciliyor")}
               </Badge>
             )}
             {isEditing && (
@@ -332,6 +338,16 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
 
           <AuditLogSection audit={store} />
 
+          <ApprovalSwitches store={store} />
+
+          <Link
+            href={`/stores/${store.id}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-400 hover:text-cyan-300"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            {t("common.openFullPage")}
+          </Link>
+
           <section>
             <label className="text-xs font-medium uppercase tracking-wider text-zinc-500">
               Özel Not
@@ -381,7 +397,7 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
                     <p className="mt-1 text-xs text-zinc-600">
                       {note.userName} ·{" "}
                       {format(parseISO(note.createdAt), "d MMM yyyy, HH:mm", {
-                        locale: tr,
+                        locale: dateLocale,
                       })}
                     </p>
                   </div>

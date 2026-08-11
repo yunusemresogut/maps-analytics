@@ -1,54 +1,64 @@
+import type { TranslationKey } from "@/i18n";
 import type { ProjectStatus } from "@/types";
 
 export const projectStatusConfig: Record<
   ProjectStatus,
-  { label: string; color: string; marker: string }
+  { labelKey: TranslationKey; color: string; marker: string }
 > = {
   proje: {
-    label: "Proje",
+    labelKey: "status.proje",
     color: "text-cyan-400",
     marker: "#22d3ee",
   },
   ihale: {
-    label: "İhale",
+    labelKey: "status.ihale",
     color: "text-violet-400",
     marker: "#a78bfa",
   },
   santiye: {
-    label: "Şantiye",
+    labelKey: "status.santiye",
     color: "text-amber-400",
     marker: "#fbbf24",
   },
   acilis: {
-    label: "Açılış",
+    labelKey: "status.acilis",
     color: "text-emerald-400",
     marker: "#34d399",
   },
   hakedis: {
-    label: "Hakediş",
+    labelKey: "status.hakedis",
     color: "text-orange-400",
     marker: "#fb923c",
   },
   fatura: {
-    label: "Fatura",
+    labelKey: "status.fatura",
     color: "text-pink-400",
     marker: "#f472b6",
   },
   yakinda_aciliyor: {
-    label: "Yakında Açılıyor",
+    labelKey: "status.yakinda_aciliyor",
     color: "text-red-400",
     marker: "#f87171",
   },
 };
 
-export const projectStatusOptions = (
-  Object.keys(projectStatusConfig) as ProjectStatus[]
-)
-  .filter((value) => value !== "yakinda_aciliyor")
-  .map((value) => ({
-    value,
-    label: projectStatusConfig[value].label,
-  }));
+type TranslateFn = (key: TranslationKey) => string;
+
+export function getProjectStatusLabel(
+  status: ProjectStatus,
+  t: TranslateFn
+): string {
+  return t(projectStatusConfig[status].labelKey);
+}
+
+export function getProjectStatusOptions(t: TranslateFn) {
+  return (Object.keys(projectStatusConfig) as ProjectStatus[])
+    .filter((value) => value !== "yakinda_aciliyor")
+    .map((value) => ({
+      value,
+      label: getProjectStatusLabel(value, t),
+    }));
+}
 
 /** İhale ve Proje durumlarında Excel import desteklenir */
 export const EXCEL_IMPORT_STATUSES: ProjectStatus[] = ["proje", "ihale"];

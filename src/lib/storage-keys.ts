@@ -6,6 +6,8 @@ export const STORAGE_KEYS = {
   session: "maps-analytics-session",
   dismissedNotifications: "maps-analytics-dismissed-notifications",
   activityLogs: "maps-analytics-activity-logs",
+  sidebarPinned: "maps-analytics-sidebar-pinned",
+  locale: "maps-analytics-locale",
 } as const;
 
 export function getStoreDataKey(userId: string) {

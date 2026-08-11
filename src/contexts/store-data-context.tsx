@@ -8,6 +8,7 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 import { useDb } from "@/contexts/db-context";
 import { supabase } from "@/lib/supabase";
+import { logActivity } from "@/lib/activity-log";
 import { isAllowedFileType } from "@/lib/file-types";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
@@ -113,6 +114,15 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         .then(({ error }) => {
           if (error) console.error("Error inserting note:", error);
         });
+      logActivity({
+        category: "note",
+        action: "create",
+        message: `Not eklendi (${storeId})`,
+        actorId: user.id,
+        actorName: user.name,
+        targetId: note.id,
+        targetLabel: storeId,
+      });
     },
     [user, data, setData]
   );
@@ -135,8 +145,19 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         .then(({ error }) => {
           if (error) console.error("Error deleting note:", error);
         });
+      if (user) {
+        logActivity({
+          category: "note",
+          action: "delete",
+          message: `Not silindi (${storeId})`,
+          actorId: user.id,
+          actorName: user.name,
+          targetId: noteId,
+          targetLabel: storeId,
+        });
+      }
     },
-    [data, setData]
+    [data, setData, user]
   );
 
   const updateSpecialNote = useCallback(
@@ -154,8 +175,19 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         .then(({ error }) => {
           if (error) console.error("Error updating special note:", error);
         });
+      if (user) {
+        logActivity({
+          category: "note",
+          action: "update",
+          message: `Özel not güncellendi (${storeId})`,
+          actorId: user.id,
+          actorName: user.name,
+          targetId: storeId,
+          targetLabel: storeId,
+        });
+      }
     },
-    [data, setData]
+    [data, setData, user]
   );
 
   const addFile = useCallback(
@@ -229,6 +261,16 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
           throw dbErr;
         }
 
+        logActivity({
+          category: "file",
+          action: "upload",
+          message: `Dosya yüklendi: ${file.name}`,
+          actorId: user.id,
+          actorName: user.name,
+          targetId: storeFile.id,
+          targetLabel: storeId,
+        });
+
         return { success: true };
       } catch (err: any) {
         console.error("File upload error:", err);
@@ -277,8 +319,19 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
           console.warn("Storage deletion parsing error:", storageErr);
         }
       }
+      if (user) {
+        logActivity({
+          category: "file",
+          action: "delete",
+          message: `Dosya silindi: ${fileToDelete?.name ?? fileId}`,
+          actorId: user.id,
+          actorName: user.name,
+          targetId: fileId,
+          targetLabel: storeId,
+        });
+      }
     },
-    [data, setData]
+    [data, setData, user]
   );
 
   const importMaterials = useCallback(
@@ -336,6 +389,16 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.error("Bulk materials insert error:", err);
       }
+
+      logActivity({
+        category: "material",
+        action: "import",
+        message: `Malzeme ${mode === "replace" ? "içe aktarıldı" : "eklendi"}: ${imported.length} satır (${storeId})`,
+        actorId: user.id,
+        actorName: user.name,
+        targetId: storeId,
+        targetLabel: storeId,
+      });
 
       return imported.length;
     },
@@ -439,8 +502,19 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         .then(({ error }) => {
           if (error) console.error("Error deleting material:", error);
         });
+      if (user) {
+        logActivity({
+          category: "material",
+          action: "delete",
+          message: `Malzeme silindi (${storeId})`,
+          actorId: user.id,
+          actorName: user.name,
+          targetId: materialId,
+          targetLabel: storeId,
+        });
+      }
     },
-    [data, setData]
+    [data, setData, user]
   );
 
   const clearMaterials = useCallback(
@@ -458,8 +532,18 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         .then(({ error }) => {
           if (error) console.error("Error clearing materials:", error);
         });
+      if (user) {
+        logActivity({
+          category: "material",
+          action: "clear",
+          message: `Malzeme listesi temizlendi (${storeId})`,
+          actorId: user.id,
+          actorName: user.name,
+          targetId: storeId,
+        });
+      }
     },
-    [data, setData]
+    [data, setData, user]
   );
 
   const importWorkPlan = useCallback(
@@ -515,6 +599,15 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.error("Bulk work plan insert error:", err);
       }
+
+      logActivity({
+        category: "workplan",
+        action: "import",
+        message: `İş programı ${mode === "replace" ? "içe aktarıldı" : "eklendi"}: ${imported.length} satır (${storeId})`,
+        actorId: user.id,
+        actorName: user.name,
+        targetId: storeId,
+      });
 
       return imported.length;
     },
@@ -618,8 +711,19 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         .then(({ error }) => {
           if (error) console.error("Error deleting work plan item:", error);
         });
+      if (user) {
+        logActivity({
+          category: "workplan",
+          action: "delete",
+          message: `İş programı kalemi silindi (${storeId})`,
+          actorId: user.id,
+          actorName: user.name,
+          targetId: itemId,
+          targetLabel: storeId,
+        });
+      }
     },
-    [data, setData]
+    [data, setData, user]
   );
 
   const clearWorkPlan = useCallback(
@@ -637,8 +741,18 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         .then(({ error }) => {
           if (error) console.error("Error clearing work plan:", error);
         });
+      if (user) {
+        logActivity({
+          category: "workplan",
+          action: "clear",
+          message: `İş programı temizlendi (${storeId})`,
+          actorId: user.id,
+          actorName: user.name,
+          targetId: storeId,
+        });
+      }
     },
-    [data, setData]
+    [data, setData, user]
   );
 
   return (

@@ -5,13 +5,16 @@ import {
   AdminPageBody,
   AdminPageHeader,
 } from "@/components/admin/admin-page-shell";
+import { useT } from "@/contexts/i18n-context";
 
 export default function AdminDashboardPage() {
+  const t = useT();
+
   return (
     <>
       <AdminPageHeader
-        title="Admin Dashboard"
-        description="Sistem özeti, kullanıcılar ve son aktiviteler"
+        title={t("adminPages.dashboardTitle")}
+        description={t("adminPages.dashboardDescription")}
       />
       <AdminPageBody>
         <AdminDashboard />

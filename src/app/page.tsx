@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { homePathForRole } from "@/lib/roles";
 
 export default function RootPage() {
   const { user, isLoading } = useAuth();
@@ -12,10 +13,8 @@ export default function RootPage() {
     if (isLoading) return;
     if (!user) {
       router.replace("/login");
-    } else if (user.role === "admin") {
-      router.replace("/admin/dashboard");
     } else {
-      router.replace("/map");
+      router.replace(homePathForRole(user.role));
     }
   }, [user, isLoading, router]);
 

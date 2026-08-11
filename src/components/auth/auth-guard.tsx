@@ -3,17 +3,24 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { canAccessRoute } from "@/lib/permissions";
+import { homePathForRole } from "@/lib/roles";
+import { PageLoader } from "@/components/ui/spinner";
+import type { AppRouteKey, UserRole } from "@/types";
 
 type AuthGuardProps = {
   children: React.ReactNode;
   redirectTo?: string;
-  allowedRoles?: ("admin" | "user")[];
+  /** @deprecated Prefer routeKey */
+  allowedRoles?: UserRole[];
+  routeKey?: AppRouteKey;
 };
 
 export function AuthGuard({
   children,
   redirectTo = "/login",
   allowedRoles,
+  routeKey,
 }: AuthGuardProps) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
@@ -25,20 +32,21 @@ export function AuthGuard({
       return;
     }
     if (allowedRoles && !allowedRoles.includes(user.role)) {
-      router.replace(user.role === "admin" ? "/admin" : "/");
+      router.replace(homePathForRole(user.role));
+      return;
     }
-  }, [user, isLoading, router, redirectTo, allowedRoles]);
+    if (routeKey && !canAccessRoute(user, routeKey)) {
+      router.replace(homePathForRole(user.role));
+    }
+  }, [user, isLoading, router, redirectTo, allowedRoles, routeKey]);
 
   if (isLoading) {
-    return (
-      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!user) return null;
   if (allowedRoles && !allowedRoles.includes(user.role)) return null;
+  if (routeKey && !canAccessRoute(user, routeKey)) return null;
 
   return <>{children}</>;
 }

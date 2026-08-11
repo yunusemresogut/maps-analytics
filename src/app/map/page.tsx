@@ -6,7 +6,7 @@ import { MapLoader } from "@/components/map/map-loader";
 
 export default function MapPage() {
   return (
-    <AuthGuard allowedRoles={["user"]}>
+    <AuthGuard routeKey="map">
       <div className="h-[calc(100vh-3.5rem)]">
         <Suspense
           fallback={

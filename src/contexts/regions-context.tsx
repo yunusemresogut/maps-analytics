@@ -41,17 +41,22 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
   const [isPanelOpen, setPanelOpen] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchRegions = async () => {
       try {
         const { data, error } = await supabase.from("regions").select("*");
         if (error) throw error;
+        if (cancelled) return;
         if (data && data.length > 0) {
           setRegions(data);
           setVisibleRegions(buildVisibility(data));
         } else {
-          // Auto-seed default regions
-          const { error: seedError } = await supabase.from("regions").insert(defaultRegions);
-          if (!seedError) {
+          // Auto-seed default regions (only when authenticated insert is allowed)
+          const { error: seedError } = await supabase
+            .from("regions")
+            .insert(defaultRegions);
+          if (!seedError && !cancelled) {
             setRegions(defaultRegions);
             setVisibleRegions(buildVisibility(defaultRegions));
           }
@@ -60,7 +65,30 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
         console.error("Regions fetch error:", err);
       }
     };
-    fetchRegions();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setTimeout(() => {
+        if (cancelled) return;
+        if (event === "SIGNED_OUT") {
+          setRegions([]);
+          setVisibleRegions({});
+          return;
+        }
+        if (
+          (event === "INITIAL_SESSION" && session) ||
+          event === "SIGNED_IN"
+        ) {
+          void fetchRegions();
+        }
+      }, 0);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const persist = useCallback((next: Region[], idToSync?: string) => {

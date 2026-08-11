@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  Coins,
   Check,
   Edit2,
   TrendingDown,
@@ -13,9 +12,30 @@ import {
 } from "lucide-react";
 import { useStores } from "@/contexts/stores-context";
 import { useStoreData } from "@/contexts/store-data-context";
+import { useTableState } from "@/hooks/use-table-state";
 import { formatCurrency } from "@/lib/excel-materials";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  SortableTh,
+  TablePagination,
+} from "@/components/modules/module-table";
+import type { Store } from "@/types";
+
+type BudgetRow = Store & {
+  spentAmount: number;
+  remainingBudget: number;
+  isOverrun: boolean;
+  percentSpent: number;
+};
+
+type SortKey =
+  | "name"
+  | "city"
+  | "totalBudget"
+  | "spentAmount"
+  | "remainingBudget"
+  | "percentSpent";
 
 export function AdminBudgetsPanel() {
   const { stores, updateStore } = useStores();
@@ -24,28 +44,40 @@ export function AdminBudgetsPanel() {
   const [editBudgetValue, setEditBudgetValue] = useState("");
   const [message, setMessage] = useState("");
 
-  // Map stores with dynamic calculated spent amounts from materials lists
-  const storesData = stores.map((store) => {
-    const sData = getStoreData(store.id);
-    const spentAmount = sData.materials.reduce(
-      (sum, m) => sum + m.quantity * m.unitPrice,
-      0
-    );
-    const remainingBudget = store.totalBudget - spentAmount;
-    const isOverrun = spentAmount > store.totalBudget;
-    const percentSpent =
-      store.totalBudget > 0 ? (spentAmount / store.totalBudget) * 100 : 0;
+  const storesData = useMemo(
+    () =>
+      stores.map((store) => {
+        const sData = getStoreData(store.id);
+        const spentAmount = sData.materials.reduce(
+          (sum, m) => sum + m.quantity * m.unitPrice,
+          0
+        );
+        const remainingBudget = store.totalBudget - spentAmount;
+        const isOverrun = spentAmount > store.totalBudget;
+        const percentSpent =
+          store.totalBudget > 0 ? (spentAmount / store.totalBudget) * 100 : 0;
 
-    return {
-      ...store,
-      spentAmount,
-      remainingBudget,
-      isOverrun,
-      percentSpent,
-    };
+        return {
+          ...store,
+          spentAmount,
+          remainingBudget,
+          isOverrun,
+          percentSpent,
+        };
+      }),
+    [stores, getStoreData]
+  );
+
+  const getSortValue = useCallback((item: BudgetRow, key: SortKey) => {
+    return item[key];
+  }, []);
+
+  const table = useTableState<BudgetRow, SortKey>({
+    items: storesData,
+    initialSort: { key: "percentSpent", direction: "desc" },
+    getSortValue,
   });
 
-  // Calculate overall metrics
   const totalBudget = storesData.reduce((sum, s) => sum + s.totalBudget, 0);
   const totalSpent = storesData.reduce((sum, s) => sum + s.spentAmount, 0);
   const totalRemaining = totalBudget - totalSpent;
@@ -73,7 +105,6 @@ export function AdminBudgetsPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Metrics Cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           icon={Wallet}
@@ -101,22 +132,32 @@ export function AdminBudgetsPanel() {
         />
       </div>
 
-      {/* Visual Chart Section */}
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 lg:col-span-2 space-y-4">
-          <h2 className="text-sm font-medium text-zinc-300">Bütçe Kullanım Analizi</h2>
+          <h2 className="text-sm font-medium text-zinc-300">
+            Bütçe Kullanım Analizi
+          </h2>
           <div className="space-y-3">
-            {storesData
-              .slice(0, 5)
+            {[...storesData]
               .sort((a, b) => b.percentSpent - a.percentSpent)
+              .slice(0, 5)
               .map((store) => {
                 const isOver = store.isOverrun;
                 return (
                   <div key={store.id} className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-zinc-300">{store.name}</span>
-                      <span className={isOver ? "text-red-400 font-semibold" : "text-zinc-400"}>
-                        %{Math.round(store.percentSpent)} ({formatCurrency(store.spentAmount)})
+                      <span className="font-medium text-zinc-300">
+                        {store.name}
+                      </span>
+                      <span
+                        className={
+                          isOver
+                            ? "text-red-400 font-semibold"
+                            : "text-zinc-400"
+                        }
+                      >
+                        %{Math.round(store.percentSpent)} (
+                        {formatCurrency(store.spentAmount)})
                       </span>
                     </div>
                     <div className="relative h-2 w-full overflow-hidden rounded-full bg-zinc-800">
@@ -124,7 +165,9 @@ export function AdminBudgetsPanel() {
                         className={`h-full rounded-full transition-all duration-300 ${
                           isOver ? "bg-red-500" : "bg-violet-500"
                         }`}
-                        style={{ width: `${Math.min(store.percentSpent, 100)}%` }}
+                        style={{
+                          width: `${Math.min(store.percentSpent, 100)}%`,
+                        }}
                       />
                     </div>
                   </div>
@@ -135,22 +178,33 @@ export function AdminBudgetsPanel() {
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 flex flex-col justify-between">
           <div>
-            <h2 className="text-sm font-medium text-zinc-300">Genel Finansal Özet</h2>
+            <h2 className="text-sm font-medium text-zinc-300">
+              Genel Finansal Özet
+            </h2>
             <div className="mt-4 space-y-3.5">
               <div className="flex justify-between items-center text-xs">
                 <span className="text-zinc-500">Ortalama Bütçe</span>
                 <span className="font-semibold text-zinc-300">
-                  {formatCurrency(stores.length ? totalBudget / stores.length : 0)}
+                  {formatCurrency(
+                    stores.length ? totalBudget / stores.length : 0
+                  )}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs">
-                <span className="text-zinc-500">Bütçe Verimliliği (Spent/Budget)</span>
+                <span className="text-zinc-500">
+                  Bütçe Verimliliği (Spent/Budget)
+                </span>
                 <span className="font-semibold text-zinc-300">
-                  %{totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0}
+                  %
+                  {totalBudget > 0
+                    ? Math.round((totalSpent / totalBudget) * 100)
+                    : 0}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs">
-                <span className="text-zinc-500">Kritik Limit Şantiyeleri (&gt;%90)</span>
+                <span className="text-zinc-500">
+                  Kritik Limit Şantiyeleri (&gt;%90)
+                </span>
                 <span className="font-semibold text-zinc-300">
                   {storesData.filter((s) => s.percentSpent >= 90).length}
                 </span>
@@ -165,26 +219,68 @@ export function AdminBudgetsPanel() {
         </section>
       </div>
 
-      {/* Stores Budgets List Table */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
         <div className="border-b border-zinc-800 px-5 py-4 flex items-center justify-between">
-          <h2 className="font-medium text-zinc-200">Şantiye Bütçe Listesi ({stores.length})</h2>
+          <h2 className="font-medium text-zinc-200">
+            Şantiye Bütçe Listesi ({stores.length})
+          </h2>
         </div>
         <div className="overflow-x-auto scrollbar-themed">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-zinc-950/40 text-zinc-500 uppercase tracking-wider text-[10px]">
               <tr className="border-b border-zinc-800">
-                <th className="px-5 py-3 font-medium">Şantiye / Mağaza</th>
-                <th className="px-4 py-3 font-medium">Şehir</th>
-                <th className="px-4 py-3 font-medium text-right">Toplam Bütçe</th>
-                <th className="px-4 py-3 font-medium text-right">Harcanan Tutar</th>
-                <th className="px-4 py-3 font-medium text-right">Kalan Tutar</th>
-                <th className="px-4 py-3 font-medium text-center">Bütçe Durumu</th>
+                <SortableTh
+                  columnKey="name"
+                  label="Şantiye / Mağaza"
+                  activeKey={table.sort.key}
+                  direction={table.sort.direction}
+                  onToggle={table.toggleSort}
+                  className="px-5"
+                />
+                <SortableTh
+                  columnKey="city"
+                  label="Şehir"
+                  activeKey={table.sort.key}
+                  direction={table.sort.direction}
+                  onToggle={table.toggleSort}
+                />
+                <SortableTh
+                  columnKey="totalBudget"
+                  label="Toplam Bütçe"
+                  activeKey={table.sort.key}
+                  direction={table.sort.direction}
+                  onToggle={table.toggleSort}
+                  className="text-right"
+                />
+                <SortableTh
+                  columnKey="spentAmount"
+                  label="Harcanan Tutar"
+                  activeKey={table.sort.key}
+                  direction={table.sort.direction}
+                  onToggle={table.toggleSort}
+                  className="text-right"
+                />
+                <SortableTh
+                  columnKey="remainingBudget"
+                  label="Kalan Tutar"
+                  activeKey={table.sort.key}
+                  direction={table.sort.direction}
+                  onToggle={table.toggleSort}
+                  className="text-right"
+                />
+                <SortableTh
+                  columnKey="percentSpent"
+                  label="Bütçe Durumu"
+                  activeKey={table.sort.key}
+                  direction={table.sort.direction}
+                  onToggle={table.toggleSort}
+                  className="text-center"
+                />
                 <th className="px-5 py-3 font-medium text-right">İşlemler</th>
               </tr>
             </thead>
             <tbody>
-              {storesData.map((store) => {
+              {table.pageItems.map((store) => {
                 const isEditing = editingStoreId === store.id;
                 const isOver = store.isOverrun;
 
@@ -193,7 +289,9 @@ export function AdminBudgetsPanel() {
                     key={store.id}
                     className="border-b border-zinc-800/60 hover:bg-white/[0.01] transition-colors"
                   >
-                    <td className="px-5 py-3.5 font-medium text-zinc-200">{store.name}</td>
+                    <td className="px-5 py-3.5 font-medium text-zinc-200">
+                      {store.name}
+                    </td>
                     <td className="px-4 py-3.5 text-zinc-400">{store.city}</td>
                     <td className="px-4 py-3.5 text-right font-medium">
                       {isEditing ? (
@@ -207,7 +305,9 @@ export function AdminBudgetsPanel() {
                           />
                         </div>
                       ) : (
-                        <span className="text-zinc-200">{formatCurrency(store.totalBudget)}</span>
+                        <span className="text-zinc-200">
+                          {formatCurrency(store.totalBudget)}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3.5 text-right text-zinc-400 font-medium">
@@ -215,7 +315,9 @@ export function AdminBudgetsPanel() {
                     </td>
                     <td
                       className={`px-4 py-3.5 text-right font-medium ${
-                        store.remainingBudget < 0 ? "text-red-400" : "text-emerald-400"
+                        store.remainingBudget < 0
+                          ? "text-red-400"
+                          : "text-emerald-400"
                       }`}
                     >
                       {formatCurrency(store.remainingBudget)}
@@ -256,7 +358,9 @@ export function AdminBudgetsPanel() {
                           size="sm"
                           variant="outline"
                           className="h-7 text-[11px] cursor-pointer"
-                          onClick={() => startEdit(store.id, store.totalBudget)}
+                          onClick={() =>
+                            startEdit(store.id, store.totalBudget)
+                          }
                         >
                           <Edit2 className="h-3 w-3 mr-1" />
                           Düzenle
@@ -269,6 +373,16 @@ export function AdminBudgetsPanel() {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          page={table.page}
+          totalPages={table.totalPages}
+          totalItems={table.totalItems}
+          rangeStart={table.rangeStart}
+          rangeEnd={table.rangeEnd}
+          onPageChange={table.setPage}
+          pageSize={table.pageSize}
+          onPageSizeChange={table.setPageSize}
+        />
       </div>
     </div>
   );
