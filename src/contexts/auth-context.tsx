@@ -19,6 +19,7 @@ import {
 } from "@/lib/permissions";
 import { normalizeRole } from "@/lib/roles";
 import { mapOrganizationFromDb } from "@/lib/migrations";
+import { resolveOrganizationId } from "@/lib/organization";
 import type {
   Organization,
   PermissionMatrix,
@@ -139,7 +140,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           setOrganization(null);
         } else {
-          const mapped = mapProfile(profile);
+          let mapped = mapProfile(profile);
+          if (!mapped.organizationId) {
+            const orgId = await resolveOrganizationId();
+            if (orgId) mapped = { ...mapped, organizationId: orgId };
+          }
           setUser(mapped);
           await loadOrganization(mapped.organizationId);
         }
@@ -225,7 +230,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ok: false, error: "Hesabınız kısıtlanmış" };
         }
 
-        const mapped = mapProfile(profile);
+        let mapped = mapProfile(profile);
+        if (!mapped.organizationId) {
+          const orgId = await resolveOrganizationId();
+          if (orgId) mapped = { ...mapped, organizationId: orgId };
+        }
         // Refresh DB under the new session BEFORE setting user
         // (setting user triggers redirect; empty cached RLS data must not win the race)
         await refetchDb();
@@ -513,6 +522,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.avatarUrl !== undefined) payload.avatar_url = data.avatarUrl;
         if (data.rolePermissionDefaults !== undefined) {
           payload.role_permission_defaults = data.rolePermissionDefaults;
+        }
+        if (data.roleLabels !== undefined) {
+          payload.role_labels = data.roleLabels;
         }
 
         const { data: updated, error } = await supabase

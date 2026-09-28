@@ -44,7 +44,7 @@ export function MapHeaderActions() {
   const handleSelectNotification = (notif: AppNotification) => {
     dismiss(notif.id);
     closeNotifications();
-    router.push(`/map?store=${notif.storeId}`);
+    router.push(notif.actionHref ?? `/map?store=${notif.storeId}`);
   };
 
   return (

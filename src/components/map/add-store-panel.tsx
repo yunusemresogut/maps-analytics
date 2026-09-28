@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MapPin, Search, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { MapPin, Search, Upload, X } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useStores } from "@/contexts/stores-context";
 import { useT } from "@/contexts/i18n-context";
@@ -16,10 +16,20 @@ import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/field-error";
 import { cn } from "@/lib/utils";
 import {
+  MAP_PANEL_HEIGHT_CLASS,
+  MAP_PANEL_SHELL_CLASS,
+} from "@/lib/map-panel-styles";
+import {
   hasErrors,
   validateStoreForm,
   type FieldErrors,
 } from "@/lib/validation";
+import {
+  downloadStoreImportTemplate,
+  formatImportErrors,
+  geocodeStoreImportRows,
+  parseStoresExcel,
+} from "@/lib/excel-stores";
 
 type GeocodeResult = {
   id: string;
@@ -29,6 +39,8 @@ type GeocodeResult = {
   latitude: number;
   longitude: number;
 };
+
+type AddMode = "map" | "search" | "excel";
 
 type AddStorePanelProps = {
   coords: { latitude: number; longitude: number } | null;
@@ -46,9 +58,7 @@ export function AddStorePanel({
   const { user } = useAuth();
   const { addStore } = useStores();
   const t = useT();
-  const [mode, setMode] = useState<"map" | "search">(
-    coords ? "map" : "search"
-  );
+  const [mode, setMode] = useState<AddMode>(coords ? "map" : "search");
   const [form, setForm] = useState<StoreFormData>(emptyStoreForm);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodeResult[]>([]);
@@ -56,6 +66,11 @@ export function AddStorePanel({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const excelInputRef = useRef<HTMLInputElement>(null);
+  const [excelLoading, setExcelLoading] = useState(false);
+  const [excelErrors, setExcelErrors] = useState<string>("");
+  const [excelSuccess, setExcelSuccess] = useState("");
 
   useEffect(() => {
     if (mode !== "search" || query.trim().length < 3) {
@@ -90,6 +105,52 @@ export function AddStorePanel({
     setQuery(item.label);
   };
 
+  const handleExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !user) return;
+    setExcelErrors("");
+    setExcelSuccess("");
+    setExcelLoading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const parsed = parseStoresExcel(buffer);
+      if (!parsed.ok) {
+        setExcelErrors(formatImportErrors(parsed.errors));
+        return;
+      }
+      const geocoded = await geocodeStoreImportRows(parsed.rows);
+      if (!geocoded.ok) {
+        setExcelErrors(formatImportErrors(geocoded.errors));
+        return;
+      }
+      let count = 0;
+      for (const row of geocoded.rows) {
+        const store = addStore(
+          formToStoreData(
+            {
+              ...emptyStoreForm(),
+              name: row.name,
+              city: row.city,
+              address: row.address,
+              projectStatus: row.projectStatus ?? emptyStoreForm().projectStatus,
+              openingDate: row.openingDate ?? emptyStoreForm().openingDate,
+            },
+            { latitude: row.latitude, longitude: row.longitude }
+          ),
+          { userId: user.id, userName: user.name }
+        );
+        count++;
+        if (count === 1) onSaved(store.id);
+      }
+      setExcelSuccess(`${count} mağaza eklendi`);
+    } catch {
+      setExcelErrors("Dosya işlenemedi");
+    } finally {
+      setExcelLoading(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
@@ -120,17 +181,24 @@ export function AddStorePanel({
     <div className="absolute bottom-4 right-4 z-20 w-full max-w-md animate-in slide-in-from-right">
       <form
         onSubmit={handleSubmit}
-        className="flex max-h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-xl border border-cyan-500/30 bg-zinc-950/95 backdrop-blur-md shadow-[0_0_40px_rgba(34,211,238,0.15)]"
+        className={cn(
+          "flex flex-col",
+          MAP_PANEL_HEIGHT_CLASS,
+          MAP_PANEL_SHELL_CLASS,
+          "border-cyan-500/30 shadow-[0_0_40px_rgba(34,211,238,0.15)]"
+        )}
       >
         <div className="flex items-center justify-between border-b border-zinc-800 p-4">
           <div>
             <h3 className="font-semibold text-zinc-100">Yeni Konum Ekle</h3>
-            <p className="mt-0.5 flex items-center gap-1 text-xs text-zinc-500">
-              <MapPin className="h-3 w-3" />
-              {coords
-                ? `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`
-                : "Konum seçilmedi"}
-            </p>
+            {mode !== "excel" && (
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-zinc-500">
+                <MapPin className="h-3 w-3" />
+                {coords
+                  ? `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`
+                  : "Konum seçilmedi"}
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -142,31 +210,28 @@ export function AddStorePanel({
         </div>
 
         <div className="border-b border-zinc-800 p-3">
-          <div className="grid grid-cols-2 gap-1 rounded-lg bg-zinc-900 p-1">
-            <button
-              type="button"
-              onClick={() => setMode("map")}
-              className={cn(
-                "rounded-md px-2 py-1.5 text-xs",
-                mode === "map"
-                  ? "bg-cyan-500/20 text-cyan-200"
-                  : "text-zinc-500"
-              )}
-            >
-              {t("geocode.mapPick")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("search")}
-              className={cn(
-                "rounded-md px-2 py-1.5 text-xs",
-                mode === "search"
-                  ? "bg-cyan-500/20 text-cyan-200"
-                  : "text-zinc-500"
-              )}
-            >
-              {t("geocode.addressSearch")}
-            </button>
+          <div className="grid grid-cols-3 gap-1 rounded-lg bg-zinc-900 p-1">
+            {(
+              [
+                ["map", t("geocode.mapPick")],
+                ["search", t("geocode.addressSearch")],
+                ["excel", "Excel"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setMode(key)}
+                className={cn(
+                  "rounded-md px-2 py-1.5 text-xs",
+                  mode === key
+                    ? "bg-cyan-500/20 text-cyan-200"
+                    : "text-zinc-500"
+                )}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           {mode === "search" && (
@@ -211,33 +276,80 @@ export function AddStorePanel({
               Haritada bir noktaya tıklayın
             </p>
           )}
+
+          {mode === "excel" && (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-zinc-500">
+                Zorunlu sütunlar: Ad, Şehir, Adres. Adresler otomatik konuma
+                çevrilir; hatalı satırlar listelenir.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={downloadStoreImportTemplate}
+                >
+                  Şablon indir
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  loading={excelLoading}
+                  onClick={() => excelInputRef.current?.click()}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Excel yükle
+                </Button>
+                <input
+                  ref={excelInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleExcelFile}
+                />
+              </div>
+              {excelErrors && (
+                <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+                  {excelErrors}
+                </pre>
+              )}
+              {excelSuccess && (
+                <p className="text-xs text-emerald-400">{excelSuccess}</p>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="scrollbar-themed flex-1 overflow-y-auto p-4">
-          <StoreFormFields
-            form={form}
-            onChange={setForm}
-            errors={fieldErrors}
-            onErrorsChange={setFieldErrors}
-          />
-        </div>
+        {mode !== "excel" && (
+          <>
+            <div className="scrollbar-themed flex-1 overflow-y-auto p-4">
+              <StoreFormFields
+                form={form}
+                onChange={setForm}
+                errors={fieldErrors}
+                onErrorsChange={setFieldErrors}
+              />
+            </div>
 
-        <div className="space-y-2 border-t border-zinc-800 p-4">
-          <FormError message={formError} />
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              className="flex-1"
-              onClick={onClose}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button type="submit" className="flex-1" loading={saving}>
-              {t("common.save")}
-            </Button>
-          </div>
-        </div>
+            <div className="space-y-2 border-t border-zinc-800 p-4">
+              <FormError message={formError} />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={onClose}
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button type="submit" className="flex-1" loading={saving}>
+                  {t("common.save")}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </form>
     </div>
   );

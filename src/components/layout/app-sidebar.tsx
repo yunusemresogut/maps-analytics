@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
-  ClipboardList,
   Coins,
   FileText,
   LayoutDashboard,
@@ -25,7 +24,8 @@ import { useAuth } from "@/contexts/auth-context";
 import { useSidebar } from "@/contexts/sidebar-context";
 import { useT } from "@/contexts/i18n-context";
 import { canAccessRoute } from "@/lib/permissions";
-import { ROLE_LABELS } from "@/lib/roles";
+import { getRoleLabel } from "@/lib/roles";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import type { TranslationKey } from "@/i18n";
 import type { AppRouteKey, UserRole } from "@/types";
 import { cn } from "@/lib/utils";
@@ -46,18 +46,6 @@ const MAIN_NAV: NavItem[] = [
   },
   { href: "/map", labelKey: "nav.map", icon: Map, routeKey: "map" },
   { href: "/stores", labelKey: "nav.stores", icon: Store, routeKey: "stores" },
-  {
-    href: "/projects",
-    labelKey: "nav.projects",
-    icon: ClipboardList,
-    routeKey: "projects",
-  },
-  {
-    href: "/approvals",
-    labelKey: "nav.approvals",
-    icon: Shield,
-    routeKey: "approvals",
-  },
   { href: "/tickets", labelKey: "nav.tickets", icon: Ticket, routeKey: "tickets" },
   {
     href: "/contracts",
@@ -76,12 +64,6 @@ const MAIN_NAV: NavItem[] = [
     labelKey: "nav.invoices",
     icon: Coins,
     routeKey: "invoices",
-  },
-  {
-    href: "/settings/profile",
-    labelKey: "nav.profile",
-    icon: UserCircle,
-    routeKey: "profile",
   },
 ];
 
@@ -125,7 +107,7 @@ const ADMIN_NAV: NavItem[] = [
 ];
 
 export function AppSidebar() {
-  const { user } = useAuth();
+  const { user, organization } = useAuth();
   const pathname = usePathname();
   const { isOpen, isPinned, close, togglePin } = useSidebar();
   const t = useT();
@@ -259,11 +241,44 @@ export function AppSidebar() {
           )}
         </nav>
 
-        <div className="border-t border-zinc-800 px-4 py-3">
-          <p className="truncate text-xs text-zinc-500">{user.name}</p>
-          <p className="truncate text-[11px] text-zinc-600">
-            {ROLE_LABELS[user.role as UserRole] ?? user.role}
-          </p>
+        <div className="border-t border-zinc-800 p-3">
+          {canAccessRoute(user, "profile") ? (
+            <Link
+              href="/settings/profile"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-zinc-900",
+                pathname.startsWith("/settings/profile")
+                  ? "bg-cyan-500/10 ring-1 ring-cyan-500/25"
+                  : ""
+              )}
+            >
+              <UserAvatar
+                name={user.name}
+                avatarUrl={user.avatarUrl}
+                size="sm"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-zinc-200">
+                  {user.name}
+                </p>
+                <p className="truncate text-[11px] text-zinc-500">
+                  {getRoleLabel(user.role as UserRole, organization)}
+                </p>
+              </div>
+              <UserCircle className="h-4 w-4 shrink-0 text-zinc-500" />
+            </Link>
+          ) : (
+            <div className="flex items-center gap-3 px-2 py-2">
+              <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="sm" />
+              <div className="min-w-0">
+                <p className="truncate text-xs text-zinc-500">{user.name}</p>
+                <p className="truncate text-[11px] text-zinc-600">
+                  {getRoleLabel(user.role as UserRole, organization)}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </aside>
     </>

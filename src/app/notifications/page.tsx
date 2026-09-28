@@ -25,19 +25,19 @@ import type { AppNotification } from "@/types";
 const TYPE_ICON = {
   opening_soon: AlertTriangle,
   opening_overdue: Clock,
-  ihale_order_reminder: ShoppingCart,
+  ihale_contract_reminder: ShoppingCart,
 };
 
 const TYPE_COLOR = {
   opening_soon: "text-red-400",
   opening_overdue: "text-amber-400",
-  ihale_order_reminder: "text-violet-400",
+  ihale_contract_reminder: "text-violet-400",
 };
 
 const TYPE_LABEL = {
   opening_soon: "Yakında Açılış",
   opening_overdue: "Açılış Gecikmesi",
-  ihale_order_reminder: "İhale Hatırlatması",
+  ihale_contract_reminder: "Sözleşme Gerekli",
 };
 
 type NotifItem = AppNotification & { dismissed: boolean };
@@ -73,7 +73,7 @@ function NotificationsContent() {
 
   const handleOpen = (notif: AppNotification) => {
     dismiss(notif.id);
-    router.push(`/map?store=${notif.storeId}`);
+    router.push(notif.actionHref ?? `/map?store=${notif.storeId}`);
   };
 
   const handleDismissAll = () => {
@@ -163,9 +163,21 @@ function NotificationsContent() {
                       })}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => handleOpen(notif)}>
-                        Haritada aç
-                      </Button>
+                      {notif.actionHref ? (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            dismiss(notif.id);
+                            router.push(notif.actionHref!);
+                          }}
+                        >
+                          Sözleşme oluştur
+                        </Button>
+                      ) : (
+                        <Button size="sm" onClick={() => handleOpen(notif)}>
+                          Haritada aç
+                        </Button>
+                      )}
                       {notif.dismissed ? (
                         <Button
                           size="sm"

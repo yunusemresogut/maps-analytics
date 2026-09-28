@@ -12,6 +12,11 @@ import {
   projectStatusConfig,
 } from "@/lib/project-status";
 import { Input } from "@/components/ui/input";
+import {
+  MAP_PANEL_HEIGHT_CLASS,
+  MAP_PANEL_SHELL_CLASS,
+} from "@/lib/map-panel-styles";
+import { cn } from "@/lib/utils";
 import type { ProjectStatus, Store as StoreType } from "@/types";
 
 type StoreListPanelProps = {
@@ -96,7 +101,7 @@ export function StoreListPanel({
 
   return (
     <div className="pointer-events-auto absolute bottom-4 right-2 z-20 w-[min(360px,calc(100vw-1rem))] slide-in-from-right sm:right-4">
-      <div className="flex max-h-[min(32rem,calc(100vh-8rem))] flex-col overflow-hidden rounded-xl border border-zinc-700/60 bg-zinc-950/95 shadow-[0_0_40px_rgba(0,0,0,0.5)] backdrop-blur-md">
+      <div className={cn("flex flex-col", MAP_PANEL_HEIGHT_CLASS, MAP_PANEL_SHELL_CLASS)}>
         <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
           <div className="flex items-center gap-2">
             <Store className="h-4 w-4 text-cyan-400" />

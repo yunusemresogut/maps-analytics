@@ -9,9 +9,15 @@ type StoreMarkerProps = {
   store: Store;
   isSelected: boolean;
   onClick: () => void;
+  onDoubleClick?: () => void;
 };
 
-export function StoreMarker({ store, isSelected, onClick }: StoreMarkerProps) {
+export function StoreMarker({
+  store,
+  isSelected,
+  onClick,
+  onDoubleClick,
+}: StoreMarkerProps) {
   const projectConfig = projectStatusConfig[store.projectStatus];
   const openingAlert = getOpeningAlert(store.openingDate);
   const isRed = shouldHighlightRed(store.openingDate);
@@ -31,6 +37,10 @@ export function StoreMarker({ store, isSelected, onClick }: StoreMarkerProps) {
       <button
         type="button"
         onClick={onClick}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          onDoubleClick?.();
+        }}
         className="group relative flex items-center justify-center"
         aria-label={`${store.name}${openingAlert.isOpeningSoon ? " — yakında açılıyor" : ""}`}
         title={openingAlert.label}

@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { formatTry } from "@/lib/currency";
 
 export type ParsedMaterialRow = {
   name: string;
@@ -128,11 +129,7 @@ export async function parseMaterialsFromExcel(
 }
 
 export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency: "TRY",
-    minimumFractionDigits: 2,
-  }).format(value);
+  return formatTry(value);
 }
 
 export function downloadMaterialsTemplate() {

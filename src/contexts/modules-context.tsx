@@ -5,6 +5,7 @@ import { useDb } from "@/contexts/db-context";
 import { useAuth } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity-log";
+import { resolveOrganizationId } from "@/lib/organization";
 import type {
   Contract,
   Invoice,
@@ -31,17 +32,19 @@ type ModulesContextValue = {
   invoices: Invoice[];
   createTicket: (data: {
     title: string;
+    code?: string;
     description?: string;
     priority?: TicketPriority;
     status?: TicketStatus;
     storeId?: string;
     assigneeId?: string;
     assigneeName?: string;
-  }) => Promise<boolean>;
+  }) => Promise<string | false>;
   updateTicket: (id: string, data: Partial<Ticket>) => Promise<boolean>;
   deleteTicket: (id: string) => Promise<boolean>;
   createContract: (data: {
     title: string;
+    code?: string;
     partyName?: string;
     startDate?: string;
     endDate?: string;
@@ -49,7 +52,7 @@ type ModulesContextValue = {
     status?: ContractStatus;
     storeId?: string;
     fileUrl?: string;
-  }) => Promise<boolean>;
+  }) => Promise<string | false>;
   updateContract: (id: string, data: Partial<Contract>) => Promise<boolean>;
   deleteContract: (id: string) => Promise<boolean>;
   createPayment: (data: {
@@ -58,7 +61,8 @@ type ModulesContextValue = {
     amount?: number;
     status?: ProgressPaymentStatus;
     storeId?: string;
-  }) => Promise<boolean>;
+    contractId?: string;
+  }) => Promise<string | false>;
   updatePayment: (
     id: string,
     data: Partial<ProgressPayment>
@@ -72,7 +76,7 @@ type ModulesContextValue = {
     issuedAt?: string;
     storeId?: string;
     progressPaymentId?: string;
-  }) => Promise<boolean>;
+  }) => Promise<string | false>;
   updateInvoice: (id: string, data: Partial<Invoice>) => Promise<boolean>;
   deleteInvoice: (id: string) => Promise<boolean>;
 };
@@ -92,11 +96,10 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
   } = useDb();
   const { user } = useAuth();
 
-  const requireOrg = () => user?.organizationId;
-
   const createTicket = useCallback(
     async (data: {
       title: string;
+      code?: string;
       description?: string;
       priority?: TicketPriority;
       status?: TicketStatus;
@@ -104,12 +107,14 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       assigneeId?: string;
       assigneeName?: string;
     }) => {
-      const orgId = requireOrg();
-      if (!user || !orgId) return false;
+      if (!user) return false;
+      const orgId = await resolveOrganizationId(user.organizationId);
+      if (!orgId) return false;
       const now = new Date().toISOString();
       const row = {
         organization_id: orgId,
         store_id: data.storeId || null,
+        code: data.code?.trim() || null,
         title: data.title,
         description: data.description || "",
         priority: data.priority || "medium",
@@ -133,6 +138,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         id: inserted.id,
         organizationId: inserted.organization_id,
         storeId: inserted.store_id || undefined,
+        code: inserted.code || undefined,
         title: inserted.title,
         description: inserted.description || "",
         priority: inserted.priority,
@@ -152,7 +158,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         targetId: ticket.id,
         targetLabel: ticket.title,
       });
-      return true;
+      return ticket.id;
     },
     [user, tickets, setTickets]
   );
@@ -170,6 +176,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       if (data.priority !== undefined) db.priority = data.priority;
       if (data.status !== undefined) db.status = data.status;
       if (data.storeId !== undefined) db.store_id = data.storeId || null;
+      if (data.code !== undefined) db.code = data.code.trim() || null;
       if (data.assigneeId !== undefined) db.assignee_id = data.assigneeId || null;
       if (data.assigneeName !== undefined)
         db.assignee_name = data.assigneeName || null;
@@ -232,6 +239,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
   const createContract = useCallback(
     async (data: {
       title: string;
+      code?: string;
       partyName?: string;
       startDate?: string;
       endDate?: string;
@@ -240,14 +248,16 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       storeId?: string;
       fileUrl?: string;
     }) => {
-      const orgId = requireOrg();
-      if (!user || !orgId) return false;
+      if (!user) return false;
+      const orgId = await resolveOrganizationId(user.organizationId);
+      if (!orgId) return false;
       const now = new Date().toISOString();
       const { data: inserted, error } = await supabase
         .from("contracts")
         .insert({
           organization_id: orgId,
           store_id: data.storeId || null,
+          code: data.code || null,
           title: data.title,
           party_name: data.partyName || "",
           start_date: data.startDate || null,
@@ -269,6 +279,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         id: inserted.id,
         organizationId: inserted.organization_id,
         storeId: inserted.store_id || undefined,
+        code: inserted.code || undefined,
         title: inserted.title,
         partyName: inserted.party_name || "",
         startDate: inserted.start_date || undefined,
@@ -289,7 +300,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         targetId: item.id,
         targetLabel: item.title,
       });
-      return true;
+      return item.id;
     },
     [user, contracts, setContracts]
   );
@@ -303,6 +314,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         updated_at: new Date().toISOString(),
       };
       if (data.title !== undefined) db.title = data.title;
+      if (data.code !== undefined) db.code = data.code || null;
       if (data.partyName !== undefined) db.party_name = data.partyName;
       if (data.startDate !== undefined) db.start_date = data.startDate || null;
       if (data.endDate !== undefined) db.end_date = data.endDate || null;
@@ -357,14 +369,17 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       amount?: number;
       status?: ProgressPaymentStatus;
       storeId?: string;
+      contractId?: string;
     }) => {
-      const orgId = requireOrg();
-      if (!user || !orgId) return false;
+      if (!user) return false;
+      const orgId = await resolveOrganizationId(user.organizationId);
+      if (!orgId) return false;
       const { data: inserted, error } = await supabase
         .from("progress_payments")
         .insert({
           organization_id: orgId,
           store_id: data.storeId || null,
+          contract_id: data.contractId || null,
           title: data.title,
           period_label: data.periodLabel || "",
           amount: data.amount ?? 0,
@@ -383,6 +398,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         id: inserted.id,
         organizationId: inserted.organization_id,
         storeId: inserted.store_id || undefined,
+        contractId: inserted.contract_id || undefined,
         title: inserted.title,
         periodLabel: inserted.period_label || "",
         amount: Number(inserted.amount || 0),
@@ -400,7 +416,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         targetId: item.id,
         targetLabel: item.title,
       });
-      return true;
+      return item.id;
     },
     [user, progressPayments, setProgressPayments]
   );
@@ -418,6 +434,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       if (data.amount !== undefined) db.amount = data.amount;
       if (data.status !== undefined) db.status = data.status;
       if (data.storeId !== undefined) db.store_id = data.storeId || null;
+      if (data.contractId !== undefined) db.contract_id = data.contractId || null;
       const { error } = await supabase
         .from("progress_payments")
         .update(db)
@@ -475,8 +492,9 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       storeId?: string;
       progressPaymentId?: string;
     }) => {
-      const orgId = requireOrg();
-      if (!user || !orgId) return false;
+      if (!user) return false;
+      const orgId = await resolveOrganizationId(user.organizationId);
+      if (!orgId) return false;
       const { data: inserted, error } = await supabase
         .from("invoices")
         .insert({
@@ -521,7 +539,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         targetId: item.id,
         targetLabel: item.invoiceNumber,
       });
-      return true;
+      return item.id;
     },
     [user, invoices, setInvoices]
   );

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Camera } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useT } from "@/contexts/i18n-context";
@@ -9,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/ui/form-field";
 import { FormError } from "@/components/ui/field-error";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { uploadAvatar } from "@/lib/avatar-upload";
 import { isAdmin } from "@/lib/roles";
 import {
   clearFieldError,
@@ -20,6 +23,7 @@ import {
 function ProfileContent() {
   const { user, organization, updateProfile, updateOrganization } = useAuth();
   const t = useT();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [companyName, setCompanyName] = useState(organization?.name ?? "");
@@ -29,9 +33,10 @@ function ProfileContent() {
   );
   const [orgPhone, setOrgPhone] = useState(organization?.phone ?? "");
   const [address, setAddress] = useState(organization?.address ?? "");
-  const [avatarUrl, setAvatarUrl] = useState(
-    organization?.avatarUrl ?? user?.avatarUrl ?? ""
-  );
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "");
+  const [avatarPreview, setAvatarPreview] = useState(user?.avatarUrl ?? "");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -40,6 +45,8 @@ function ProfileContent() {
   useEffect(() => {
     setName(user?.name ?? "");
     setPhone(user?.phone ?? "");
+    setAvatarUrl(user?.avatarUrl ?? "");
+    setAvatarPreview(user?.avatarUrl ?? "");
   }, [user]);
 
   useEffect(() => {
@@ -48,12 +55,40 @@ function ProfileContent() {
     setAuthorizedPerson(organization?.authorizedPerson ?? "");
     setOrgPhone(organization?.phone ?? "");
     setAddress(organization?.address ?? "");
-    setAvatarUrl(organization?.avatarUrl ?? user?.avatarUrl ?? "");
-  }, [organization, user?.avatarUrl]);
+  }, [organization]);
 
   const touch = (key: string, value: string, setter: (v: string) => void) => {
     setter(value);
     setFieldErrors((prev) => clearFieldError(prev, key));
+  };
+
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !user) return;
+    setAvatarError("");
+    setAvatarUploading(true);
+    const localPreview = URL.createObjectURL(file);
+    setAvatarPreview(localPreview);
+    const result = await uploadAvatar(user.id, file);
+    setAvatarUploading(false);
+    if (!result.ok) {
+      setAvatarError(result.error);
+      setAvatarPreview(avatarUrl);
+      URL.revokeObjectURL(localPreview);
+      return;
+    }
+    setAvatarUrl(result.url);
+    setAvatarPreview(result.url);
+    await updateProfile({ avatarUrl: result.url });
+    URL.revokeObjectURL(localPreview);
+  };
+
+  const resetAvatar = async () => {
+    setAvatarUrl("");
+    setAvatarPreview("");
+    setAvatarError("");
+    await updateProfile({ avatarUrl: undefined });
   };
 
   const save = async () => {
@@ -88,7 +123,6 @@ function ProfileContent() {
         authorizedPerson: authorizedPerson.trim(),
         phone: orgPhone.trim(),
         address: address.trim(),
-        avatarUrl: avatarUrl.trim() || undefined,
       });
     }
     setSaving(false);
@@ -105,11 +139,56 @@ function ProfileContent() {
         <p className="mt-1 text-sm text-zinc-500">{t("profile.description")}</p>
       </div>
 
-      <div className="grid max-w-3xl gap-6">
+      <div className="grid w-full gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
           <h2 className="mb-4 text-sm font-medium text-zinc-200">
             {t("profile.userInfo")}
           </h2>
+          <div className="mb-4 flex items-center gap-4">
+            <div className="relative">
+              <UserAvatar
+                name={name || user?.name || "?"}
+                avatarUrl={avatarPreview}
+                size="lg"
+              />
+              {avatarUploading && (
+                <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 text-xs text-zinc-200">
+                  …
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={handleAvatarFile}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                loading={avatarUploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Camera className="h-3.5 w-3.5" />
+                Fotoğraf seç
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={resetAvatar}
+                disabled={avatarUploading || !avatarUrl}
+              >
+                Varsayılana dön
+              </Button>
+            </div>
+          </div>
+          {avatarError && (
+            <p className="mb-3 text-xs text-red-400">{avatarError}</p>
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             <FormField
               label={t("auth.fullName")}
@@ -196,19 +275,6 @@ function ProfileContent() {
                     touch("orgPhone", e.target.value, setOrgPhone)
                   }
                   aria-invalid={!!fieldErrors.orgPhone}
-                />
-              </FormField>
-              <FormField
-                label={t("profile.avatar")}
-                error={fieldErrors.avatarUrl}
-              >
-                <Input
-                  value={avatarUrl}
-                  onChange={(e) =>
-                    touch("avatarUrl", e.target.value, setAvatarUrl)
-                  }
-                  placeholder="https://..."
-                  aria-invalid={!!fieldErrors.avatarUrl}
                 />
               </FormField>
               <FormField

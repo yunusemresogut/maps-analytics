@@ -107,7 +107,24 @@ export type Organization = {
   createdAt: string;
   /** Editable org-level role default matrices (admin excluded) */
   rolePermissionDefaults?: Partial<Record<UserRole, PermissionMatrix>>;
+  /** Admin tarafından düzenlenebilir rol görünen adları */
+  roleLabels?: Partial<Record<UserRole, string>>;
 };
+
+export type ModuleAttachment = {
+  id: string;
+  organizationId: string;
+  name: string;
+  size: number;
+  type: string;
+  storagePath: string;
+  uploadedBy: string;
+  uploadedByName: string;
+  uploadedAt: string;
+};
+
+export type TicketAttachment = ModuleAttachment & { ticketId: string };
+export type ContractAttachment = ModuleAttachment & { contractId: string };
 
 export type Store = {
   id: string;
@@ -226,6 +243,7 @@ export type Ticket = {
   id: string;
   organizationId: string;
   storeId?: string;
+  code?: string;
   title: string;
   description: string;
   priority: TicketPriority;
@@ -234,12 +252,19 @@ export type Ticket = {
   assigneeName?: string;
 } & AuditInfo;
 
-export type ContractStatus = "draft" | "active" | "expired" | "cancelled";
+export type ContractStatus =
+  | "draft"
+  | "active"
+  | "expired"
+  | "cancelled"
+  | "terminated"
+  | "completed";
 
 export type Contract = {
   id: string;
   organizationId: string;
   storeId?: string;
+  code?: string;
   title: string;
   partyName: string;
   startDate?: string;
@@ -259,6 +284,7 @@ export type ProgressPayment = {
   id: string;
   organizationId: string;
   storeId?: string;
+  contractId?: string;
   title: string;
   periodLabel: string;
   amount: number;
@@ -282,7 +308,7 @@ export type Invoice = {
 export type NotificationType =
   | "opening_soon"
   | "opening_overdue"
-  | "ihale_order_reminder";
+  | "ihale_contract_reminder";
 
 export type AppNotification = {
   id: string;
@@ -292,6 +318,8 @@ export type AppNotification = {
   message: string;
   createdAt: string;
   read: boolean;
+  /** Bildirime tıklanınca gidilecek rota (yoksa haritada mağaza açılır) */
+  actionHref?: string;
 };
 
 export type ActivityCategory =
@@ -338,7 +366,9 @@ export const DB_TABLES = {
   workPlan: "store_work_plan",
   notifications: "notifications",
   tickets: "tickets",
+  ticketAttachments: "ticket_attachments",
   contracts: "contracts",
+  contractAttachments: "contract_attachments",
   progressPayments: "progress_payments",
   invoices: "invoices",
 } as const;

@@ -2,17 +2,17 @@
 
 import { useEffect } from "react";
 import { useDb } from "@/contexts/db-context";
-import { subscribeActivityLogs } from "@/lib/activity-log";
+import { loadActivityLogs, subscribeActivityLogs } from "@/lib/activity-log";
 
 export function useActivityLogs() {
-  const { activityLogs, refetch } = useDb();
+  const { activityLogs, setActivityLogs } = useDb();
 
   useEffect(() => {
-    // Local log event triggers a refetch from DB
+    // Tam DB refetch yerine sadece log listesini güncelle — stores state'i ezilmesin
     return subscribeActivityLogs(() => {
-      refetch();
+      void setActivityLogs(loadActivityLogs());
     });
-  }, [refetch]);
+  }, [setActivityLogs]);
 
   return activityLogs;
 }

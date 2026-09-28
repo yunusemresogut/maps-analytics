@@ -25,13 +25,13 @@ type NotificationsPanelProps = {
 const TYPE_ICON = {
   opening_soon: AlertTriangle,
   opening_overdue: Clock,
-  ihale_order_reminder: ShoppingCart,
+  ihale_contract_reminder: ShoppingCart,
 };
 
 const TYPE_COLOR = {
   opening_soon: "text-red-400",
   opening_overdue: "text-amber-400",
-  ihale_order_reminder: "text-violet-400",
+  ihale_contract_reminder: "text-violet-400",
 };
 
 export function NotificationsPanel({

@@ -1,11 +1,14 @@
-import type { AppNotification, Store } from "@/types";
+import type { AppNotification, Contract, Store } from "@/types";
 import { getOpeningAlert } from "@/lib/opening-dates";
-import { supportsOrderReminder } from "@/lib/project-status";
+import { needsContractWarning } from "@/lib/module-finance";
 
 /** Bildirim altyapısı */
 export const NOTIFICATIONS_ENABLED = true;
 
-export function computeStoreNotifications(stores: Store[]): AppNotification[] {
+export function computeStoreNotifications(
+  stores: Store[],
+  contracts: Contract[] = []
+): AppNotification[] {
   const notifications: AppNotification[] = [];
   const now = new Date().toISOString();
 
@@ -36,15 +39,16 @@ export function computeStoreNotifications(stores: Store[]): AppNotification[] {
       });
     }
 
-    if (supportsOrderReminder(store.projectStatus)) {
+    if (needsContractWarning(store.projectStatus, store.id, contracts)) {
       notifications.push({
-        id: `notif-ihale-${store.id}`,
-        type: "ihale_order_reminder",
+        id: `notif-ihale-contract-${store.id}`,
+        type: "ihale_contract_reminder",
         storeId: store.id,
         storeName: store.name,
-        message: `${store.name}: İhale kaydı — sipariş kontrolü gerekebilir`,
+        message: `${store.name}: İhale durumunda — sözleşmenizi oluşturun`,
         createdAt: now,
         read: false,
+        actionHref: `/contracts/new?storeId=${store.id}`,
       });
     }
   }
@@ -52,6 +56,9 @@ export function computeStoreNotifications(stores: Store[]): AppNotification[] {
   return notifications;
 }
 
-export function getNotificationCount(stores: Store[]): number {
-  return computeStoreNotifications(stores).length;
+export function getNotificationCount(
+  stores: Store[],
+  contracts: Contract[] = []
+): number {
+  return computeStoreNotifications(stores, contracts).length;
 }

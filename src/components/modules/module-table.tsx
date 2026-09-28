@@ -76,23 +76,30 @@ export function ModuleTableShell({
   description,
   stats,
   toolbar,
+  headerAction,
   footer,
-  demoNote = true,
+  demoNote = false,
   children,
 }: {
   title: string;
   description: string;
   stats?: ReactNode;
   toolbar?: ReactNode;
+  headerAction?: ReactNode;
   footer?: ReactNode;
   demoNote?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="scrollbar-themed h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
-      <div className="mb-5">
-        <h1 className="text-xl font-semibold text-zinc-100">{title}</h1>
-        <p className="mt-1 text-sm text-zinc-500">{description}</p>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-zinc-100">{title}</h1>
+          <p className="mt-1 text-sm text-zinc-500">{description}</p>
+        </div>
+        {headerAction && (
+          <div className="shrink-0">{headerAction}</div>
+        )}
       </div>
       {stats && (
         <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

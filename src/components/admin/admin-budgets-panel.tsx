@@ -90,14 +90,18 @@ export function AdminBudgetsPanel() {
     setMessage("");
   };
 
-  const saveBudget = (storeId: string) => {
+  const saveBudget = async (storeId: string) => {
     const parsedBudget = Number(editBudgetValue);
     if (isNaN(parsedBudget) || parsedBudget < 0) {
       setMessage("Geçersiz bütçe değeri");
       return;
     }
 
-    updateStore(storeId, { totalBudget: parsedBudget });
+    const ok = await updateStore(storeId, { totalBudget: parsedBudget });
+    if (!ok) {
+      setMessage("Bütçe kaydedilemedi");
+      return;
+    }
     setEditingStoreId(null);
     setMessage("Bütçe güncellendi");
     setTimeout(() => setMessage(""), 3000);

@@ -14,8 +14,9 @@ import {
   normalizePermissions,
   setMatrixCell,
 } from "@/lib/permissions";
-import { ALL_ROLES, ROLE_LABELS } from "@/lib/roles";
+import { ALL_ROLES, getRoleLabel, ROLE_LABELS } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type {
   AppModuleKey,
@@ -98,6 +99,7 @@ export function AdminPermissionsPanel() {
   );
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [roleLabelDraft, setRoleLabelDraft] = useState("");
 
   const regularUsers = users.filter((u) => u.role !== "admin");
   const selectedUser = regularUsers.find((u) => u.id === selectedUserId);
@@ -117,7 +119,10 @@ export function AdminPermissionsPanel() {
 
   useEffect(() => {
     setRoleDraft(getRoleDefaultMatrix(selectedRole));
-  }, [selectedRole, getRoleDefaultMatrix, organization?.rolePermissionDefaults]);
+    setRoleLabelDraft(
+      organization?.roleLabels?.[selectedRole] ?? ROLE_LABELS[selectedRole]
+    );
+  }, [selectedRole, getRoleDefaultMatrix, organization?.rolePermissionDefaults, organization?.roleLabels]);
 
   useEffect(() => {
     if (selectedUser) {
@@ -142,9 +147,14 @@ export function AdminPermissionsPanel() {
       ...(organization.rolePermissionDefaults ?? {}),
       [selectedRole]: roleDraft,
     };
-    const ok = await updateOrganization({ rolePermissionDefaults: next });
+    const nextLabels = {
+      ...(organization.roleLabels ?? {}),
+      [selectedRole]: roleLabelDraft.trim() || ROLE_LABELS[selectedRole],
+    };
+    const okPerms = await updateOrganization({ rolePermissionDefaults: next });
+    const okLabels = await updateOrganization({ roleLabels: nextLabels });
     setSaving(false);
-    flash(ok ? "Rol varsayılanı kaydedildi" : "Kayıt başarısız");
+    flash(okPerms && okLabels ? "Rol kaydedildi" : "Kayıt başarısız");
   };
 
   const resetRoleToBuiltIn = () => {
@@ -214,7 +224,7 @@ export function AdminPermissionsPanel() {
                         : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
                     )}
                   >
-                    {ROLE_LABELS[role]}
+                    {getRoleLabel(role, organization)}
                     {organization?.rolePermissionDefaults?.[role] && (
                       <span className="mt-0.5 block text-[10px] text-cyan-500/80">
                         Özel şablon
@@ -230,7 +240,7 @@ export function AdminPermissionsPanel() {
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="font-medium text-zinc-200">
-                  {ROLE_LABELS[selectedRole]}
+                  {getRoleLabel(selectedRole, organization)}
                 </h2>
                 <p className="mt-1 max-w-xl text-xs text-zinc-600">
                   Bu matris, bu role sahip yeni kullanıcılar ve “rol varsayılanını
@@ -248,6 +258,16 @@ export function AdminPermissionsPanel() {
                   Rolü kaydet
                 </Button>
               </div>
+            </div>
+
+            <div className="mb-4 max-w-md">
+              <label className="text-xs text-zinc-500">Görünen ad</label>
+              <Input
+                className="mt-1"
+                value={roleLabelDraft}
+                onChange={(e) => setRoleLabelDraft(e.target.value)}
+                placeholder={ROLE_LABELS[selectedRole]}
+              />
             </div>
 
             <PermissionMatrixTable
@@ -292,7 +312,7 @@ export function AdminPermissionsPanel() {
                   >
                     <p className="text-sm font-medium">{u.name}</p>
                     <p className="text-xs text-zinc-600">
-                      {ROLE_LABELS[u.role]} · {u.email}
+                      {getRoleLabel(u.role, organization)} · {u.email}
                     </p>
                   </button>
                 </li>
@@ -316,7 +336,7 @@ export function AdminPermissionsPanel() {
                       </h2>
                     </div>
                     <p className="mt-1 text-sm text-zinc-500">
-                      {ROLE_LABELS[selectedUser.role]} · {selectedUser.email}
+                      {getRoleLabel(selectedUser.role, organization)} · {selectedUser.email}
                     </p>
                     <p className="mt-2 max-w-xl text-xs text-zinc-600">
                       Kullanıcı matrisi kaydedilince rol şablonunu ezer. Rol

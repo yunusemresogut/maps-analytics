@@ -1,5 +1,6 @@
 import type {
   ApprovalDiscipline,
+  Organization,
   ProjectApprovals,
   UserRole,
 } from "@/types";
@@ -27,6 +28,16 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   store_manager: "Mağaza Müdürü",
   accounting: "Muhasebe",
 };
+
+/** Org özelleştirmesi varsa onu, yoksa varsayılan etiketi döner */
+export function getRoleLabel(
+  role: UserRole,
+  org?: Pick<Organization, "roleLabels"> | null
+): string {
+  const custom = org?.roleLabels?.[role];
+  if (custom?.trim()) return custom.trim();
+  return ROLE_LABELS[role];
+}
 
 export const ENGINEER_ROLES: UserRole[] = [
   "mechanical_engineer",

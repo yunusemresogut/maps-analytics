@@ -76,5 +76,6 @@ export function mapOrganizationFromDb(row: Record<string, any>): Organization {
     rolePermissionDefaults: normalizeRolePermissionDefaults(
       row.role_permission_defaults
     ),
+    roleLabels: (row.role_labels as Organization["roleLabels"]) || undefined,
   };
 }

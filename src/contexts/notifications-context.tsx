@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useStores } from "@/contexts/stores-context";
+import { useDb } from "@/contexts/db-context";
 import { computeStoreNotifications } from "@/lib/notifications";
 import { STORAGE_KEYS } from "@/lib/storage-keys";
 import type { AppNotification } from "@/types";
@@ -47,6 +48,7 @@ export function NotificationsProvider({
   children: React.ReactNode;
 }) {
   const { stores } = useStores();
+  const { contracts } = useDb();
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -79,8 +81,8 @@ export function NotificationsProvider({
   }, []);
 
   const allNotifications = useMemo(
-    () => computeStoreNotifications(stores),
-    [stores]
+    () => computeStoreNotifications(stores, contracts),
+    [stores, contracts]
   );
 
   const notifications = useMemo(() => {

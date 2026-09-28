@@ -84,6 +84,48 @@ function describeStoreUpdate(
   };
 }
 
+function buildStoreDbUpdates(
+  data: Partial<Store>,
+  meta?: { userId: string; userName: string }
+): Record<string, unknown> {
+  const now = new Date().toISOString();
+  const dbUpdates: Record<string, unknown> = {};
+
+  if (data.name !== undefined) dbUpdates.name = data.name;
+  if (data.city !== undefined) dbUpdates.city = data.city;
+  if (data.address !== undefined) dbUpdates.address = data.address;
+  if (data.latitude !== undefined) dbUpdates.latitude = data.latitude;
+  if (data.longitude !== undefined) dbUpdates.longitude = data.longitude;
+  if (data.projectStatus !== undefined)
+    dbUpdates.project_status = data.projectStatus;
+  if (data.openingDate !== undefined) dbUpdates.opening_date = data.openingDate;
+  if (data.acceptanceDate !== undefined)
+    dbUpdates.acceptance_date = data.acceptanceDate || null;
+  if (data.contractorCompany !== undefined)
+    dbUpdates.contractor_company = data.contractorCompany || null;
+  if (data.siteManager !== undefined)
+    dbUpdates.site_manager = data.siteManager || null;
+  if (data.locationType !== undefined)
+    dbUpdates.location_type = data.locationType;
+  if (data.grossM2 !== undefined) dbUpdates.gross_m2 = data.grossM2;
+  if (data.floorCount !== undefined) dbUpdates.floor_count = data.floorCount;
+  if (data.phone !== undefined) dbUpdates.phone = data.phone || null;
+  if (data.totalBudget !== undefined) dbUpdates.total_budget = data.totalBudget;
+  if (data.organizationId !== undefined)
+    dbUpdates.organization_id = data.organizationId || null;
+  if (data.approvals !== undefined) {
+    Object.assign(dbUpdates, approvalsToDb(data.approvals));
+  }
+
+  if (meta) {
+    dbUpdates.updated_by = meta.userId;
+    dbUpdates.updated_by_name = meta.userName;
+    dbUpdates.updated_at = now;
+  }
+
+  return dbUpdates;
+}
+
 type StoresContextValue = {
   stores: Store[];
   addStore: (
@@ -94,15 +136,15 @@ type StoresContextValue = {
     id: string,
     data: Partial<Store>,
     meta?: { userId: string; userName: string }
-  ) => void;
-  deleteStore: (id: string) => void;
+  ) => Promise<boolean>;
+  deleteStore: (id: string) => Promise<boolean>;
   getStore: (id: string) => Store | undefined;
 };
 
 const StoresContext = createContext<StoresContextValue | null>(null);
 
 export function StoresProvider({ children }: { children: React.ReactNode }) {
-  const { stores, setStores } = useDb();
+  const { stores, setStores, contracts, setContracts } = useDb();
   const { user } = useAuth();
 
   const addStore = useCallback(
@@ -169,15 +211,17 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateStore = useCallback(
-    (
+    async (
       id: string,
       data: Partial<Store>,
       meta?: { userId: string; userName: string }
-    ) => {
+    ): Promise<boolean> => {
       const now = new Date().toISOString();
-      const target = stores.find((s) => s.id === id);
+      const prevStores = stores;
+      const target = prevStores.find((s) => s.id === id);
+      if (!target) return false;
 
-      const next = stores.map((s) => {
+      const next = prevStores.map((s) => {
         if (s.id !== id) return s;
         return {
           ...s,
@@ -193,78 +237,75 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
       });
       setStores(next);
 
-      const dbUpdates: Record<string, unknown> = {};
-      if (data.name !== undefined) dbUpdates.name = data.name;
-      if (data.city !== undefined) dbUpdates.city = data.city;
-      if (data.address !== undefined) dbUpdates.address = data.address;
-      if (data.latitude !== undefined) dbUpdates.latitude = data.latitude;
-      if (data.longitude !== undefined) dbUpdates.longitude = data.longitude;
-      if (data.projectStatus !== undefined)
-        dbUpdates.project_status = data.projectStatus;
-      if (data.openingDate !== undefined)
-        dbUpdates.opening_date = data.openingDate;
-      if (data.acceptanceDate !== undefined)
-        dbUpdates.acceptance_date = data.acceptanceDate;
-      if (data.contractorCompany !== undefined)
-        dbUpdates.contractor_company = data.contractorCompany;
-      if (data.siteManager !== undefined)
-        dbUpdates.site_manager = data.siteManager;
-      if (data.locationType !== undefined)
-        dbUpdates.location_type = data.locationType;
-      if (data.grossM2 !== undefined) dbUpdates.gross_m2 = data.grossM2;
-      if (data.floorCount !== undefined)
-        dbUpdates.floor_count = data.floorCount;
-      if (data.phone !== undefined) dbUpdates.phone = data.phone;
-      if (data.totalBudget !== undefined)
-        dbUpdates.total_budget = data.totalBudget;
-      if (data.organizationId !== undefined)
-        dbUpdates.organization_id = data.organizationId;
-      if (data.approvals !== undefined) {
-        Object.assign(dbUpdates, approvalsToDb(data.approvals));
-      }
+      const dbUpdates = buildStoreDbUpdates(data, meta);
+      if (Object.keys(dbUpdates).length === 0) return true;
 
-      if (meta) {
-        dbUpdates.updated_by = meta.userId;
-        dbUpdates.updated_by_name = meta.userName;
-        dbUpdates.updated_at = now;
-      }
-
-      supabase
+      const { data: updated, error } = await supabase
         .from("stores")
         .update(dbUpdates)
         .eq("id", id)
-        .then(({ error }) => {
-          if (error) console.error("Error updating store in Supabase:", error);
-        });
+        .select("id")
+        .maybeSingle();
 
-      if (target) {
-        const desc = describeStoreUpdate(target, data);
-        logActivity({
-          category: desc.category,
-          action: desc.action,
-          message: desc.message,
-          actorId: meta?.userId ?? user?.id ?? "system",
-          actorName: meta?.userName ?? user?.name ?? "Sistem",
-          targetId: id,
-          targetLabel: target.name,
-        });
+      if (error || !updated) {
+        console.error("Error updating store in Supabase:", error);
+        setStores(prevStores);
+        return false;
       }
+
+      if (data.projectStatus === "hakedis") {
+        const { error: contractErr } = await supabase
+          .from("contracts")
+          .update({ status: "completed" })
+          .eq("store_id", id)
+          .in("status", ["active", "draft"]);
+
+        if (!contractErr) {
+          setContracts(
+            contracts.map((c) =>
+              c.storeId === id &&
+              (c.status === "active" || c.status === "draft")
+                ? { ...c, status: "completed" as const }
+                : c
+            )
+          );
+        }
+      }
+
+      const desc = describeStoreUpdate(target, data);
+      logActivity({
+        category: desc.category,
+        action: desc.action,
+        message: desc.message,
+        actorId: meta?.userId ?? user?.id ?? "system",
+        actorName: meta?.userName ?? user?.name ?? "Sistem",
+        targetId: id,
+        targetLabel: target.name,
+      });
+
+      return true;
     },
-    [stores, setStores, user?.id, user?.name]
+    [stores, setStores, contracts, setContracts, user?.id, user?.name]
   );
 
   const deleteStore = useCallback(
-    (id: string) => {
-      const target = stores.find((s) => s.id === id);
-      setStores(stores.filter((s) => s.id !== id));
+    async (id: string): Promise<boolean> => {
+      const prevStores = stores;
+      const target = prevStores.find((s) => s.id === id);
+      setStores(prevStores.filter((s) => s.id !== id));
 
-      supabase
+      const { data: deleted, error } = await supabase
         .from("stores")
         .delete()
         .eq("id", id)
-        .then(({ error }) => {
-          if (error) console.error("Error deleting store from Supabase:", error);
-        });
+        .select("id")
+        .maybeSingle();
+
+      if (error || !deleted) {
+        console.error("Error deleting store from Supabase:", error);
+        setStores(prevStores);
+        return false;
+      }
 
       if (target) {
         appendActivityLog({
@@ -275,6 +316,7 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
           targetLabel: target.name,
         });
       }
+      return true;
     },
     [stores, setStores]
   );

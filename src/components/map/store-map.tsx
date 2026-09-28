@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Map, { NavigationControl } from "react-map-gl/maplibre";
 import type { MapMouseEvent, MapRef } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -34,6 +34,7 @@ const DARK_MAP_STYLE =
 const TURKEY_CENTER = { longitude: 35.2433, latitude: 38.9637, zoom: 5.5 };
 
 export function StoreMap() {
+  const router = useRouter();
   const { theme } = useTheme();
   const t = useT();
   const searchParams = useSearchParams();
@@ -140,6 +141,10 @@ export function StoreMap() {
               if (addMode) return;
               setPendingCoords(null);
               setSelectedStoreId(store.id);
+            }}
+            onDoubleClick={() => {
+              if (addMode) return;
+              router.push(`/stores/${store.id}`);
             }}
           />
         ))}
