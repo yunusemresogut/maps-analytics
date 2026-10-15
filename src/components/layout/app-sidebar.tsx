@@ -141,7 +141,7 @@ export function AppSidebar() {
         className={cn(
           "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
           active
-            ? "bg-cyan-500/15 text-cyan-200 ring-1 ring-cyan-500/25"
+            ? "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/25"
             : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
         )}
       >

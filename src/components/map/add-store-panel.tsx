@@ -63,6 +63,7 @@ export function AddStorePanel({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -71,28 +72,46 @@ export function AddStorePanel({
   const [excelLoading, setExcelLoading] = useState(false);
   const [excelErrors, setExcelErrors] = useState<string>("");
   const [excelSuccess, setExcelSuccess] = useState("");
+  const queryTerm = query.trim();
+  const canSearch = mode === "search" && queryTerm.length >= 3;
+  const visibleResults = canSearch ? results : [];
+  const isSearching = canSearch && searching;
 
   useEffect(() => {
-    if (mode !== "search" || query.trim().length < 3) {
-      setResults([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
+    if (!canSearch) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(
-          `/api/geocode/search?q=${encodeURIComponent(query.trim())}`
+        const response = await fetch(
+          `/api/geocode/search?q=${encodeURIComponent(queryTerm)}`,
+          { signal: controller.signal }
         );
-        const data = await res.json();
-        setResults(data.results || []);
+        const data: unknown = await response.json().catch(() => null);
+        if (
+          !response.ok ||
+          !data ||
+          typeof data !== "object" ||
+          !Array.isArray((data as { results?: unknown }).results)
+        ) {
+          throw new Error("Geocoding request failed");
+        }
+        setResults((data as { results: GeocodeResult[] }).results);
+        setSearchError("");
       } catch {
+        if (controller.signal.aborted) return;
         setResults([]);
+        setSearchError(t("geocode.searchFailed"));
       } finally {
-        setSearching(false);
+        if (!controller.signal.aborted) setSearching(false);
       }
     }, 400);
-    return () => clearTimeout(timer);
-  }, [query, mode]);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [canSearch, queryTerm, t]);
 
   const applyResult = (item: GeocodeResult) => {
     onCoordsChange({ latitude: item.latitude, longitude: item.longitude });
@@ -102,6 +121,7 @@ export function AddStorePanel({
       city: item.city || prev.city,
     }));
     setResults([]);
+    setSearchError("");
     setQuery(item.label);
   };
 
@@ -225,7 +245,7 @@ export function AddStorePanel({
                 className={cn(
                   "rounded-md px-2 py-1.5 text-xs",
                   mode === key
-                    ? "bg-cyan-500/20 text-cyan-200"
+                    ? "bg-cyan-500/20 text-cyan-300"
                     : "text-zinc-500"
                 )}
               >
@@ -239,23 +259,32 @@ export function AddStorePanel({
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
               <Input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setSearchError("");
+                  if (e.target.value.trim().length < 3) setSearching(false);
+                }}
                 placeholder={t("geocode.searchPlaceholder")}
                 className="pl-9"
               />
-              {(searching || results.length > 0) && (
+              {(isSearching || visibleResults.length > 0 || searchError) && (
                 <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl">
-                  {searching && (
+                  {isSearching && (
                     <li className="px-3 py-2 text-xs text-zinc-500">
                       {t("geocode.searching")}
                     </li>
                   )}
-                  {!searching && results.length === 0 && query.length >= 3 && (
+                  {!isSearching && searchError && (
+                    <li className="px-3 py-2 text-xs text-red-400" role="alert">
+                      {searchError}
+                    </li>
+                  )}
+                  {!isSearching && !searchError && visibleResults.length === 0 && canSearch && (
                     <li className="px-3 py-2 text-xs text-zinc-500">
                       {t("geocode.noResults")}
                     </li>
                   )}
-                  {results.map((item) => (
+                  {visibleResults.map((item) => (
                     <li key={item.id}>
                       <button
                         type="button"

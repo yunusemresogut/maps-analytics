@@ -13,6 +13,7 @@ import {
 import { useStores } from "@/contexts/stores-context";
 import { useRegions } from "@/contexts/regions-context";
 import { useDb } from "@/contexts/db-context";
+import { formatTry } from "@/lib/currency";
 import { useT } from "@/contexts/i18n-context";
 import { findRegionForCity } from "@/data/regions";
 import { getOpeningAlert } from "@/lib/opening-dates";
@@ -76,12 +77,15 @@ export function UserDashboard() {
   // Upcoming Openings
   const upcomingStores = [...stores]
     .filter((s) => {
-      const diffTime = new Date(s.openingDate).getTime() - Date.now();
-      return diffTime > 0 && s.projectStatus !== "acilis";
+      return (
+        getOpeningAlert(s.openingDate).daysUntilOpening > 0 &&
+        s.projectStatus !== "acilis"
+      );
     })
     .sort(
       (a, b) =>
-        new Date(a.openingDate).getTime() - new Date(b.openingDate).getTime()
+        getOpeningAlert(a.openingDate).daysUntilOpening -
+        getOpeningAlert(b.openingDate).daysUntilOpening
     )
     .slice(0, 4);
 
@@ -95,7 +99,6 @@ export function UserDashboard() {
     .slice(0, 4);
 
   // Financial calculations
-  const totalBudget = stores.reduce((sum, s) => sum + s.totalBudget, 0);
   const totalSpent = Object.values(storeData).reduce((total, sData) => {
     return (
       total +
@@ -106,11 +109,7 @@ export function UserDashboard() {
     );
   }, 0);
 
-  const formattedSpent = new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency: "TRY",
-    maximumFractionDigits: 0,
-  }).format(totalSpent);
+  const formattedSpent = formatTry(totalSpent);
 
   return (
     <div className="scrollbar-themed h-[calc(100vh-3.5rem)] overflow-y-auto">
@@ -255,9 +254,7 @@ export function UserDashboard() {
                 </li>
               )}
               {upcomingStores.map((store) => {
-                const diffTime =
-                  new Date(store.openingDate).getTime() - Date.now();
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const diffDays = getOpeningAlert(store.openingDate).daysUntilOpening;
                 return (
                   <li
                     key={store.id}
@@ -353,7 +350,7 @@ export function UserDashboard() {
                       />
                     </div>
                     <span className="text-[10px] text-zinc-500 mt-1 block">
-                      Toplamın %{pct}'si
+                      Toplam payı %{pct}
                     </span>
                   </div>
                 </div>

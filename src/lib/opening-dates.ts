@@ -1,6 +1,6 @@
 import { differenceInDays, isPast, parseISO } from "date-fns";
 
-const OPENING_SOON_DAYS = 30;
+const OPENING_SOON_DAYS = 7;
 
 export type OpeningAlert = {
   isOpeningSoon: boolean;

@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/ui/form-field";
 import { FormError } from "@/components/ui/field-error";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { uploadAvatar } from "@/lib/avatar-upload";
+import { removeAvatarFiles, uploadAvatar } from "@/lib/avatar-upload";
 import { isAdmin } from "@/lib/roles";
 import {
   clearFieldError,
@@ -43,18 +43,24 @@ function ProfileContent() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setName(user?.name ?? "");
-    setPhone(user?.phone ?? "");
-    setAvatarUrl(user?.avatarUrl ?? "");
-    setAvatarPreview(user?.avatarUrl ?? "");
+    const frame = window.requestAnimationFrame(() => {
+      setName(user?.name ?? "");
+      setPhone(user?.phone ?? "");
+      setAvatarUrl(user?.avatarUrl ?? "");
+      setAvatarPreview(user?.avatarUrl ?? "");
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [user]);
 
   useEffect(() => {
-    setCompanyName(organization?.name ?? "");
-    setTaxNumber(organization?.taxNumber ?? "");
-    setAuthorizedPerson(organization?.authorizedPerson ?? "");
-    setOrgPhone(organization?.phone ?? "");
-    setAddress(organization?.address ?? "");
+    const frame = window.requestAnimationFrame(() => {
+      setCompanyName(organization?.name ?? "");
+      setTaxNumber(organization?.taxNumber ?? "");
+      setAuthorizedPerson(organization?.authorizedPerson ?? "");
+      setOrgPhone(organization?.phone ?? "");
+      setAddress(organization?.address ?? "");
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [organization]);
 
   const touch = (key: string, value: string, setter: (v: string) => void) => {
@@ -78,17 +84,29 @@ function ProfileContent() {
       URL.revokeObjectURL(localPreview);
       return;
     }
+    const saved = await updateProfile({ avatarUrl: result.url });
+    if (!saved) {
+      setAvatarError("Fotoğraf yüklendi ancak profil güncellenemedi. Lütfen tekrar deneyin.");
+      setAvatarPreview(avatarUrl);
+      URL.revokeObjectURL(localPreview);
+      return;
+    }
     setAvatarUrl(result.url);
     setAvatarPreview(result.url);
-    await updateProfile({ avatarUrl: result.url });
     URL.revokeObjectURL(localPreview);
   };
 
   const resetAvatar = async () => {
+    setAvatarError("");
+    if (!user) return;
+    const saved = await updateProfile({ avatarUrl: null });
+    if (!saved) {
+      setAvatarError("Profil fotoğrafı kaldırılamadı. Lütfen tekrar deneyin.");
+      return;
+    }
     setAvatarUrl("");
     setAvatarPreview("");
-    setAvatarError("");
-    await updateProfile({ avatarUrl: undefined });
+    await removeAvatarFiles(user.id);
   };
 
   const save = async () => {
