@@ -9,6 +9,9 @@
   --scrollbar-thumb: rgba(82, 82, 91, 0.85);
   --scrollbar-thumb-hover: rgba(113, 113, 122, 0.95);
   --scrollbar-track: transparent;
+  --glow-accent: rgba(34, 211, 238, 0.3);
+  --panel-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
 
   /* Tailwind Zinc Color Overrides for Dark Mode (default) */
   --color-zinc-50: #fafafa;
@@ -25,40 +28,162 @@
 }
 
 .light {
-  --background: #fafbff;
-  --foreground: #09090b;
-  --scrollbar-thumb: rgba(161, 161, 170, 0.5);
-  --scrollbar-thumb-hover: rgba(113, 113, 122, 0.8);
+  color-scheme: light;
+  --background: #f6f7f9;
+  --foreground: #151922;
+  --scrollbar-thumb: rgba(107, 114, 128, 0.35);
+  --scrollbar-thumb-hover: rgba(75, 82, 96, 0.6);
+  --glow-accent: rgba(13, 148, 136, 0.12);
+  --panel-shadow: 0 8px 28px rgba(15, 23, 42, 0.1), 0 1px 3px rgba(15, 23, 42, 0.08);
 
-  /* Inverted Zinc Colors for Light Mode */
-  --color-zinc-50: #09090b;
-  --color-zinc-100: #18181b;
-  --color-zinc-200: #27272a;
-  --color-zinc-300: #3f3f46;
-  --color-zinc-400: #52525b;
-  --color-zinc-500: #71717a;
-  --color-zinc-600: #a1a1aa;
-  --color-zinc-700: #d4d4d8;
-  --color-zinc-800: #e4e4e7;
-  --color-zinc-900: #f4f4f5;
+  /*
+   * Açık tema gri skalası: koyu temadaki "derinlik" sırası korunur
+   * (950 en açık yüzey, 50 en koyu yazı). Yazı tonları beyaz zeminde
+   * WCAG AA kontrastını sağlar; hafif soğuk ton göz yorgunluğunu azaltır.
+   */
+  --color-zinc-50: #0b0e14;
+  --color-zinc-100: #151922;
+  --color-zinc-200: #232833;
+  --color-zinc-300: #353b47;
+  --color-zinc-400: #4b5260;
+  --color-zinc-500: #5f6673;
+  --color-zinc-600: #6b7280;
+  --color-zinc-700: #d1d5db;
+  --color-zinc-800: #e5e7eb;
+  --color-zinc-900: #f3f4f6;
   --color-zinc-950: #ffffff;
 
-  /* Overrides for accent colors in Light Mode for high contrast readability */
-  --color-cyan-300: #0e7490;
-  --color-cyan-400: #0f766e;
+  /*
+   * Vurgu renkleri: koyu temada yazı için kullanılan açık tonlar (100–400)
+   * açık temada koyu tonlara, dolgu/ton için kullanılan 500+ ise bir kademe
+   * koyusuna eşlenir. Böylece badge, uyarı ve buton yazıları okunur kalır.
+   */
+  --color-red-100: #991b1b;
+  --color-red-200: #991b1b;
+  --color-red-300: #b91c1c;
+  --color-red-400: #b91c1c;
+  --color-red-500: #dc2626;
+  --color-red-600: #b91c1c;
+  --color-red-700: #991b1b;
+  --color-orange-100: #7c2d12;
+  --color-orange-200: #7c2d12;
+  --color-orange-300: #9a3412;
+  --color-orange-400: #9a3412;
+  --color-orange-500: #ea580c;
+  --color-orange-600: #c2410c;
+  --color-orange-700: #9a3412;
+  --color-amber-100: #78350f;
+  --color-amber-200: #78350f;
+  --color-amber-300: #92400e;
+  --color-amber-400: #92400e;
+  --color-amber-500: #d97706;
+  --color-amber-600: #b45309;
+  --color-amber-700: #92400e;
+  --color-yellow-100: #713f12;
+  --color-yellow-200: #713f12;
+  --color-yellow-300: #854d0e;
+  --color-yellow-400: #854d0e;
+  --color-yellow-500: #ca8a04;
+  --color-yellow-600: #a16207;
+  --color-yellow-700: #854d0e;
+  --color-lime-100: #365314;
+  --color-lime-200: #365314;
+  --color-lime-300: #3f6212;
+  --color-lime-400: #3f6212;
+  --color-lime-500: #65a30d;
+  --color-lime-600: #4d7c0f;
+  --color-lime-700: #3f6212;
+  --color-green-100: #14532d;
+  --color-green-200: #14532d;
+  --color-green-300: #166534;
+  --color-green-400: #166534;
+  --color-green-500: #16a34a;
+  --color-green-600: #15803d;
+  --color-green-700: #166534;
+  --color-emerald-100: #064e3b;
+  --color-emerald-200: #064e3b;
+  --color-emerald-300: #065f46;
+  --color-emerald-400: #065f46;
+  --color-emerald-500: #059669;
+  --color-emerald-600: #047857;
+  --color-emerald-700: #065f46;
+  --color-teal-100: #134e4a;
+  --color-teal-200: #134e4a;
+  --color-teal-300: #115e59;
+  --color-teal-400: #115e59;
+  --color-teal-500: #0d9488;
+  --color-teal-600: #0f766e;
+  --color-teal-700: #115e59;
+  --color-cyan-100: #134e4a;
+  --color-cyan-200: #134e4a;
+  --color-cyan-300: #115e59;
+  --color-cyan-400: #115e59;
   --color-cyan-500: #0d9488;
-
-  --color-amber-100: #92400e;
-  --color-amber-200: #92400e;
+  --color-cyan-600: #0f766e;
+  --color-cyan-700: #115e59;
+  --color-sky-100: #075985;
+  --color-sky-200: #075985;
+  --color-sky-300: #0369a1;
+  --color-sky-400: #0369a1;
+  --color-sky-500: #0284c7;
+  --color-sky-600: #0369a1;
+  --color-sky-700: #075985;
+  --color-blue-100: #1e40af;
+  --color-blue-200: #1e40af;
+  --color-blue-300: #1d4ed8;
+  --color-blue-400: #1d4ed8;
+  --color-blue-500: #2563eb;
+  --color-blue-600: #1d4ed8;
+  --color-blue-700: #1e40af;
+  --color-indigo-100: #3730a3;
+  --color-indigo-200: #3730a3;
+  --color-indigo-300: #4338ca;
+  --color-indigo-400: #4338ca;
+  --color-indigo-500: #4f46e5;
+  --color-indigo-600: #4338ca;
+  --color-indigo-700: #3730a3;
   --color-violet-100: #5b21b6;
   --color-violet-200: #5b21b6;
-
-  --color-amber-400: #b55c09;
-  --color-emerald-400: #047857;
-  --color-orange-400: #c2410c;
+  --color-violet-300: #6d28d9;
   --color-violet-400: #6d28d9;
+  --color-violet-500: #7c3aed;
+  --color-violet-600: #6d28d9;
+  --color-violet-700: #5b21b6;
+  --color-purple-100: #6b21a8;
+  --color-purple-200: #6b21a8;
+  --color-purple-300: #7e22ce;
+  --color-purple-400: #7e22ce;
+  --color-purple-500: #9333ea;
+  --color-purple-600: #7e22ce;
+  --color-purple-700: #6b21a8;
+  --color-fuchsia-100: #86198f;
+  --color-fuchsia-200: #86198f;
+  --color-fuchsia-300: #a21caf;
+  --color-fuchsia-400: #a21caf;
+  --color-fuchsia-500: #c026d3;
+  --color-fuchsia-600: #a21caf;
+  --color-fuchsia-700: #86198f;
+  --color-pink-100: #9d174d;
+  --color-pink-200: #9d174d;
+  --color-pink-300: #be185d;
   --color-pink-400: #be185d;
-  --color-red-400: #b91c1c;
+  --color-pink-500: #db2777;
+  --color-pink-600: #be185d;
+  --color-pink-700: #9d174d;
+  --color-rose-100: #9f1239;
+  --color-rose-200: #9f1239;
+  --color-rose-300: #be123c;
+  --color-rose-400: #be123c;
+  --color-rose-500: #e11d48;
+  --color-rose-600: #be123c;
+  --color-rose-700: #9f1239;
+  --color-stone-100: #44403c;
+  --color-stone-200: #44403c;
+  --color-stone-300: #57534e;
+  --color-stone-400: #57534e;
+  --color-stone-500: #78716c;
+  --color-stone-600: #57534e;
+  --color-stone-700: #44403c;
 }
 
 @theme inline {
@@ -73,6 +198,23 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/*
+ * Açık temada sayfa zemini yumuşak gri, kartlar beyaz: tam beyaz ekranın
+ * parlamasını azaltır ve kartları zeminden ayırır. Koyu tema etkilenmez.
+ */
+.light body {
+  background-color: var(--background);
+}
+
+.light .bg-zinc-900\/40,
+.light .bg-zinc-900\/50 {
+  background-color: #ffffff;
+}
+
+.light ::selection {
+  background-color: color-mix(in srgb, var(--color-cyan-500) 22%, transparent);
 }
 
 /* Themed scrollbars */
@@ -123,7 +265,11 @@ html:not(.light) .maplibregl-ctrl-group button {
 }
 
 .maplibregl-ctrl-group button:hover {
-  background: rgba(34, 211, 238, 0.1) !important;
+  background: color-mix(in srgb, var(--color-cyan-500) 10%, transparent) !important;
+}
+
+.light .maplibregl-ctrl-group {
+  box-shadow: var(--panel-shadow);
 }
 
 @keyframes slide-in-from-left {

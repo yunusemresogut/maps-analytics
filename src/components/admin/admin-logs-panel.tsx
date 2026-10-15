@@ -174,7 +174,7 @@ export function AdminLogsPanel() {
               {table.pageItems.map((log) => (
                 <tr
                   key={log.id}
-                  className="border-t border-zinc-800/80 hover:bg-white/[0.02]"
+                  className="border-t border-zinc-800/80 hover:bg-zinc-900/50"
                 >
                   <td className="whitespace-nowrap px-4 py-3 text-xs text-zinc-500">
                     {format(parseISO(log.createdAt), "d MMM yyyy, HH:mm", {

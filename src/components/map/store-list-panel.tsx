@@ -113,7 +113,7 @@ export function StoreListPanel({
           <button
             type="button"
             onClick={() => setStoreListOpen(false)}
-            className="rounded-lg p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+            className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
           >
             <X className="h-4 w-4" />
           </button>

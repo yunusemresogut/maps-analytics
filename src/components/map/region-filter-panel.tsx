@@ -20,13 +20,13 @@ export function RegionFilterPanel() {
 
   return (
     <div className="pointer-events-auto absolute bottom-4 left-4 z-20 w-full max-w-xs slide-in-from-left">
-      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/95 p-4 shadow-[0_0_40px_rgba(0,0,0,0.5)] backdrop-blur-md">
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/95 p-4 shadow-(--panel-shadow) backdrop-blur-md">
         <div className="mb-3 flex items-center justify-between">
           <span className="text-sm font-medium text-zinc-200">Bölgeler</span>
           <button
             type="button"
             onClick={() => setPanelOpen(false)}
-            className="rounded-lg p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+            className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
           >
             <X className="h-4 w-4" />
           </button>

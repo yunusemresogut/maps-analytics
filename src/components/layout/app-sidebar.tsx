@@ -203,7 +203,7 @@ export function AppSidebar() {
                 "rounded-lg p-1.5 transition-colors",
                 isPinned
                   ? "bg-cyan-500/15 text-cyan-300"
-                  : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+                  : "text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
               )}
               title={isPinned ? t("nav.unpinMenu") : t("nav.pinMenu")}
               aria-label={isPinned ? t("nav.unpinMenu") : t("nav.pinMenu")}
@@ -220,7 +220,7 @@ export function AppSidebar() {
               <button
                 type="button"
                 onClick={close}
-                className="rounded-lg p-1.5 text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+                className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
                 aria-label={t("nav.closeMenu")}
               >
                 <X className="h-4 w-4" />

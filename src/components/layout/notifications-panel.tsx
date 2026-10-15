@@ -71,7 +71,7 @@ export function NotificationsPanel({
     <div
       ref={ref}
       style={{ top, right }}
-      className="fixed z-[9999] w-80 rounded-xl border border-zinc-700/60 bg-zinc-950/98 shadow-[0_0_40px_rgba(0,0,0,0.6)] backdrop-blur-md"
+      className="fixed z-[9999] w-80 rounded-xl border border-zinc-700/60 bg-zinc-950/98 shadow-(--panel-shadow) backdrop-blur-md"
     >
       <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <div className="flex items-center gap-2">
@@ -88,7 +88,7 @@ export function NotificationsPanel({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+          className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
           aria-label={t("common.close")}
         >
           <X className="h-3.5 w-3.5" />
@@ -110,7 +110,7 @@ export function NotificationsPanel({
                 <button
                   type="button"
                   onClick={() => onSelect(notif)}
-                  className="flex min-w-0 flex-1 items-start gap-2 rounded-md p-1 text-left transition-colors hover:bg-white/5"
+                  className="flex min-w-0 flex-1 items-start gap-2 rounded-md p-1 text-left transition-colors hover:bg-zinc-800/50"
                 >
                   <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} />
                   <div className="min-w-0">
@@ -125,7 +125,7 @@ export function NotificationsPanel({
                 <button
                   type="button"
                   onClick={() => onDismiss(notif.id)}
-                  className="shrink-0 rounded-md p-1.5 text-zinc-600 opacity-70 transition-opacity hover:bg-white/5 hover:text-zinc-300 group-hover:opacity-100"
+                  className="shrink-0 rounded-md p-1.5 text-zinc-600 opacity-70 transition-opacity hover:bg-zinc-800/50 hover:text-zinc-300 group-hover:opacity-100"
                   aria-label={t("notifications.dismiss")}
                 >
                   <X className="h-3.5 w-3.5" />

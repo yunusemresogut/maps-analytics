@@ -291,7 +291,7 @@ export function AdminBudgetsPanel() {
                 return (
                   <tr
                     key={store.id}
-                    className="border-b border-zinc-800/60 hover:bg-white/[0.01] transition-colors"
+                    className="border-b border-zinc-800/60 hover:bg-zinc-900/50 transition-colors"
                   >
                     <td className="px-5 py-3.5 font-medium text-zinc-200">
                       {store.name}

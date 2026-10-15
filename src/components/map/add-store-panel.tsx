@@ -205,7 +205,7 @@ export function AddStorePanel({
           "flex flex-col",
           MAP_PANEL_HEIGHT_CLASS,
           MAP_PANEL_SHELL_CLASS,
-          "border-cyan-500/30 shadow-[0_0_40px_rgba(34,211,238,0.15)]"
+          "border-cyan-500/30 shadow-[0_0_40px_var(--glow-accent)]"
         )}
       >
         <div className="flex items-center justify-between border-b border-zinc-800 p-4">
@@ -223,7 +223,7 @@ export function AddStorePanel({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+            className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
           >
             <X className="h-4 w-4" />
           </button>
