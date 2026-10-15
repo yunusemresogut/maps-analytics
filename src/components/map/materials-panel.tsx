@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useId, useState } from "react";
-import { Edit2, Package, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Edit2, Package, Plus, Trash2 } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import { formatCurrency } from "@/lib/excel-materials";
 import { Button } from "@/components/ui/button";
@@ -189,6 +189,8 @@ export function MaterialsPanel({
 }: MaterialsPanelProps) {
   const { addMaterial, updateMaterial } = useStoreData();
   const [modal, setModal] = useState<{ key: number; material: StoreMaterial | null } | null>(null);
+  const [expanded, setExpanded] = useState(true);
+  const bodyId = useId();
 
   const getSortValue = useCallback((item: StoreMaterial, key: MaterialSortKey) => {
     if (key === "name") return item.name;
@@ -220,14 +222,26 @@ export function MaterialsPanel({
 
   return (
     <section className="flex w-full min-w-0 flex-col rounded-lg border border-zinc-800 bg-zinc-900/40">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 px-4 py-3">
-        <div className="flex items-center gap-2">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2 px-4 py-3 ${expanded ? "border-b border-zinc-800" : ""}`}
+      >
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          aria-expanded={expanded}
+          aria-controls={bodyId}
+          className="-mx-1.5 -my-1 flex items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-zinc-800/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
+        >
+          <ChevronDown
+            className={`h-4 w-4 text-zinc-500 transition-transform ${expanded ? "" : "-rotate-90"}`}
+            aria-hidden
+          />
           <Package className="h-4 w-4 text-violet-400" />
           <span className="text-sm font-medium text-zinc-200">Malzemeler</span>
           <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-xs text-violet-300">
             {materials.length}
           </span>
-        </div>
+        </button>
         {isEditing && (
           <div className="flex items-center gap-2">
             <MaterialsImportMenu existingCount={materials.length} onImport={onImport} />
@@ -239,119 +253,121 @@ export function MaterialsPanel({
         )}
       </div>
 
-      <div className="min-w-0 overflow-x-auto">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead className="border-b border-zinc-800 text-xs text-zinc-500">
-            <tr>
-              <th className="px-4 py-3 text-left font-medium">Malzeme</th>
-              <th className="px-4 py-3 text-right font-medium">Miktar</th>
-              <th className="px-4 py-3 text-left font-medium">Birim</th>
-              <th className="px-4 py-3 text-right font-medium">Birim fiyat</th>
-              <th className="px-4 py-3 text-right font-medium">Tutar</th>
-              <th className="px-4 py-3 text-left font-medium">Durum</th>
-              {isEditing && <th className="w-20 px-4 py-3" />}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800/70">
-            {materials.length === 0 ? (
+      <div id={bodyId} hidden={!expanded}>
+        <div className="min-w-0 overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="border-b border-zinc-800 text-xs text-zinc-500">
               <tr>
-                <td colSpan={isEditing ? 7 : 6} className="px-4 py-10 text-center text-sm text-zinc-500">
-                  Henüz malzeme yok. Excel ile içe aktarın veya &quot;Malzeme ekle&quot; ile ekleyin.
-                </td>
+                <th className="px-4 py-3 text-left font-medium">Malzeme</th>
+                <th className="px-4 py-3 text-right font-medium">Miktar</th>
+                <th className="px-4 py-3 text-left font-medium">Birim</th>
+                <th className="px-4 py-3 text-right font-medium">Birim fiyat</th>
+                <th className="px-4 py-3 text-right font-medium">Tutar</th>
+                <th className="px-4 py-3 text-left font-medium">Durum</th>
+                {isEditing && <th className="w-20 px-4 py-3" />}
               </tr>
-            ) : (
-              table.pageItems.map((m) => {
-                const currentStatus = m.status || "bekleniyor";
-                return (
-                  <tr key={m.id} className="text-zinc-300 hover:bg-zinc-900/50">
-                    <td className="max-w-[360px] px-4 py-3 font-medium text-zinc-100">
-                      <TruncateWithTooltip text={m.name} />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-zinc-400">
-                      {m.quantity}
-                    </td>
-                    <td className="max-w-[120px] px-4 py-3 text-zinc-400">
-                      <TruncateWithTooltip text={m.unit || "—"} />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-zinc-400">
-                      {formatCurrency(m.unitPrice)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-zinc-200">
-                      {formatCurrency(m.quantity * m.unitPrice)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-950/40 px-2 py-0.5 text-xs font-medium">
-                        <span className={`h-1.5 w-1.5 rounded-full ${statusColors[currentStatus].split(" ")[0]}`} />
-                        <span className={statusColors[currentStatus].split(" ")[1]}>
-                          {statusLabels[currentStatus]}
-                        </span>
-                      </span>
-                    </td>
-                    {isEditing && (
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openModal(m)}
-                            className="text-zinc-500 hover:text-cyan-400"
-                            aria-label="Düzenle"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDelete(m.id)}
-                            className="text-zinc-500 hover:text-red-400"
-                            aria-label="Sil"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
+            </thead>
+            <tbody className="divide-y divide-zinc-800/70">
+              {materials.length === 0 ? (
+                <tr>
+                  <td colSpan={isEditing ? 7 : 6} className="px-4 py-10 text-center text-sm text-zinc-500">
+                    Henüz malzeme yok. Excel ile içe aktarın veya &quot;Malzeme ekle&quot; ile ekleyin.
+                  </td>
+                </tr>
+              ) : (
+                table.pageItems.map((m) => {
+                  const currentStatus = m.status || "bekleniyor";
+                  return (
+                    <tr key={m.id} className="text-zinc-300 hover:bg-zinc-900/50">
+                      <td className="max-w-[360px] px-4 py-3 font-medium text-zinc-100">
+                        <TruncateWithTooltip text={m.name} />
                       </td>
-                    )}
-                  </tr>
-                );
-              })
+                      <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-zinc-400">
+                        {m.quantity}
+                      </td>
+                      <td className="max-w-[120px] px-4 py-3 text-zinc-400">
+                        <TruncateWithTooltip text={m.unit || "—"} />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-zinc-400">
+                        {formatCurrency(m.unitPrice)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-zinc-200">
+                        {formatCurrency(m.quantity * m.unitPrice)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-950/40 px-2 py-0.5 text-xs font-medium">
+                          <span className={`h-1.5 w-1.5 rounded-full ${statusColors[currentStatus].split(" ")[0]}`} />
+                          <span className={statusColors[currentStatus].split(" ")[1]}>
+                            {statusLabels[currentStatus]}
+                          </span>
+                        </span>
+                      </td>
+                      {isEditing && (
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openModal(m)}
+                              className="text-zinc-500 hover:text-cyan-400"
+                              aria-label="Düzenle"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDelete(m.id)}
+                              className="text-zinc-500 hover:text-red-400"
+                              aria-label="Sil"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+            {materials.length > 0 && (
+              <tfoot className="border-t border-zinc-800">
+                <tr>
+                  <td colSpan={4} className="px-4 py-3 text-right text-xs text-zinc-500">
+                    Toplam tutar
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-cyan-300">
+                    {formatCurrency(total)}
+                  </td>
+                  <td colSpan={isEditing ? 2 : 1} />
+                </tr>
+              </tfoot>
             )}
-          </tbody>
-          {materials.length > 0 && (
-            <tfoot className="border-t border-zinc-800">
-              <tr>
-                <td colSpan={4} className="px-4 py-3 text-right text-xs text-zinc-500">
-                  Toplam tutar
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-cyan-300">
-                  {formatCurrency(total)}
-                </td>
-                <td colSpan={isEditing ? 2 : 1} />
-              </tr>
-            </tfoot>
-          )}
-        </table>
+          </table>
+        </div>
+
+        {materials.length > 0 && (
+          <div className="border-t border-zinc-800 px-3 py-2">
+            <TablePagination
+              page={table.page}
+              totalPages={table.totalPages}
+              totalItems={table.totalItems}
+              rangeStart={table.rangeStart}
+              rangeEnd={table.rangeEnd}
+              onPageChange={table.setPage}
+              pageSize={table.pageSize}
+              onPageSizeChange={table.setPageSize}
+            />
+          </div>
+        )}
+
+        {materials.length > 0 && isEditing && (
+          <div className="border-t border-zinc-800 px-3 py-3">
+            <Button size="sm" variant="ghost" className="text-xs text-red-400/80" onClick={onClear}>
+              Tümünü temizle
+            </Button>
+          </div>
+        )}
       </div>
-
-      {materials.length > 0 && (
-        <div className="border-t border-zinc-800 px-3 py-2">
-          <TablePagination
-            page={table.page}
-            totalPages={table.totalPages}
-            totalItems={table.totalItems}
-            rangeStart={table.rangeStart}
-            rangeEnd={table.rangeEnd}
-            onPageChange={table.setPage}
-            pageSize={table.pageSize}
-            onPageSizeChange={table.setPageSize}
-          />
-        </div>
-      )}
-
-      {materials.length > 0 && isEditing && (
-        <div className="border-t border-zinc-800 px-3 py-3">
-          <Button size="sm" variant="ghost" className="text-xs text-red-400/80" onClick={onClear}>
-            Tümünü temizle
-          </Button>
-        </div>
-      )}
 
       {modal && (
         <MaterialFormModal

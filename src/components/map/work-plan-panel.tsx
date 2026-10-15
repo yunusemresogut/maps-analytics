@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { CalendarRange, Edit2, List, Plus, Trash2 } from "lucide-react";
+import { useCallback, useId, useState } from "react";
+import { ChevronDown, CalendarRange, Edit2, List, Plus, Trash2 } from "lucide-react";
 import {
   addMonths,
   differenceInCalendarDays,
@@ -242,6 +242,8 @@ export function WorkPlanPanel({
   const { addWorkPlanItem, updateWorkPlanItem } = useStoreData();
   const [viewMode, setViewMode] = useState<"table" | "gantt">("table");
   const [modal, setModal] = useState<{ key: number; item: StoreWorkPlanItem | null } | null>(null);
+  const [expanded, setExpanded] = useState(true);
+  const bodyId = useId();
 
   const getSortValue = useCallback(
     (item: StoreWorkPlanItem, key: WorkPlanSortKey) => {
@@ -270,16 +272,28 @@ export function WorkPlanPanel({
 
   return (
     <section className="flex w-full min-w-0 flex-col rounded-lg border border-zinc-800 bg-zinc-900/40">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 px-4 py-3">
-        <div className="flex items-center gap-2">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2 px-4 py-3 ${expanded ? "border-b border-zinc-800" : ""}`}
+      >
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          aria-expanded={expanded}
+          aria-controls={bodyId}
+          className="-mx-1.5 -my-1 flex items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-zinc-800/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
+        >
+          <ChevronDown
+            className={`h-4 w-4 text-zinc-500 transition-transform ${expanded ? "" : "-rotate-90"}`}
+            aria-hidden
+          />
           <CalendarRange className="h-4 w-4 text-emerald-400" />
           <span className="text-sm font-medium text-zinc-200">İş Planı</span>
           <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-xs text-emerald-300">
             {items.length}
           </span>
-        </div>
+        </button>
         <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-md border border-zinc-800 bg-zinc-950/50 p-0.5" role="group" aria-label="İş planı görünümü">
+          <div className={`${expanded ? "inline-flex" : "hidden"} rounded-md border border-zinc-800 bg-zinc-950/50 p-0.5`} role="group" aria-label="İş planı görünümü">
             <button
               type="button"
               onClick={() => setViewMode("table")}
@@ -311,124 +325,126 @@ export function WorkPlanPanel({
         </div>
       </div>
 
-      {viewMode === "table" ? (
-        <>
-          <div className="min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
-              <thead className="border-b border-zinc-800 text-left text-xs text-zinc-500">
-                <tr>
-                  <th className="px-4 py-3 font-medium">İş kalemi</th>
-                  <th className="px-4 py-3 font-medium">Aktivite kodu</th>
-                  <th className="px-4 py-3 font-medium">Başlangıç</th>
-                  <th className="px-4 py-3 font-medium">Bitiş</th>
-                  <th className="px-4 py-3 font-medium">İlerleme</th>
-                  <th className="px-4 py-3 font-medium">Sorumlu</th>
-                  <th className="px-4 py-3 font-medium">Durum</th>
-                  {isEditing && <th className="w-20 px-4 py-3" />}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/70">
-                {items.length === 0 ? (
+      <div id={bodyId} hidden={!expanded}>
+        {viewMode === "table" ? (
+          <>
+            <div className="min-w-0 overflow-x-auto">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead className="border-b border-zinc-800 text-left text-xs text-zinc-500">
                   <tr>
-                    <td
-                      colSpan={isEditing ? 8 : 7}
-                      className="px-4 py-10 text-center text-sm text-zinc-500"
-                    >
-                      Henüz iş planı yok.
-                    </td>
+                    <th className="px-4 py-3 font-medium">İş kalemi</th>
+                    <th className="px-4 py-3 font-medium">Aktivite kodu</th>
+                    <th className="px-4 py-3 font-medium">Başlangıç</th>
+                    <th className="px-4 py-3 font-medium">Bitiş</th>
+                    <th className="px-4 py-3 font-medium">İlerleme</th>
+                    <th className="px-4 py-3 font-medium">Sorumlu</th>
+                    <th className="px-4 py-3 font-medium">Durum</th>
+                    {isEditing && <th className="w-20 px-4 py-3" />}
                   </tr>
-                ) : (
-                  table.pageItems.map((item) => {
-                    const currentStatus = (item.status as WorkPlanStatus) || "yapilacak";
-                    return (
-                      <tr key={item.id} className="text-zinc-300 hover:bg-zinc-900/50">
-                        <td className="max-w-[440px] px-4 py-3 font-medium text-zinc-100">
-                          <div><TruncateWithTooltip text={item.description} /></div>
-                          {item.wbsCode && <span className="mt-1 block text-[10px] font-normal text-zinc-500">WBS {item.wbsCode}</span>}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-zinc-400">
-                          {item.activityCode ?? "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-zinc-400">
-                          {formatDateSafe(item.startDate)}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-zinc-400">
-                          {formatDateSafe(item.endDate)}
-                        </td>
-                        <td className="min-w-36 px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-zinc-800">
-                              <div className="h-full rounded-full bg-emerald-500" style={{ width: `${item.percentComplete}%` }} />
-                            </div>
-                            <span className="w-10 text-right text-xs tabular-nums text-zinc-400">{item.percentComplete}%</span>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-zinc-400">
-                          {item.responsible || "-"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center rounded border px-2 py-1 text-xs font-medium ${statusColors[currentStatus]}`}
-                          >
-                            {statusLabels[currentStatus] ?? currentStatus}
-                          </span>
-                        </td>
-                        {isEditing && (
-                          <td className="whitespace-nowrap px-4 py-3">
+                </thead>
+                <tbody className="divide-y divide-zinc-800/70">
+                  {items.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={isEditing ? 8 : 7}
+                        className="px-4 py-10 text-center text-sm text-zinc-500"
+                      >
+                        Henüz iş planı yok.
+                      </td>
+                    </tr>
+                  ) : (
+                    table.pageItems.map((item) => {
+                      const currentStatus = (item.status as WorkPlanStatus) || "yapilacak";
+                      return (
+                        <tr key={item.id} className="text-zinc-300 hover:bg-zinc-900/50">
+                          <td className="max-w-[440px] px-4 py-3 font-medium text-zinc-100">
+                            <div><TruncateWithTooltip text={item.description} /></div>
+                            {item.wbsCode && <span className="mt-1 block text-[10px] font-normal text-zinc-500">WBS {item.wbsCode}</span>}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-zinc-400">
+                            {item.activityCode ?? "—"}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-zinc-400">
+                            {formatDateSafe(item.startDate)}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-zinc-400">
+                            {formatDateSafe(item.endDate)}
+                          </td>
+                          <td className="min-w-36 px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openModal(item)}
-                                className="text-zinc-500 hover:text-cyan-400"
-                                aria-label="Düzenle"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => onDelete(item.id)}
-                                className="text-zinc-500 hover:text-red-400"
-                                aria-label="Sil"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-zinc-800">
+                                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${item.percentComplete}%` }} />
+                              </div>
+                              <span className="w-10 text-right text-xs tabular-nums text-zinc-400">{item.percentComplete}%</span>
                             </div>
                           </td>
-                        )}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {items.length > 0 && (
-            <div className="border-t border-zinc-800 px-3 py-2">
-              <TablePagination
-                page={table.page}
-                totalPages={table.totalPages}
-                totalItems={table.totalItems}
-                rangeStart={table.rangeStart}
-                rangeEnd={table.rangeEnd}
-                onPageChange={table.setPage}
-                pageSize={table.pageSize}
-                onPageSizeChange={table.setPageSize}
-              />
+                          <td className="whitespace-nowrap px-4 py-3 text-zinc-400">
+                            {item.responsible || "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex items-center rounded border px-2 py-1 text-xs font-medium ${statusColors[currentStatus]}`}
+                            >
+                              {statusLabels[currentStatus] ?? currentStatus}
+                            </span>
+                          </td>
+                          {isEditing && (
+                            <td className="whitespace-nowrap px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openModal(item)}
+                                  className="text-zinc-500 hover:text-cyan-400"
+                                  aria-label="Düzenle"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onDelete(item.id)}
+                                  className="text-zinc-500 hover:text-red-400"
+                                  aria-label="Sil"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
-        </>
-      ) : (
-        <WorkPlanGantt items={items} />
-      )}
 
-      {items.length > 0 && isEditing && (
-        <div className="border-t border-zinc-800 px-3 py-3">
-          <Button size="sm" variant="ghost" className="text-xs text-red-400/80" onClick={onClear}>
-            Tümünü temizle
-          </Button>
-        </div>
-      )}
+            {items.length > 0 && (
+              <div className="border-t border-zinc-800 px-3 py-2">
+                <TablePagination
+                  page={table.page}
+                  totalPages={table.totalPages}
+                  totalItems={table.totalItems}
+                  rangeStart={table.rangeStart}
+                  rangeEnd={table.rangeEnd}
+                  onPageChange={table.setPage}
+                  pageSize={table.pageSize}
+                  onPageSizeChange={table.setPageSize}
+                />
+              </div>
+            )}
+          </>
+        ) : (
+          <WorkPlanGantt items={items} />
+        )}
+
+        {items.length > 0 && isEditing && (
+          <div className="border-t border-zinc-800 px-3 py-3">
+            <Button size="sm" variant="ghost" className="text-xs text-red-400/80" onClick={onClear}>
+              Tümünü temizle
+            </Button>
+          </div>
+        )}
+      </div>
 
       {modal && (
         <WorkPlanFormModal
