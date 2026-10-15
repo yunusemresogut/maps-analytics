@@ -170,7 +170,8 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
         .from("stores")
         .insert({
           id: store.id,
-          organization_id: store.organizationId ?? null,
+          // Bilinmiyorsa gönderme: veritabanı oturumdaki firmayı atar
+          ...(store.organizationId ? { organization_id: store.organizationId } : {}),
           name: store.name,
           city: store.city,
           address: store.address,

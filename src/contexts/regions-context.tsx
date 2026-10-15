@@ -8,7 +8,6 @@ import {
   useState,
 } from "react";
 import { supabase } from "@/lib/supabase";
-import { defaultRegions } from "@/data/regions";
 import { appendActivityLog } from "@/lib/activity-log";
 import type { Region } from "@/types";
 
@@ -48,19 +47,9 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
         const { data, error } = await supabase.from("regions").select("*");
         if (error) throw error;
         if (cancelled) return;
-        if (data && data.length > 0) {
-          setRegions(data);
-          setVisibleRegions(buildVisibility(data));
-        } else {
-          // Auto-seed default regions (only when authenticated insert is allowed)
-          const { error: seedError } = await supabase
-            .from("regions")
-            .insert(defaultRegions);
-          if (!seedError && !cancelled) {
-            setRegions(defaultRegions);
-            setVisibleRegions(buildVisibility(defaultRegions));
-          }
-        }
+        // Her firma kendi bölgelerini oluşturur; yeni hesap boş başlar
+        setRegions(data ?? []);
+        setVisibleRegions(buildVisibility(data ?? []));
       } catch (err) {
         console.error("Regions fetch error:", err);
       }
@@ -121,7 +110,7 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
 
   const addRegion = useCallback(
     (data: Omit<Region, "id">) => {
-      const region: Region = { ...data, id: `region-${Date.now()}` };
+      const region: Region = { ...data, id: `region-${crypto.randomUUID()}` };
       const next = [...regions, region];
       
       // Update local state immediately

@@ -2,8 +2,12 @@ import { STORAGE_KEYS } from "@/lib/storage-keys";
 import { supabase } from "@/lib/supabase";
 import type { ActivityCategory, ActivityLogEntry } from "@/types";
 
-const MAX_LOGS = 500;
+export const MAX_LOGS = 500;
 const EVENT_NAME = "activity-log-updated";
+
+export type ActivityLogEvent =
+  | { type: "append"; entry: ActivityLogEntry }
+  | { type: "clear" };
 
 export type ActivityAction =
   | "create"
@@ -55,21 +59,6 @@ async function getSessionActor(): Promise<{
   }
 }
 
-export function loadActivityLogs(): ActivityLogEntry[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(STORAGE_KEYS.activityLogs);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw) as ActivityLogEntry[];
-  } catch {
-    return [];
-  }
-}
-
-function saveActivityLogs(logs: ActivityLogEntry[]) {
-  localStorage.setItem(STORAGE_KEYS.activityLogs, JSON.stringify(logs));
-}
-
 /**
  * Low-cost activity log:
  * - Prefer passing actorId/actorName (skips session lookup)
@@ -99,9 +88,11 @@ export async function appendActivityLog(input: ActivityLogInput) {
     createdAt: new Date().toISOString(),
   };
 
-  const logs = [entry, ...loadActivityLogs()].slice(0, MAX_LOGS);
-  saveActivityLogs(logs);
-  window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  // Yerel depoya yazılmaz: aynı tarayıcıdaki farklı hesaplar arasında
+  // log paylaşılmasın. Açık ekranlar olayla güncellenir.
+  window.dispatchEvent(
+    new CustomEvent<ActivityLogEvent>(EVENT_NAME, { detail: { type: "append", entry } })
+  );
 
   // Cloud write: non-blocking (don't await cost on UI path)
   void supabase
@@ -131,19 +122,25 @@ export function logActivity(
 
 export async function clearActivityLogs() {
   if (typeof window === "undefined") return;
+  // Eski sürümlerin bıraktığı yerel kopyayı da temizle
   localStorage.removeItem(STORAGE_KEYS.activityLogs);
 
   try {
+    // RLS yalnızca oturumdaki firmanın loglarını siler
     await supabase.from("activity_logs").delete().neq("id", "");
   } catch (err) {
     console.error("Bulut log temizleme başarısız:", err);
   }
 
-  window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  window.dispatchEvent(
+    new CustomEvent<ActivityLogEvent>(EVENT_NAME, { detail: { type: "clear" } })
+  );
 }
 
-export function subscribeActivityLogs(callback: () => void) {
+export function subscribeActivityLogs(callback: (event: ActivityLogEvent) => void) {
   if (typeof window === "undefined") return () => undefined;
-  window.addEventListener(EVENT_NAME, callback);
-  return () => window.removeEventListener(EVENT_NAME, callback);
+  const listener = (event: Event) =>
+    callback((event as CustomEvent<ActivityLogEvent>).detail);
+  window.addEventListener(EVENT_NAME, listener);
+  return () => window.removeEventListener(EVENT_NAME, listener);
 }
