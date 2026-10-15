@@ -10,6 +10,7 @@ import { useDb } from "@/contexts/db-context";
 import { useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Select } from "@/components/ui/select";
 import { formatTry } from "@/lib/currency";
 import { encodePaymentPeriod, paidAmountForPayment, parsePaymentPeriod } from "@/lib/module-finance";
@@ -111,12 +112,12 @@ function EditPaymentContent({ id }: { id: string }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="text-xs text-zinc-500">Dönem başlangıcı</label>
-            <Input className="mt-1" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} disabled={!canEdit} />
+            <DatePicker className="mt-1" value={periodStart} onChange={setPeriodStart} disabled={!canEdit} />
             {!periodStart && periodLabel && <p className="mt-1 text-xs text-zinc-500">Mevcut dönem: {periodLabel}</p>}
           </div>
           <div>
             <label className="text-xs text-zinc-500">Dönem bitişi</label>
-            <Input className="mt-1" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} min={periodStart || undefined} disabled={!canEdit} />
+            <DatePicker className="mt-1" value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} disabled={!canEdit} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">Toplam hakediş (TRY)</label>

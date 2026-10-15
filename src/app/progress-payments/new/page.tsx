@@ -8,6 +8,7 @@ import { useModules } from "@/contexts/modules-context";
 import { useDb } from "@/contexts/db-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Select } from "@/components/ui/select";
 import { encodePaymentPeriod } from "@/lib/module-finance";
 import type { ProgressPaymentStatus } from "@/types";
@@ -89,11 +90,11 @@ function NewPaymentContent() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="text-xs text-zinc-500">Dönem başlangıcı *</label>
-            <Input className="mt-1" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
+            <DatePicker className="mt-1" value={periodStart} onChange={setPeriodStart} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">Dönem bitişi *</label>
-            <Input className="mt-1" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} min={periodStart || undefined} />
+            <DatePicker className="mt-1" value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">Toplam hakediş (TRY)</label>

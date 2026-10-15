@@ -13,8 +13,6 @@ import {
 import { useI18n } from "@/contexts/i18n-context";
 import { useStoreData } from "@/contexts/store-data-context";
 import { usePermissions } from "@/hooks/use-permissions";
-import { ExcelImportPanel } from "@/components/map/excel-import-panel";
-import { ExcelWorkPlanImportPanel } from "@/components/map/excel-work-plan-import-panel";
 import { MaterialsPanel } from "@/components/map/materials-panel";
 import { WorkPlanPanel } from "@/components/map/work-plan-panel";
 import { Button } from "@/components/ui/button";
@@ -116,19 +114,13 @@ export function StoreDetailSections({ store }: { store: Store }) {
 
   return (
     <div className="space-y-6">
-      {canEdit && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ExcelWorkPlanImportPanel onImport={handleWorkPlanImport} />
-          <ExcelImportPanel onImport={handleMaterialImport} />
-        </div>
-      )}
-
       <WorkPlanPanel
         storeId={store.id}
         items={userData.workPlan}
         isEditing={canEdit}
         onDelete={(id) => deleteWorkPlanItem(store.id, id)}
         onClear={() => clearWorkPlan(store.id)}
+        onImport={handleWorkPlanImport}
       />
 
       <MaterialsPanel
@@ -137,6 +129,7 @@ export function StoreDetailSections({ store }: { store: Store }) {
         isEditing={canEdit}
         onDelete={(id) => deleteMaterial(store.id, id)}
         onClear={() => clearMaterials(store.id)}
+        onImport={handleMaterialImport}
       />
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">

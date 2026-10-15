@@ -1,16 +1,19 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Check, Edit2, Package, Plus, Trash2 } from "lucide-react";
+import { useCallback, useId, useState } from "react";
+import { Edit2, Package, Plus, Trash2 } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import { formatCurrency } from "@/lib/excel-materials";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Modal } from "@/components/ui/modal";
 import { TablePagination } from "@/components/modules/module-table";
 import { useStoreData } from "@/contexts/store-data-context";
 import { useTableState } from "@/hooks/use-table-state";
 import { cn } from "@/lib/utils";
+import { MaterialsImportMenu } from "@/components/map/materials-import-menu";
+import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { MaterialStatus, StoreMaterial } from "@/types";
 
 type MaterialsPanelProps = {
@@ -19,6 +22,7 @@ type MaterialsPanelProps = {
   isEditing: boolean;
   onDelete: (id: string) => void;
   onClear: () => void;
+  onImport: (rows: ParsedMaterialRow[]) => void;
 };
 
 const statusLabels: Record<MaterialStatus, string> = {
@@ -56,19 +60,122 @@ function FloatingInput({
           setFocused(false);
           props.onBlur?.(event);
         }}
-        className={cn("h-10 pt-3 text-xs", className)}
+        className={cn("h-11", className)}
       />
       <label
         className={cn(
           "pointer-events-none absolute left-3 transition-all",
           floating
-            ? "-top-1.5 bg-zinc-950 px-1 text-[10px] text-violet-400"
-            : "top-1/2 -translate-y-1/2 text-xs text-zinc-500"
+            ? "-top-2 bg-zinc-950 px-1 text-[11px] text-violet-400"
+            : "top-1/2 -translate-y-1/2 text-sm text-zinc-500"
         )}
       >
         {label}
       </label>
     </div>
+  );
+}
+
+type MaterialFormValues = Pick<StoreMaterial, "name" | "quantity" | "unit" | "unitPrice" | "status">;
+
+function MaterialFormModal({
+  material,
+  onClose,
+  onSubmit,
+}: {
+  material: StoreMaterial | null;
+  onClose: () => void;
+  onSubmit: (values: MaterialFormValues) => void;
+}) {
+  const formId = useId();
+  const [name, setName] = useState(material?.name ?? "");
+  const [quantity, setQuantity] = useState(String(material?.quantity ?? 1));
+  const [unit, setUnit] = useState(material?.unit ?? "adet");
+  const [unitPrice, setUnitPrice] = useState(String(material?.unitPrice ?? 0));
+  const [status, setStatus] = useState<MaterialStatus>(material?.status || "bekleniyor");
+  const [error, setError] = useState("");
+  const lineTotal = (Number(quantity) || 0) * (Number(unitPrice) || 0);
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!name.trim()) {
+      setError("Malzeme adı zorunludur");
+      return;
+    }
+    onSubmit({
+      name: name.trim(),
+      quantity: Number(quantity) || 1,
+      unit: unit.trim() || "adet",
+      unitPrice: Number(unitPrice) || 0,
+      status,
+    });
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={material ? "Malzemeyi düzenle" : "Yeni malzeme"}
+      description="Miktar, birim ve fiyat bilgilerini girin."
+      footer={
+        <>
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Vazgeç
+          </Button>
+          <Button type="submit" form={formId}>
+            {material ? "Değişiklikleri kaydet" : "Malzemeyi ekle"}
+          </Button>
+        </>
+      }
+    >
+      <form id={formId} onSubmit={handleSubmit} className="space-y-4 pt-1" noValidate>
+        <div>
+          <FloatingInput
+            label="Malzeme adı"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (error) setError("");
+            }}
+            aria-invalid={!!error}
+          />
+          {error && <p role="alert" className="mt-1 text-xs text-red-400">{error}</p>}
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <FloatingInput
+            label="Miktar"
+            type="number"
+            min="0.01"
+            step="any"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+          />
+          <FloatingInput label="Birim" value={unit} onChange={(e) => setUnit(e.target.value)} />
+          <FloatingInput
+            label="Birim fiyat (TRY)"
+            type="number"
+            min="0"
+            step="any"
+            value={unitPrice}
+            onChange={(e) => setUnitPrice(e.target.value)}
+          />
+        </div>
+        <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-sm text-zinc-400">Durum</label>
+            <Select value={status} onChange={(e) => setStatus(e.target.value as MaterialStatus)}>
+              <option value="bekleniyor">Bekleniyor</option>
+              <option value="geldi">Geldi</option>
+              <option value="gitti">Gitti</option>
+            </Select>
+          </div>
+          <div className="flex h-10 items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 text-sm">
+            <span className="text-zinc-500">Tutar</span>
+            <span className="font-medium tabular-nums text-zinc-100">{formatCurrency(lineTotal)}</span>
+          </div>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -78,24 +185,10 @@ export function MaterialsPanel({
   isEditing,
   onDelete,
   onClear,
+  onImport,
 }: MaterialsPanelProps) {
   const { addMaterial, updateMaterial } = useStoreData();
-
-  // Add Form State
-  const [isAdding, setIsAdding] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newQuantity, setNewQuantity] = useState("1");
-  const [newUnit, setNewUnit] = useState("adet");
-  const [newUnitPrice, setNewUnitPrice] = useState("0");
-  const [newStatus, setNewStatus] = useState<MaterialStatus>("bekleniyor");
-
-  // Inline Edit State
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editQuantity, setEditQuantity] = useState("1");
-  const [editUnit, setEditUnit] = useState("");
-  const [editUnitPrice, setEditUnitPrice] = useState("0");
-  const [editStatus, setEditStatus] = useState<MaterialStatus>("bekleniyor");
+  const [modal, setModal] = useState<{ key: number; material: StoreMaterial | null } | null>(null);
 
   const getSortValue = useCallback((item: StoreMaterial, key: MaterialSortKey) => {
     if (key === "name") return item.name;
@@ -116,53 +209,18 @@ export function MaterialsPanel({
     0
   );
 
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
+  const openModal = (material: StoreMaterial | null) =>
+    setModal({ key: Date.now(), material });
 
-    addMaterial(storeId, {
-      name: newName.trim(),
-      quantity: Number(newQuantity) || 1,
-      unit: newUnit.trim() || "adet",
-      unitPrice: Number(newUnitPrice) || 0,
-      status: newStatus,
-    });
-
-    // Reset Add Form
-    setNewName("");
-    setNewQuantity("1");
-    setNewUnit("adet");
-    setNewUnitPrice("0");
-    setNewStatus("bekleniyor");
-    setIsAdding(false);
-  };
-
-  const startEdit = (m: StoreMaterial) => {
-    setEditingId(m.id);
-    setEditName(m.name);
-    setEditQuantity(String(m.quantity));
-    setEditUnit(m.unit);
-    setEditUnitPrice(String(m.unitPrice));
-    setEditStatus(m.status || "bekleniyor");
-  };
-
-  const handleUpdateSave = (id: string) => {
-    if (!editName.trim()) return;
-
-    updateMaterial(storeId, id, {
-      name: editName.trim(),
-      quantity: Number(editQuantity) || 1,
-      unit: editUnit.trim() || "adet",
-      unitPrice: Number(editUnitPrice) || 0,
-      status: editStatus,
-    });
-
-    setEditingId(null);
+  const handleSubmit = (values: MaterialFormValues) => {
+    if (modal?.material) updateMaterial(storeId, modal.material.id, values);
+    else addMaterial(storeId, values);
+    setModal(null);
   };
 
   return (
-    <section className="flex w-full min-w-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40">
-      <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-3">
+    <section className="flex w-full min-w-0 flex-col rounded-lg border border-zinc-800 bg-zinc-900/40">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 px-4 py-3">
         <div className="flex items-center gap-2">
           <Package className="h-4 w-4 text-violet-400" />
           <span className="text-sm font-medium text-zinc-200">Malzemeler</span>
@@ -170,208 +228,59 @@ export function MaterialsPanel({
             {materials.length}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          {isEditing && !isAdding && (
-            <button
-              type="button"
-              onClick={() => setIsAdding(true)}
-              className="flex items-center gap-1 rounded bg-violet-650 px-2 py-1 text-[11px] font-medium text-zinc-100 transition-colors hover:bg-violet-750 cursor-pointer"
-            >
-              <Plus className="h-3 w-3" />
-              Ekle
-            </button>
-          )}
-        </div>
+        {isEditing && (
+          <div className="flex items-center gap-2">
+            <MaterialsImportMenu existingCount={materials.length} onImport={onImport} />
+            <Button size="sm" onClick={() => openModal(null)}>
+              <Plus className="h-3.5 w-3.5" />
+              Malzeme ekle
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Add Material Form */}
-      {isAdding && (
-        <form
-          onSubmit={handleAdd}
-          className="border-b border-zinc-800/80 bg-zinc-900/30 p-3 space-y-2.5"
-        >
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-            Yeni Malzeme Ekle
-          </div>
-          <div className="space-y-2">
-            <FloatingInput
-              label="Malzeme adı"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              required
-              className="bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
-            />
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <FloatingInput
-                label="Miktar"
-                type="number"
-                min="0.01"
-                step="any"
-                value={newQuantity}
-                onChange={(e) => setNewQuantity(e.target.value)}
-                required
-                className="bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
-              />
-              <FloatingInput
-                label="Birim"
-                value={newUnit}
-                onChange={(e) => setNewUnit(e.target.value)}
-                required
-                className="bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
-              />
-              <FloatingInput
-                label="Birim fiyat (TRY)"
-                type="number"
-                min="0"
-                step="any"
-                value={newUnitPrice}
-                onChange={(e) => setNewUnitPrice(e.target.value)}
-                required
-                className="bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-[10px] text-zinc-500">Durum</label>
-              <Select
-                value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value as MaterialStatus)}
-                className="h-8 text-xs bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
-              >
-                <option value="bekleniyor">Bekleniyor</option>
-                <option value="geldi">Geldi</option>
-                <option value="gitti">Gitti</option>
-              </Select>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setIsAdding(false)}
-              className="rounded px-2.5 py-1 text-xs text-zinc-400 hover:bg-zinc-800 cursor-pointer"
-            >
-              İptal
-            </button>
-            <button
-              type="submit"
-              className="rounded bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700 cursor-pointer"
-            >
-              Kaydet
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Materials Table */}
-      <div className="scrollbar-themed flex-1 overflow-y-auto">
-        {materials.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-zinc-600">
-            Henüz malzeme yok. Excel import veya Ekle ile ekleyin.
-          </p>
-        ) : (
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-zinc-950/95 text-zinc-500 z-10">
+      <div className="min-w-0 overflow-x-auto">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="border-b border-zinc-800 text-xs text-zinc-500">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium">Malzeme</th>
+              <th className="px-4 py-3 text-right font-medium">Miktar</th>
+              <th className="px-4 py-3 text-left font-medium">Birim</th>
+              <th className="px-4 py-3 text-right font-medium">Birim fiyat</th>
+              <th className="px-4 py-3 text-right font-medium">Tutar</th>
+              <th className="px-4 py-3 text-left font-medium">Durum</th>
+              {isEditing && <th className="w-20 px-4 py-3" />}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-800/70">
+            {materials.length === 0 ? (
               <tr>
-                <th className="px-2.5 py-2 text-left font-medium">Açıklama</th>
-                <th className="px-2 py-2 text-right font-medium">Miktar</th>
-                <th className="px-2 py-2 text-left font-medium">Birim</th>
-                <th className="px-2 py-2 text-right font-medium">Birim fiyat (TRY)</th>
-                <th className="px-2 py-2 text-center font-medium">Durum</th>
-                {isEditing && <th className="w-14" />}
+                <td colSpan={isEditing ? 7 : 6} className="px-4 py-10 text-center text-sm text-zinc-500">
+                  Henüz malzeme yok. Excel ile içe aktarın veya &quot;Malzeme ekle&quot; ile ekleyin.
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {table.pageItems.map((m) => {
-                const isItemEditing = editingId === m.id;
-
-                if (isItemEditing) {
-                  return (
-                    <tr
-                      key={m.id}
-                      className="border-t border-violet-500/30 bg-violet-500/5"
-                    >
-                      <td className="px-2 py-1.5" colSpan={6}>
-                        <div className="space-y-2 py-1">
-                          <Input
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            className="h-7 text-[11px] w-full"
-                          />
-                          <div className="grid grid-cols-4 gap-1.5">
-                            <Input
-                              type="number"
-                              step="any"
-                              value={editQuantity}
-                              onChange={(e) => setEditQuantity(e.target.value)}
-                              className="h-7 text-[11px]"
-                              placeholder="Mik."
-                            />
-                            <Input
-                              value={editUnit}
-                              onChange={(e) => setEditUnit(e.target.value)}
-                              className="h-7 text-[11px]"
-                              placeholder="Birim"
-                            />
-                            <Input
-                              type="number"
-                              step="any"
-                              value={editUnitPrice}
-                              onChange={(e) => setEditUnitPrice(e.target.value)}
-                              className="h-7 text-[11px]"
-                              placeholder="Birim fiyat (TRY)"
-                            />
-                            <Select
-                              value={editStatus}
-                              onChange={(e) => setEditStatus(e.target.value as MaterialStatus)}
-                              className="h-7 text-[11px] py-0 px-1"
-                            >
-                              <option value="bekleniyor">Bekle</option>
-                              <option value="geldi">Geldi</option>
-                              <option value="gitti">Gitti</option>
-                            </Select>
-                          </div>
-                          <div className="flex justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setEditingId(null)}
-                              className="rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-800 cursor-pointer"
-                            >
-                              İptal
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateSave(m.id)}
-                              className="flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-0.5 text-[10px] font-medium text-white hover:bg-emerald-700 cursor-pointer"
-                            >
-                              <Check className="h-3 w-3" /> Kaydet
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                }
-
+            ) : (
+              table.pageItems.map((m) => {
                 const currentStatus = m.status || "bekleniyor";
-
                 return (
-                  <tr
-                    key={m.id}
-                    className="border-t border-zinc-800/60 hover:bg-white/[0.02]"
-                  >
-                    <td className="max-w-[90px] px-2.5 py-2 text-zinc-300">
+                  <tr key={m.id} className="text-zinc-300 hover:bg-zinc-900/50">
+                    <td className="max-w-[360px] px-4 py-3 font-medium text-zinc-100">
                       <TruncateWithTooltip text={m.name} />
                     </td>
-                    <td className="px-2 py-2 text-right text-zinc-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-zinc-400">
                       {m.quantity}
                     </td>
-                    <td className="max-w-[45px] px-2 py-2 text-zinc-400">
+                    <td className="max-w-[120px] px-4 py-3 text-zinc-400">
                       <TruncateWithTooltip text={m.unit || "—"} />
                     </td>
-                    <td className="px-2 py-2 text-right text-zinc-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-zinc-400">
                       {formatCurrency(m.unitPrice)}
                     </td>
-                    <td className="px-2 py-2 text-center">
-                      <span className="inline-flex items-center gap-1 rounded-full border bg-zinc-950/40 px-1.5 py-0.5 text-[9px] font-medium">
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-zinc-200">
+                      {formatCurrency(m.quantity * m.unitPrice)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-950/40 px-2 py-0.5 text-xs font-medium">
                         <span className={`h-1.5 w-1.5 rounded-full ${statusColors[currentStatus].split(" ")[0]}`} />
                         <span className={statusColors[currentStatus].split(" ")[1]}>
                           {statusLabels[currentStatus]}
@@ -379,33 +288,46 @@ export function MaterialsPanel({
                       </span>
                     </td>
                     {isEditing && (
-                      <td className="px-2 py-2">
-                        <div className="flex justify-end gap-1.5">
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() => startEdit(m)}
-                            className="text-zinc-500 hover:text-cyan-400 cursor-pointer"
-                            title="Düzenle"
+                            onClick={() => openModal(m)}
+                            className="text-zinc-500 hover:text-cyan-400"
+                            aria-label="Düzenle"
                           >
-                            <Edit2 className="h-3 w-3" />
+                            <Edit2 className="h-4 w-4" />
                           </button>
                           <button
                             type="button"
                             onClick={() => onDelete(m.id)}
-                            className="text-zinc-500 hover:text-red-400 cursor-pointer"
-                            title="Sil"
+                            className="text-zinc-500 hover:text-red-400"
+                            aria-label="Sil"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>
                     )}
                   </tr>
                 );
-              })}
-            </tbody>
-          </table>
-        )}
+              })
+            )}
+          </tbody>
+          {materials.length > 0 && (
+            <tfoot className="border-t border-zinc-800">
+              <tr>
+                <td colSpan={4} className="px-4 py-3 text-right text-xs text-zinc-500">
+                  Toplam tutar
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-cyan-300">
+                  {formatCurrency(total)}
+                </td>
+                <td colSpan={isEditing ? 2 : 1} />
+              </tr>
+            </tfoot>
+          )}
+        </table>
       </div>
 
       {materials.length > 0 && (
@@ -423,25 +345,21 @@ export function MaterialsPanel({
         </div>
       )}
 
-      {materials.length > 0 && (
-        <div className="border-t border-zinc-800 px-3 py-3 z-10 bg-zinc-950/95">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-zinc-500">Toplam Tutar</span>
-            <span className="font-medium text-cyan-300">
-              {formatCurrency(total)}
-            </span>
-          </div>
-          {isEditing && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="mt-2 w-full text-xs text-red-400/80 cursor-pointer"
-              onClick={onClear}
-            >
-              Tümünü Temizle
-            </Button>
-          )}
+      {materials.length > 0 && isEditing && (
+        <div className="border-t border-zinc-800 px-3 py-3">
+          <Button size="sm" variant="ghost" className="text-xs text-red-400/80" onClick={onClear}>
+            Tümünü temizle
+          </Button>
         </div>
+      )}
+
+      {modal && (
+        <MaterialFormModal
+          key={modal.key}
+          material={modal.material}
+          onClose={() => setModal(null)}
+          onSubmit={handleSubmit}
+        />
       )}
     </section>
   );

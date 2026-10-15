@@ -5,6 +5,7 @@ import { getProjectStatusOptions } from "@/lib/project-status";
 import { clearFieldError, type FieldErrors } from "@/lib/validation";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { LocationType, ProjectStatus, Store, StoreInput } from "@/types";
@@ -160,19 +161,18 @@ export function StoreFormFields({
 
       <div className="grid grid-cols-2 gap-3">
         <FormField label="Açılış Tarihi" required error={errors.openingDate}>
-          <Input
-            type="date"
+          <DatePicker
             value={form.openingDate}
-            onChange={(e) => set("openingDate", e.target.value)}
+            onChange={(value) => set("openingDate", value)}
             readOnly={readOnly}
+            required
             aria-invalid={!!errors.openingDate}
           />
         </FormField>
         <FormField label="Kabul Tarihi" error={errors.acceptanceDate}>
-          <Input
-            type="date"
+          <DatePicker
             value={form.acceptanceDate}
-            onChange={(e) => set("acceptanceDate", e.target.value)}
+            onChange={(value) => set("acceptanceDate", value)}
             readOnly={readOnly}
           />
         </FormField>
