@@ -5,8 +5,9 @@ import type { Locale } from "date-fns";
 const PERIOD_SEPARATOR = "..";
 export const VAT_RATE_OPTIONS = [0, 1, 10, 20] as const;
 
+/** vatRate yüzde olarak verilir (örn. 20 → %20) */
 export function calculateVat(amount: number, vatRate: number): number {
-  return Math.round((amount * vatRate + Number.EPSILON) * 100) / 100;
+  return Math.round(((amount * vatRate) / 100 + Number.EPSILON) * 100) / 100;
 }
 
 export function inferVatRate(amount: number, taxAmount: number): number {
