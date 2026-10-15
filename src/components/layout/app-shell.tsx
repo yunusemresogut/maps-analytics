@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { AssistantWidget } from "@/components/assistant/assistant-widget";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -18,6 +19,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <AppSidebar />
         <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
       </div>
+      <AssistantWidget />
     </>
   );
 }
