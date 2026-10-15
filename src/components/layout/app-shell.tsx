@@ -1,9 +1,16 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  if (pathname === "/login" || pathname === "/register") {
+    return <>{children}</>;
+  }
+
   return (
     <>
       <Header />

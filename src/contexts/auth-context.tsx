@@ -50,7 +50,7 @@ type AuthContextValue = {
     password: string;
     role: UserRole;
     permissions?: UserPermissions;
-  }) => Promise<boolean>;
+  }) => Promise<{ ok: boolean; error?: string }>;
   updateUserPermissions: (
     userId: string,
     permissions: UserPermissions
@@ -70,7 +70,7 @@ type AuthContextValue = {
   updateProfile: (data: {
     name?: string;
     phone?: string;
-    avatarUrl?: string;
+    avatarUrl?: string | null;
   }) => Promise<boolean>;
   updateOrganization: (
     data: Partial<Omit<Organization, "id" | "createdAt">>
@@ -85,18 +85,24 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function mapProfile(profile: Record<string, any>): User {
-  const role = normalizeRole(profile.role);
+function mapProfile(profile: Record<string, unknown>): User {
+  const role = normalizeRole(
+    typeof profile.role === "string" ? profile.role : undefined
+  );
   return {
-    id: profile.id,
-    email: profile.email,
-    name: profile.name,
+    id: String(profile.id ?? ""),
+    email: String(profile.email ?? ""),
+    name: String(profile.name ?? ""),
     role,
     permissions: normalizePermissions(role, profile.permissions),
-    organizationId: profile.organization_id || undefined,
-    phone: profile.phone || undefined,
-    avatarUrl: profile.avatar_url || undefined,
-    restricted: profile.restricted,
+    organizationId:
+      typeof profile.organization_id === "string"
+        ? profile.organization_id
+        : undefined,
+    phone: typeof profile.phone === "string" ? profile.phone : undefined,
+    avatarUrl:
+      typeof profile.avatar_url === "string" ? profile.avatar_url : undefined,
+    restricted: profile.restricted === true,
   };
 }
 
@@ -105,7 +111,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const {
     users,
-    setUsers,
     refetch: refetchDb,
     organization,
     setOrganization,
@@ -249,9 +254,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           actorName: profile.name,
         });
         return { ok: true };
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Giriş hatası:", err);
-        return { ok: false, error: err?.message || "Giriş başarısız" };
+        return {
+          ok: false,
+          error: "Sunucuya bağlanılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+        };
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -271,9 +279,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data),
         });
-        const res = await response.json();
+        const res: unknown = await response.json().catch(() => null);
+        const apiError =
+          res &&
+          typeof res === "object" &&
+          "error" in res &&
+          typeof res.error === "string"
+            ? res.error
+            : undefined;
         if (!response.ok) {
-          return { ok: false, error: res.error || "Kayıt başarısız" };
+          return {
+            ok: false,
+            error:
+              response.status >= 500
+                ? "Kayıt sırasında bir sunucu hatası oluştu. Lütfen tekrar deneyin."
+                : apiError || "Kayıt tamamlanamadı. Bilgilerinizi kontrol edin.",
+          };
+        }
+        if (!res || typeof res !== "object" || !("success" in res) || res.success !== true) {
+          return {
+            ok: false,
+            error: "Sunucudan beklenmeyen bir yanıt alındı. Lütfen tekrar deneyin.",
+          };
         }
 
         const loginResult = await login(data.email, data.password);
@@ -286,8 +313,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
         }
         return { ok: true };
-      } catch (err: any) {
-        return { ok: false, error: err.message || "Kayıt başarısız" };
+      } catch (err) {
+        console.error("Kayıt isteği başarısız:", err);
+        return {
+          ok: false,
+          error: "Sunucuya bağlanılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+        };
       }
     },
     [login]
@@ -317,7 +348,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       permissions?: UserPermissions;
     }) => {
       try {
-        if (!user?.organizationId) return false;
+        if (!user?.organizationId) {
+          return { ok: false, error: "Organizasyon bilgisi bulunamadı." };
+        }
         const role = normalizeRole(data.role);
         const permissions =
           data.permissions ||
@@ -336,12 +369,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }),
         });
 
+        const resData: unknown = await response.json().catch(() => null);
+        const errorMessage =
+          resData &&
+          typeof resData === "object" &&
+          "error" in resData &&
+          typeof resData.error === "string"
+            ? resData.error
+            : undefined;
         if (!response.ok) {
-          const errRes = await response.json();
-          throw new Error(errRes.error || "Kullanıcı eklenemedi");
+          return {
+            ok: false,
+            error: errorMessage || "Kullanıcı oluşturulamadı. Bilgileri kontrol edin.",
+          };
         }
-
-        const resData = await response.json();
+        if (
+          !resData ||
+          typeof resData !== "object" ||
+          !("user" in resData) ||
+          !resData.user ||
+          typeof resData.user !== "object" ||
+          !("id" in resData.user) ||
+          typeof resData.user.id !== "string"
+        ) {
+          return {
+            ok: false,
+            error: "Sunucudan geçerli kullanıcı bilgisi alınamadı.",
+          };
+        }
         await refetchDb();
 
         appendActivityLog({
@@ -351,13 +406,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           targetId: resData.user.id,
           targetLabel: data.email,
         });
-        return true;
+        return { ok: true };
       } catch (err) {
         console.error("User creation error:", err);
-        return false;
+        return {
+          ok: false,
+          error:
+            err instanceof Error
+              ? err.message
+              : "Kullanıcı oluşturulurken beklenmeyen bir hata oluştu.",
+        };
       }
     },
-    [refetchDb, user?.organizationId, organization?.rolePermissionDefaults]
+    [refetchDb, user, organization]
   );
 
   const updateUserPermissions = useCallback(
@@ -470,7 +531,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateProfile = useCallback(
-    async (data: { name?: string; phone?: string; avatarUrl?: string }) => {
+    async (data: { name?: string; phone?: string; avatarUrl?: string | null }) => {
       if (!user) return false;
       try {
         const response = await fetch("/api/admin/users", {

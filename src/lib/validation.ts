@@ -6,6 +6,7 @@ export const ValidationMessages = {
   required: "Bu alan zorunludur",
   emailInvalid: "Geçerli bir e-posta adresi girin",
   passwordMin: "Şifre en az 6 karakter olmalıdır",
+  passwordMismatch: "Şifreler eşleşmiyor",
   nameMin: "Ad soyad en az 2 karakter olmalıdır",
   companyMin: "Firma adı en az 2 karakter olmalıdır",
   phoneInvalid: "Geçerli bir telefon numarası girin (en az 10 rakam)",
@@ -69,6 +70,7 @@ export function validateLogin(input: {
 export function validateRegister(input: {
   email: string;
   password: string;
+  confirmPassword?: string;
   name: string;
   companyName: string;
 }): FieldErrors {
@@ -79,6 +81,27 @@ export function validateRegister(input: {
     errors.companyName = ValidationMessages.required;
   else if (!isNonEmpty(input.companyName, 2))
     errors.companyName = ValidationMessages.companyMin;
+  if (input.confirmPassword !== undefined) {
+    if (!isNonEmpty(input.confirmPassword))
+      errors.confirmPassword = ValidationMessages.required;
+    else if (input.password !== input.confirmPassword)
+      errors.confirmPassword = ValidationMessages.passwordMismatch;
+  }
+  return errors;
+}
+
+export function validateUserCreate(input: {
+  email: string;
+  password: string;
+  name: string;
+}): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!isNonEmpty(input.name)) errors.name = ValidationMessages.required;
+  else if (!isNonEmpty(input.name, 2)) errors.name = ValidationMessages.nameMin;
+  if (!isNonEmpty(input.email)) errors.email = ValidationMessages.required;
+  else if (!isValidEmail(input.email)) errors.email = ValidationMessages.emailInvalid;
+  if (!isNonEmpty(input.password)) errors.password = ValidationMessages.required;
+  else if (!isValidPassword(input.password)) errors.password = ValidationMessages.passwordMin;
   return errors;
 }
 

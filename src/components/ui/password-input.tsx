@@ -8,9 +8,17 @@ import { cn } from "@/lib/utils";
 type PasswordInputProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
   "type"
->;
+> & {
+  showPasswordLabel?: string;
+  hidePasswordLabel?: string;
+};
 
-export function PasswordInput({ className, ...props }: PasswordInputProps) {
+export function PasswordInput({
+  className,
+  showPasswordLabel = "Şifreyi göster",
+  hidePasswordLabel = "Şifreyi gizle",
+  ...props
+}: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -24,8 +32,9 @@ export function PasswordInput({ className, ...props }: PasswordInputProps) {
         type="button"
         onClick={() => setVisible((v) => !v)}
         className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-zinc-500 transition-colors hover:text-zinc-300"
-        aria-label={visible ? "Şifreyi gizle" : "Şifreyi göster"}
-        tabIndex={-1}
+        aria-label={visible ? hidePasswordLabel : showPasswordLabel}
+        aria-pressed={visible}
+        title={visible ? hidePasswordLabel : showPasswordLabel}
       >
         {visible ? (
           <EyeOff className="h-4 w-4" aria-hidden />

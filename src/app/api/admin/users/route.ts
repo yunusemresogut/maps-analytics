@@ -3,6 +3,10 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { defaultMatrixForRole } from "@/lib/permissions";
 import { normalizeRole } from "@/lib/roles";
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Beklenmeyen bir sunucu hatası";
+}
+
 export async function POST(request: Request) {
   try {
     const adminClient = getSupabaseAdmin();
@@ -58,8 +62,8 @@ export async function POST(request: Request) {
       success: true,
       user: { id: userId, email, name, role: normalizedRole },
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: errorMessage(error) }, { status: 500 });
   }
 }
 
@@ -124,8 +128,8 @@ export async function PUT(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: errorMessage(error) }, { status: 500 });
   }
 }
 
@@ -149,7 +153,7 @@ export async function DELETE(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: errorMessage(error) }, { status: 500 });
   }
 }

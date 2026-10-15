@@ -16,12 +16,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useTableState } from "@/hooks/use-table-state";
-import { ALL_ROLES, ROLE_LABELS } from "@/lib/roles";
+import { ALL_ROLES, getRoleLabel } from "@/lib/roles";
 import { MODULE_KEYS, MODULE_LABELS } from "@/lib/permissions";
 import {
   clearFieldError,
   hasErrors,
-  validateRegister,
+  validateUserCreate,
   type FieldErrors,
 } from "@/lib/validation";
 import { FormField } from "@/components/ui/form-field";
@@ -35,6 +35,7 @@ const CREATABLE_ROLES = ALL_ROLES.filter((r) => r !== "admin");
 export function AdminUsersPanel() {
   const {
     users,
+    organization,
     addUser,
     updateUser,
     deleteUser,
@@ -62,9 +63,9 @@ export function AdminUsersPanel() {
   );
 
   const getSortValue = useCallback((user: User, key: UserSortKey) => {
-    if (key === "role") return ROLE_LABELS[user.role] ?? user.role;
+    if (key === "role") return getRoleLabel(user.role, organization);
     return user[key];
-  }, []);
+  }, [organization]);
 
   const table = useTableState<User, UserSortKey>({
     items: orgUsers,
@@ -82,27 +83,20 @@ export function AdminUsersPanel() {
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage("");
-    const errors = validateRegister({
-      name,
-      email,
-      password,
-      companyName: "x", // not used for users; keep register shape for name/email/password
-    });
-    // company not needed for user create
-    delete errors.companyName;
+    const errors = validateUserCreate({ name, email, password });
     setFieldErrors(errors);
     if (hasErrors(errors)) return;
 
     setSubmitting(true);
-    const success = await addUser({
-      name,
-      email,
+    const result = await addUser({
+      name: name.trim(),
+      email: email.trim(),
       password,
       role,
       permissions: getRoleDefaultMatrix(role),
     });
     setSubmitting(false);
-    if (success) {
+    if (result.ok) {
       setMessage("Kullanıcı başarıyla eklendi");
       setName("");
       setEmail("");
@@ -110,7 +104,7 @@ export function AdminUsersPanel() {
       setRole("manager");
       setFieldErrors({});
     } else {
-      setMessage("Bu e-posta zaten kayıtlı veya eklenemedi");
+      setMessage(result.error || "Kullanıcı oluşturulamadı");
     }
   };
 
@@ -225,7 +219,7 @@ export function AdminUsersPanel() {
             >
               {CREATABLE_ROLES.map((r) => (
                 <option key={r} value={r}>
-                  {ROLE_LABELS[r]}
+                  {getRoleLabel(r, organization)}
                 </option>
               ))}
             </Select>
@@ -276,7 +270,7 @@ export function AdminUsersPanel() {
               >
                 {CREATABLE_ROLES.map((r) => (
                   <option key={r} value={r}>
-                    {ROLE_LABELS[r]}
+                    {getRoleLabel(r, organization)}
                   </option>
                 ))}
               </Select>
@@ -343,7 +337,7 @@ export function AdminUsersPanel() {
                         {u.name}
                       </p>
                       <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
-                        {ROLE_LABELS[u.role]}
+                        {getRoleLabel(u.role, organization)}
                       </span>
                       {u.restricted && (
                         <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-400">
