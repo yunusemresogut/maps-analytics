@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import {
   MAP_PANEL_HEIGHT_CLASS,
   MAP_PANEL_SHELL_CLASS,
+  MAP_PANEL_BOTTOM_CLASS,
 } from "@/lib/map-panel-styles";
 import {
   hasErrors,
@@ -198,7 +199,7 @@ export function AddStorePanel({
   };
 
   return (
-    <div className="absolute bottom-4 right-4 z-20 w-full max-w-md animate-in slide-in-from-right">
+    <div className={cn(MAP_PANEL_BOTTOM_CLASS, "absolute right-4 z-20 w-full max-w-md animate-in slide-in-from-right")}>
       <form
         onSubmit={handleSubmit}
         className={cn(

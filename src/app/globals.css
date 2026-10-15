@@ -298,6 +298,22 @@ html:not(.light) .maplibregl-ctrl-group button {
   }
 }
 
+@keyframes slide-up-fade {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.slide-up-fade {
+  animation: slide-up-fade 0.2s ease-out;
+  transform-origin: bottom center;
+}
+
 .animate-in {
   animation: slide-in-from-right 0.25s ease-out;
 }

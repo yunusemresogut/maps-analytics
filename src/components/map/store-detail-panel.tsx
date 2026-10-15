@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import {
   MAP_PANEL_HEIGHT_CLASS,
   MAP_PANEL_SHELL_CLASS,
+  MAP_PANEL_BOTTOM_CLASS,
 } from "@/lib/map-panel-styles";
 import {
   getProjectStatusLabel,
@@ -94,7 +95,7 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
   };
 
   return (
-    <div className="pointer-events-auto absolute bottom-4 right-4 z-20 flex w-full max-w-md animate-in sm:w-[min(420px,calc(100vw-2rem))]">
+    <div className={cn(MAP_PANEL_BOTTOM_CLASS, "pointer-events-auto absolute right-4 z-20 flex w-full max-w-md animate-in sm:w-[min(420px,calc(100vw-2rem))]")}>
       <div className={cn("flex w-full flex-col", MAP_PANEL_HEIGHT_CLASS, MAP_PANEL_SHELL_CLASS)}>
         <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 p-4">
           <div className="flex min-w-0 flex-wrap items-center gap-2">

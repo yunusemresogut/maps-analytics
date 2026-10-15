@@ -4,6 +4,8 @@ import { X } from "lucide-react";
 import { useRegions } from "@/contexts/regions-context";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { MAP_PANEL_BOTTOM_CLASS } from "@/lib/map-panel-styles";
+import { cn } from "@/lib/utils";
 
 export function RegionFilterPanel() {
   const {
@@ -19,7 +21,7 @@ export function RegionFilterPanel() {
   if (!isPanelOpen) return null;
 
   return (
-    <div className="pointer-events-auto absolute bottom-4 left-4 z-20 w-full max-w-xs slide-in-from-left">
+    <div className={cn(MAP_PANEL_BOTTOM_CLASS, "pointer-events-auto absolute left-4 z-20 w-full max-w-xs slide-in-from-left")}>
       <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/95 p-4 shadow-(--panel-shadow) backdrop-blur-md">
         <div className="mb-3 flex items-center justify-between">
           <span className="text-sm font-medium text-zinc-200">Bölgeler</span>

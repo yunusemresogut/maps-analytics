@@ -20,8 +20,29 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const MAX_STORES = 150;
+/** Route 60.000 karakterde keser; detaylar bu bütçeye sığdırılır */
+const MAX_CONTEXT_CHARS = 55000;
+const MAX_ITEMS_PER_STORE = 60;
+
+const MATERIAL_STATUS: Record<string, string> = {
+  bekleniyor: "bekleniyor",
+  geldi: "geldi",
+  gitti: "gitti",
+};
+
+const WORK_PLAN_STATUS: Record<string, string> = {
+  yapilacak: "yapılacak",
+  devam_ediyor: "devam ediyor",
+  tamamlandi: "tamamlandı",
+};
+
+function normalize(text: string): string {
+  return text.toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
+}
 
 type AssistantContextInput = {
+  /** Son kullanıcı sorusu: adı geçen mağazaların detayları önce eklenir */
+  question?: string;
   organizationName?: string;
   userName: string;
   stores: Store[];
@@ -106,6 +127,59 @@ export function buildAssistantContext(input: AssistantContextInput): string {
     lines.push(
       `- ${ticket.code ?? ticket.title} | ${storeName(ticket.storeId)} | ${ticket.title} | öncelik: ${ticket.priority} | ${ticket.status}`
     );
+  }
+
+  // Mağaza detayları: malzeme ve iş planı kalemleri (birim fiyat, tarih vb.)
+  const question = normalize(input.question ?? "");
+  const storesWithDetails = input.stores.filter((store) => {
+    const data = input.storeData[store.id];
+    return (data?.materials.length ?? 0) + (data?.workPlan.length ?? 0) > 0;
+  });
+  const mentioned = (store: Store) => question.includes(normalize(store.name));
+  const ordered = [
+    ...storesWithDetails.filter(mentioned),
+    ...storesWithDetails.filter((store) => !mentioned(store)),
+  ];
+
+  lines.push("", "## Mağaza detayları (malzemeler ve iş planı)");
+  let length = lines.join("\n").length;
+  let skipped = 0;
+  for (const store of ordered) {
+    const data = input.storeData[store.id];
+    const block: string[] = [`### ${store.name} (${store.city})`];
+    if (data.materials.length > 0) {
+      block.push("Malzemeler (ad | miktar | birim fiyat | tutar | durum):");
+      for (const m of data.materials.slice(0, MAX_ITEMS_PER_STORE)) {
+        block.push(
+          `- ${m.name} | ${m.quantity} ${m.unit} | ${money(m.unitPrice)} | ${money(m.quantity * m.unitPrice)} | ${MATERIAL_STATUS[m.status] ?? m.status}`
+        );
+      }
+      if (data.materials.length > MAX_ITEMS_PER_STORE) {
+        block.push(`… ve ${data.materials.length - MAX_ITEMS_PER_STORE} malzeme daha`);
+      }
+    }
+    if (data.workPlan.length > 0) {
+      block.push("İş planı (iş | başlangıç – bitiş | ilerleme | sorumlu | durum):");
+      for (const w of data.workPlan.slice(0, MAX_ITEMS_PER_STORE)) {
+        block.push(
+          `- ${w.activityCode ? `${w.activityCode} ` : ""}${w.description} | ${w.startDate || "—"} – ${w.endDate || "—"} | %${w.percentComplete} | ${w.responsible || "—"} | ${WORK_PLAN_STATUS[w.status] ?? w.status}`
+        );
+      }
+      if (data.workPlan.length > MAX_ITEMS_PER_STORE) {
+        block.push(`… ve ${data.workPlan.length - MAX_ITEMS_PER_STORE} iş kalemi daha`);
+      }
+    }
+    const text = block.join("\n");
+    if (length + text.length + 1 > MAX_CONTEXT_CHARS) {
+      skipped++;
+      continue;
+    }
+    lines.push(text);
+    length += text.length + 1;
+  }
+  if (storesWithDetails.length === 0) lines.push("Kayıtlı malzeme veya iş planı yok.");
+  if (skipped > 0) {
+    lines.push(`(${skipped} mağazanın detayı boyut sınırı nedeniyle eklenmedi; soruda mağaza adını belirtin.)`);
   }
 
   return lines.join("\n");
