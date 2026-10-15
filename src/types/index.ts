@@ -62,6 +62,7 @@ export type AppRouteKey =
   | "contracts"
   | "progressPayments"
   | "invoices"
+  | "team"
   | "profile"
   | "adminUsers"
   | "adminRegions"
@@ -394,3 +395,17 @@ export function emptyApprovals(): ProjectApprovals {
     projectOpened: false,
   };
 }
+
+export type TeamMessage = {
+  id: string;
+  organizationId: string;
+  senderId: string;
+  recipientId: string;
+  body: string;
+  attachmentPath?: string;
+  attachmentName?: string;
+  attachmentSize?: number;
+  attachmentType?: string;
+  createdAt: string;
+  readAt?: string;
+};

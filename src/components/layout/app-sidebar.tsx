@@ -18,11 +18,13 @@ import {
   Ticket,
   UserCircle,
   Users,
+  UsersRound,
   X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useSidebar } from "@/contexts/sidebar-context";
 import { useT } from "@/contexts/i18n-context";
+import { useTeamChat } from "@/contexts/team-chat-context";
 import { canAccessRoute } from "@/lib/permissions";
 import { getRoleLabel } from "@/lib/roles";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -65,6 +67,7 @@ const MAIN_NAV: NavItem[] = [
     icon: Coins,
     routeKey: "invoices",
   },
+  { href: "/team", labelKey: "nav.team", icon: UsersRound, routeKey: "team" },
 ];
 
 const ADMIN_NAV: NavItem[] = [
@@ -111,6 +114,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { isOpen, isPinned, close, togglePin } = useSidebar();
   const t = useT();
+  const { totalUnread } = useTeamChat();
 
   if (!user) return null;
 
@@ -151,7 +155,15 @@ export function AppSidebar() {
             active ? "text-cyan-400" : "text-zinc-500"
           )}
         />
-        {t(item.labelKey)}
+        <span className="flex-1">{t(item.labelKey)}</span>
+        {item.routeKey === "team" && totalUnread > 0 && (
+          <span
+            className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-cyan-500 px-1.5 text-[11px] font-semibold text-white tabular-nums"
+            aria-label={`${totalUnread} okunmamış mesaj`}
+          >
+            {totalUnread > 99 ? "99+" : totalUnread}
+          </span>
+        )}
       </Link>
     );
   };

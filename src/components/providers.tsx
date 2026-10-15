@@ -11,6 +11,7 @@ import { DbProvider } from "@/contexts/db-context";
 import { SidebarProvider } from "@/contexts/sidebar-context";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { ModulesProvider } from "@/contexts/modules-context";
+import { TeamChatProvider } from "@/contexts/team-chat-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -24,7 +25,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
                   <ModulesProvider>
                     <NotificationsProvider>
                       <MapUiProvider>
-                        <StoreDataProvider>{children}</StoreDataProvider>
+                        <StoreDataProvider>
+                          <TeamChatProvider>{children}</TeamChatProvider>
+                        </StoreDataProvider>
                       </MapUiProvider>
                     </NotificationsProvider>
                   </ModulesProvider>
