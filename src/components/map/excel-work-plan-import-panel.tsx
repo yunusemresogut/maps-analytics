@@ -5,7 +5,7 @@ import { CalendarRange, Download, Upload } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import {
   downloadWorkPlanTemplate,
-  parseWorkPlanFromExcel,
+  parseWorkPlanFile,
   type ParsedWorkPlanRow,
 } from "@/lib/excel-work-plan";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ export function ExcelWorkPlanImportPanel({
     setMatchedInfo("");
 
     try {
-      const result = await parseWorkPlanFromExcel(file);
+      const result = await parseWorkPlanFile(file);
 
       if (result.errors.length > 0 && result.items.length === 0) {
         setError(result.errors.join(" · "));
@@ -71,7 +71,7 @@ export function ExcelWorkPlanImportPanel({
         <div className="flex items-center gap-1.5 min-w-0">
           <CalendarRange className="h-4 w-4 text-emerald-400 shrink-0" />
           <span className="text-xs font-medium text-emerald-300 truncate">
-            İş Planı Excel Import
+            İş Planı Import
           </span>
         </div>
         <div className="flex gap-1 shrink-0">
@@ -98,14 +98,14 @@ export function ExcelWorkPlanImportPanel({
         <input
           ref={inputRef}
           type="file"
-          accept=".xlsx,.xls"
+          accept=".xlsx,.xls,.xer"
           className="hidden"
           onChange={handleFile}
         />
       </div>
 
       <p className="mt-2 text-xs text-zinc-500">
-        Sütunlar: Açıklama, Başlangıç, Bitiş, Sorumlu, Durum
+        Excel iş planı şablonunu veya Primavera P6 .xer dosyasını seçin.
       </p>
 
       {matchedInfo && (

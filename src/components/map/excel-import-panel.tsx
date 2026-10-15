@@ -5,6 +5,7 @@ import { Download, FileSpreadsheet, Upload } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import {
   downloadMaterialsTemplate,
+  formatCurrency,
   parseMaterialsFromExcel,
   type ParsedMaterialRow,
 } from "@/lib/excel-materials";
@@ -123,7 +124,7 @@ export function ExcelImportPanel({ onImport }: ExcelImportPanelProps) {
                   <th className="px-2 py-1.5 text-left font-medium">Açıklama</th>
                   <th className="px-2 py-1.5 text-right font-medium">Miktar</th>
                   <th className="px-2 py-1.5 text-left font-medium">Birim</th>
-                  <th className="px-2 py-1.5 text-right font-medium">B.Fiyat</th>
+                  <th className="px-2 py-1.5 text-right font-medium">Birim fiyat (TRY)</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,7 +140,7 @@ export function ExcelImportPanel({ onImport }: ExcelImportPanelProps) {
                       <TruncateWithTooltip text={row.unit || "—"} />
                     </td>
                     <td className="px-2 py-1.5 text-right text-zinc-400">
-                      {row.unitPrice.toLocaleString("tr-TR")}
+                      {formatCurrency(row.unitPrice)}
                     </td>
                   </tr>
                 ))}

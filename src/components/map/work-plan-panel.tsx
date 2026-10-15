@@ -1,28 +1,45 @@
 "use client";
 
-import { useState } from "react";
-import { CalendarRange, Check, Edit2, Plus, Trash2, X } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { Fragment, useCallback, useState } from "react";
+import { CalendarRange, Check, Edit2, List, Plus, Trash2, X } from "lucide-react";
+import {
+  addMonths,
+  differenceInCalendarDays,
+  differenceInCalendarMonths,
+  endOfMonth,
+  format,
+  isValid,
+  parseISO,
+  startOfMonth,
+} from "date-fns";
 import { tr } from "date-fns/locale";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { TablePagination } from "@/components/modules/module-table";
 import { useStoreData } from "@/contexts/store-data-context";
+import { useTableState } from "@/hooks/use-table-state";
 import type { StoreWorkPlanItem, WorkPlanStatus } from "@/types";
 
 type WorkPlanPanelProps = {
   storeId: string;
   items: StoreWorkPlanItem[];
   isEditing: boolean;
-  onClose: () => void;
   onDelete: (id: string) => void;
   onClear: () => void;
 };
 
+type WorkPlanSortKey =
+  | "description"
+  | "startDate"
+  | "endDate"
+  | "responsible"
+  | "status";
+
 const statusLabels: Record<WorkPlanStatus, string> = {
   yapilacak: "Yapılacak",
-  devam_ediyor: "Devam Ediyor",
+  devam_ediyor: "Devam ediyor",
   tamamlandi: "Tamamlandı",
 };
 
@@ -33,107 +50,322 @@ const statusColors: Record<WorkPlanStatus, string> = {
 };
 
 function formatDateSafe(dateStr: string) {
-  if (!dateStr) return "Tarih Belirtilmemiş";
-  try {
-    return format(parseISO(dateStr), "d MMMM yyyy", { locale: tr });
-  } catch {
-    return dateStr;
+  if (!dateStr) return "-";
+  const date = parseISO(dateStr);
+  return isValid(date) ? format(date, "d MMM yyyy", { locale: tr }) : dateStr;
+}
+
+function WorkPlanGantt({ items }: { items: StoreWorkPlanItem[] }) {
+  const scheduled = items.filter((item) => {
+    if (!item.startDate) return false;
+    const start = parseISO(item.startDate);
+    return isValid(start);
+  });
+
+  if (scheduled.length === 0) {
+    return (
+      <div className="px-4 py-10 text-center text-sm text-zinc-500">
+        Gantt görünümü için başlangıç tarihi olan iş kalemi ekleyin.
+      </div>
+    );
   }
+
+  const startTimes = scheduled.map((item) => parseISO(item.startDate).getTime());
+  const endTimes = scheduled.map((item) => {
+    const end = item.endDate ? parseISO(item.endDate) : parseISO(item.startDate);
+    return (isValid(end) ? end : parseISO(item.startDate)).getTime();
+  });
+  const rangeStart = startOfMonth(new Date(Math.min(...startTimes)));
+  const rangeEnd = endOfMonth(new Date(Math.max(...endTimes)));
+  const totalDays = differenceInCalendarDays(rangeEnd, rangeStart) + 1;
+  const monthCount = differenceInCalendarMonths(rangeEnd, rangeStart) + 1;
+  const timelineWidth = Math.max(720, monthCount * 128);
+  const months = Array.from({ length: monthCount }, (_, index) => addMonths(rangeStart, index));
+  const rowIndexById = new Map(scheduled.map((item, index) => [item.id, index]));
+  const dependencyLines = scheduled.flatMap((item, successorIndex) =>
+    item.predecessors.flatMap((dependency) => {
+      const predecessorIndex = rowIndexById.get(dependency.predecessorId);
+      const predecessor = scheduled.find((candidate) => candidate.id === dependency.predecessorId);
+      if (predecessorIndex === undefined || !predecessor) return [];
+
+      const predecessorStart = parseISO(predecessor.startDate);
+      const predecessorEnd = predecessor.endDate ? parseISO(predecessor.endDate) : predecessorStart;
+      const successorStart = parseISO(item.startDate);
+      const successorEnd = item.endDate ? parseISO(item.endDate) : successorStart;
+      const sourceAtEnd = dependency.type === "FS" || dependency.type === "FF";
+      const targetAtEnd = dependency.type === "FF" || dependency.type === "SF";
+      const sourceDate = sourceAtEnd ? predecessorEnd : predecessorStart;
+      const targetDate = targetAtEnd ? successorEnd : successorStart;
+      const sourceDay = differenceInCalendarDays(sourceDate, rangeStart) + (sourceAtEnd ? 1 : 0);
+      const targetDay = differenceInCalendarDays(targetDate, rangeStart) + (targetAtEnd ? 1 : 0) + dependency.lagHours / 24;
+      return [{
+        key: `${predecessor.id}-${item.id}-${dependency.type}`,
+        x1: (sourceDay / totalDays) * timelineWidth,
+        y1: predecessorIndex * 44 + 22,
+        x2: (targetDay / totalDays) * timelineWidth,
+        y2: successorIndex * 44 + 22,
+        label: `${dependency.type}, ${dependency.lagHours} saat`,
+      }];
+    })
+  );
+  const monthOffset = (month: Date) =>
+    differenceInCalendarDays(month, rangeStart) / totalDays;
+  const monthWidth = (month: Date) => {
+    const monthStart = startOfMonth(month);
+    const monthEnd = endOfMonth(month);
+    return (differenceInCalendarDays(monthEnd, monthStart) + 1) / totalDays;
+  };
+
+  return (
+    <div className="scrollbar-themed overflow-x-auto">
+      <div className="min-w-max">
+        <div className="flex border-b border-zinc-800 bg-zinc-950/60">
+          <div className="sticky left-0 z-10 w-64 shrink-0 border-r border-zinc-800 bg-zinc-950 px-4 py-3 text-xs font-medium text-zinc-500">
+            İş kalemi
+          </div>
+          <div className="flex shrink-0" style={{ width: timelineWidth }}>
+            {months.map((month) => (
+              <div
+                key={month.toISOString()}
+                className="border-r border-zinc-800 px-2 py-3 text-xs font-medium text-zinc-400"
+                style={{ width: `${monthWidth(month) * timelineWidth}px` }}
+              >
+                {format(month, "MMM yyyy", { locale: tr })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="relative">
+        <svg
+          className="pointer-events-none absolute left-64 top-0 z-0 overflow-visible"
+          width={timelineWidth}
+          height={scheduled.length * 44}
+          aria-label="Görev bağımlılıkları"
+        >
+          <defs>
+            <marker id="gantt-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 8 4 L 0 8 z" fill="#fbbf24" />
+            </marker>
+          </defs>
+          {dependencyLines.map((line) => {
+            const bendX = line.x1 + (line.x2 - line.x1) / 2;
+            return (
+              <path
+                key={line.key}
+                d={`M ${line.x1} ${line.y1} H ${bendX} V ${line.y2} H ${line.x2}`}
+                fill="none"
+                stroke="#fbbf24"
+                strokeWidth="1.5"
+                markerEnd="url(#gantt-arrow)"
+              >
+                <title>{line.label}</title>
+              </path>
+            );
+          })}
+        </svg>
+        <div className="relative z-[1]">
+        {scheduled.map((item) => {
+          const startDate = parseISO(item.startDate);
+          const rawEnd = item.endDate ? parseISO(item.endDate) : startDate;
+          const endDate = isValid(rawEnd) ? rawEnd : startDate;
+          const offset = Math.max(0, differenceInCalendarDays(startDate, rangeStart));
+          const duration = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
+          const status = (item.status as WorkPlanStatus) || "yapilacak";
+          const barColor =
+            status === "tamamlandi"
+              ? "bg-emerald-500"
+              : status === "devam_ediyor"
+                ? "bg-amber-500"
+                : "bg-sky-500";
+
+          return (
+            <div key={item.id} className="flex border-b border-zinc-800/70">
+              <div className="sticky left-0 z-[1] flex h-11 w-64 shrink-0 items-center justify-between gap-3 border-r border-zinc-800 bg-zinc-950 px-4 py-2">
+                <div className="min-w-0">
+                  <span className="block truncate text-xs font-medium text-zinc-300" title={item.description}>
+                    {item.description}
+                  </span>
+                  <span className="block truncate text-[10px] text-zinc-600">
+                    {[item.activityCode, item.wbsCode].filter(Boolean).join(" · ") || format(startDate, "d MMM", { locale: tr })}
+                  </span>
+                </div>
+              </div>
+              <div className="relative h-11 shrink-0" style={{ width: timelineWidth }}>
+                {months.map((month) => (
+                  <span
+                    key={month.toISOString()}
+                    className="absolute inset-y-0 border-l border-zinc-800/60"
+                    style={{ left: `${monthOffset(month) * 100}%` }}
+                    aria-hidden
+                  />
+                ))}
+                <div
+                  className="absolute top-2.5 h-6 min-w-2 overflow-hidden rounded bg-zinc-700/70"
+                  style={{
+                    left: `${(offset / totalDays) * 100}%`,
+                    width: `${(duration / totalDays) * 100}%`,
+                  }}
+                  title={`${item.description}: ${formatDateSafe(item.startDate)} - ${formatDateSafe(item.endDate)} · ${item.percentComplete}%`}
+                >
+                  <div className={`h-full ${barColor}`} style={{ width: `${item.percentComplete}%` }} />
+                  <span className="absolute inset-y-0 left-1 flex items-center truncate text-[10px] font-medium text-white">
+                    {item.percentComplete}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        </div>
+        </div>
+      </div>
+      {scheduled.length < items.length && (
+        <p className="border-t border-zinc-800 px-4 py-2 text-xs text-zinc-500">
+          {items.length - scheduled.length} iş kalemi tarih olmadığı için zaman çizelgesinde gösterilmiyor.
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function WorkPlanPanel({
   storeId,
   items,
   isEditing,
-  onClose,
   onDelete,
   onClear,
 }: WorkPlanPanelProps) {
   const { addWorkPlanItem, updateWorkPlanItem } = useStoreData();
-
-  // Add Form State
   const [isAdding, setIsAdding] = useState(false);
   const [newDescription, setNewDescription] = useState("");
   const [newStartDate, setNewStartDate] = useState("");
   const [newEndDate, setNewEndDate] = useState("");
   const [newResponsible, setNewResponsible] = useState("");
   const [newStatus, setNewStatus] = useState<WorkPlanStatus>("yapilacak");
-
-  // Inline Edit State
+  const [newActivityCode, setNewActivityCode] = useState("");
+  const [newWbsCode, setNewWbsCode] = useState("");
+  const [newPercentComplete, setNewPercentComplete] = useState(0);
+  const [newPredecessorIds, setNewPredecessorIds] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"table" | "gantt">("table");
+  const [formError, setFormError] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
   const [editResponsible, setEditResponsible] = useState("");
   const [editStatus, setEditStatus] = useState<WorkPlanStatus>("yapilacak");
+  const [editActivityCode, setEditActivityCode] = useState("");
+  const [editWbsCode, setEditWbsCode] = useState("");
+  const [editPercentComplete, setEditPercentComplete] = useState(0);
+  const [editPredecessorIds, setEditPredecessorIds] = useState<string[]>([]);
+  const [editError, setEditError] = useState("");
 
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newDescription.trim()) return;
+  const getSortValue = useCallback(
+    (item: StoreWorkPlanItem, key: WorkPlanSortKey) => {
+      if (key === "status") {
+        return statusLabels[item.status as WorkPlanStatus] ?? item.status;
+      }
+      return item[key] ?? "";
+    },
+    []
+  );
+  const table = useTableState<StoreWorkPlanItem, WorkPlanSortKey>({
+    items,
+    initialSort: { key: "startDate", direction: "asc" },
+    getSortValue,
+    resetKey: String(items.length),
+  });
 
+  const handleAdd = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newDescription.trim() || !newStartDate) {
+      setFormError("İş tanımı ve başlangıç tarihi zorunludur.");
+      return;
+    }
+    if (newEndDate && newEndDate < newStartDate) {
+      setFormError("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+      return;
+    }
+
+    setFormError("");
     addWorkPlanItem(storeId, {
       description: newDescription.trim(),
       startDate: newStartDate,
       endDate: newEndDate,
       responsible: newResponsible.trim() || "Belirtilmemiş",
       status: newStatus,
+      activityCode: newActivityCode.trim() || undefined,
+      wbsCode: newWbsCode.trim() || undefined,
+      percentComplete: newPercentComplete,
+      predecessors: newPredecessorIds.map((predecessorId) => ({
+        predecessorId,
+        type: "FS",
+        lagHours: 0,
+      })),
     });
-
-    // Reset Add Form
     setNewDescription("");
     setNewStartDate("");
     setNewEndDate("");
     setNewResponsible("");
     setNewStatus("yapilacak");
+    setNewActivityCode("");
+    setNewWbsCode("");
+    setNewPercentComplete(0);
+    setNewPredecessorIds([]);
     setIsAdding(false);
   };
 
   const startEdit = (item: StoreWorkPlanItem) => {
     setEditingId(item.id);
+    setEditError("");
     setEditDescription(item.description);
     setEditStartDate(item.startDate);
     setEditEndDate(item.endDate);
     setEditResponsible(item.responsible);
     setEditStatus((item.status as WorkPlanStatus) || "yapilacak");
+    setEditActivityCode(item.activityCode ?? "");
+    setEditWbsCode(item.wbsCode ?? "");
+    setEditPercentComplete(item.percentComplete);
+    setEditPredecessorIds(item.predecessors.map((dependency) => dependency.predecessorId));
   };
 
   const handleUpdateSave = (id: string) => {
-    if (!editDescription.trim()) return;
-
+    if (!editDescription.trim() || !editStartDate) {
+      setEditError("İş tanımı ve başlangıç tarihi zorunludur.");
+      return;
+    }
+    if (editEndDate && editEndDate < editStartDate) {
+      setEditError("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+      return;
+    }
+    setEditError("");
     updateWorkPlanItem(storeId, id, {
       description: editDescription.trim(),
       startDate: editStartDate,
       endDate: editEndDate,
       responsible: editResponsible.trim() || "Belirtilmemiş",
       status: editStatus,
+      activityCode: editActivityCode.trim() || undefined,
+      wbsCode: editWbsCode.trim() || undefined,
+      percentComplete: editPercentComplete,
+      predecessors: editPredecessorIds.map((predecessorId) => {
+        const existing = items
+          .find((candidate) => candidate.id === id)
+          ?.predecessors.find((dependency) => dependency.predecessorId === predecessorId);
+        return {
+          predecessorId,
+          type: existing?.type ?? "FS",
+          lagHours: existing?.lagHours ?? 0,
+        };
+      }),
     });
-
     setEditingId(null);
   };
 
-  // Group items by startDate
-  const groupedItems = items.reduce(
-    (groups, item) => {
-      const dateKey = item.startDate || "";
-      if (!groups[dateKey]) {
-        groups[dateKey] = [];
-      }
-      groups[dateKey].push(item);
-      return groups;
-    },
-    {} as Record<string, StoreWorkPlanItem[]>
-  );
-
-  // Sort dates chronologically
-  const sortedDates = Object.keys(groupedItems).sort((a, b) => {
-    if (!a) return 1;
-    if (!b) return -1;
-    return a.localeCompare(b);
-  });
-
   return (
-    <div className="flex max-h-[26rem] w-full max-w-[min(24rem,calc(100vw-1rem))] shrink-0 flex-col self-end overflow-hidden rounded-l-xl border border-r-0 border-zinc-700/60 bg-zinc-950/95 shadow-[-8px_0_24px_rgba(0,0,0,0.35)] backdrop-blur-md slide-in-from-left sm:max-h-[32rem] sm:w-[26rem]">
-      <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-3">
+    <section className="flex w-full min-w-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40">
+      <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <div className="flex items-center gap-2">
           <CalendarRange className="h-4 w-4 text-emerald-400" />
           <span className="text-sm font-medium text-zinc-200">İş Planı</span>
@@ -141,256 +373,338 @@ export function WorkPlanPanel({
             {items.length}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          {isEditing && !isAdding && (
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-md border border-zinc-800 bg-zinc-950/50 p-0.5" role="group" aria-label="İş planı görünümü">
             <button
               type="button"
-              onClick={() => setIsAdding(true)}
-              className="flex items-center gap-1 rounded bg-emerald-650 px-2 py-1 text-[11px] font-medium text-zinc-100 transition-colors hover:bg-emerald-750 cursor-pointer"
+              onClick={() => setViewMode("table")}
+              aria-pressed={viewMode === "table"}
+              className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs ${viewMode === "table" ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
             >
-              <Plus className="h-3 w-3" />
-              İş Ekle
+              <List className="h-3.5 w-3.5" />
+              Tablo
             </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("gantt")}
+              aria-pressed={viewMode === "gantt"}
+              className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs ${viewMode === "gantt" ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+            >
+              <CalendarRange className="h-3.5 w-3.5" />
+              Gantt
+            </button>
+          </div>
+          {isEditing && !isAdding && (
+            <Button size="sm" onClick={() => setIsAdding(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              İş ekle
+            </Button>
           )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
-      {/* Add Task Form */}
       {isAdding && (
         <form
           onSubmit={handleAdd}
-          className="border-b border-zinc-800/80 bg-zinc-900/30 p-3 space-y-2.5 z-10"
+          className="grid gap-3 border-b border-zinc-800 p-4 lg:grid-cols-[minmax(0,2fr)_1fr_1fr_1.25fr_1fr_auto]"
         >
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-            Yeni İş Kalemi Ekle
-          </div>
-          <div className="space-y-2">
+          <Input
+            value={newDescription}
+            onChange={(event) => setNewDescription(event.target.value)}
+            placeholder="İş tanımı"
+            aria-label="İş tanımı"
+            required
+          />
+          <Input
+            type="date"
+            value={newStartDate}
+            onChange={(event) => setNewStartDate(event.target.value)}
+            aria-label="Başlangıç tarihi"
+            required
+          />
+          <Input
+            type="date"
+            value={newEndDate}
+            onChange={(event) => setNewEndDate(event.target.value)}
+            min={newStartDate || undefined}
+            aria-label="Bitiş tarihi"
+          />
+          <Input
+            value={newResponsible}
+            onChange={(event) => setNewResponsible(event.target.value)}
+            placeholder="Sorumlu"
+            aria-label="Sorumlu"
+          />
+          <Select
+            value={newStatus}
+            onChange={(event) => setNewStatus(event.target.value as WorkPlanStatus)}
+            aria-label="Durum"
+          >
+            <option value="yapilacak">Yapılacak</option>
+            <option value="devam_ediyor">Devam ediyor</option>
+            <option value="tamamlandi">Tamamlandı</option>
+          </Select>
+          <Button type="submit" size="sm">
+            <Check className="h-3.5 w-3.5" />
+            Kaydet
+          </Button>
+          <div className="grid gap-3 lg:col-span-full lg:grid-cols-4">
             <Input
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
-              placeholder="İş Tanımı..."
-              required
-              className="h-8 text-xs bg-zinc-950/60 border-zinc-800 focus:border-emerald-500/50"
+              value={newActivityCode}
+              onChange={(event) => setNewActivityCode(event.target.value)}
+              placeholder="Aktivite kodu"
+              aria-label="Aktivite kodu"
             />
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="mb-0.5 block text-[9px] text-zinc-500">Başlangıç</label>
-                <Input
-                  type="date"
-                  value={newStartDate}
-                  onChange={(e) => setNewStartDate(e.target.value)}
-                  required
-                  className="h-8 text-xs bg-zinc-950/60 border-zinc-800"
-                />
-              </div>
-              <div>
-                <label className="mb-0.5 block text-[9px] text-zinc-500">Bitiş</label>
-                <Input
-                  type="date"
-                  value={newEndDate}
-                  onChange={(e) => setNewEndDate(e.target.value)}
-                  className="h-8 text-xs bg-zinc-950/60 border-zinc-800"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="mb-0.5 block text-[9px] text-zinc-500">Sorumlu</label>
-                <Input
-                  value={newResponsible}
-                  onChange={(e) => setNewResponsible(e.target.value)}
-                  placeholder="Ad Soyad..."
-                  className="h-8 text-xs bg-zinc-950/60 border-zinc-800"
-                />
-              </div>
-              <div>
-                <label className="mb-0.5 block text-[9px] text-zinc-500">Durum</label>
-                <Select
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value as WorkPlanStatus)}
-                  className="h-8 text-xs bg-zinc-950/60 border-zinc-800"
-                >
-                  <option value="yapilacak">Yapılacak</option>
-                  <option value="devam_ediyor">Devam Ediyor</option>
-                  <option value="tamamlandi">Tamamlandı</option>
-                </Select>
-              </div>
-            </div>
+            <Input
+              value={newWbsCode}
+              onChange={(event) => setNewWbsCode(event.target.value)}
+              placeholder="WBS"
+              aria-label="WBS kodu"
+            />
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={newPercentComplete}
+              onChange={(event) => setNewPercentComplete(Math.min(100, Math.max(0, Number(event.target.value) || 0)))}
+              aria-label="Tamamlanma yüzdesi"
+            />
+            <label className="text-xs text-zinc-500">
+              Öncül görevler
+              <select
+                multiple
+                value={newPredecessorIds}
+                onChange={(event) => setNewPredecessorIds(Array.from(event.target.selectedOptions, (option) => option.value))}
+                className="mt-1 h-20 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs text-zinc-200"
+              >
+                {items.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.activityCode ? `${item.activityCode} — ` : ""}{item.description}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => setIsAdding(false)}
-              className="rounded px-2.5 py-1 text-xs text-zinc-400 hover:bg-zinc-800 cursor-pointer"
-            >
-              İptal
-            </button>
-            <button
-              type="submit"
-              className="rounded bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700 cursor-pointer"
-            >
-              Kaydet
-            </button>
-          </div>
+          {formError && (
+            <p role="alert" className="text-xs text-red-400 lg:col-span-full">
+              {formError}
+            </p>
+          )}
         </form>
       )}
 
-      {/* Work Plan Grouped List */}
-      <div className="scrollbar-themed flex-1 overflow-y-auto p-3 space-y-4">
-        {items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-zinc-600">
-            Henüz iş planı yok. Excel import veya "+ İş Ekle" ile başlayın.
-          </p>
-        ) : (
-          sortedDates.map((dateKey) => (
-            <div key={dateKey} className="space-y-2">
-              <div className="flex items-center gap-2 border-b border-zinc-800 pb-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/70" />
-                <span className="text-[11px] font-semibold text-zinc-400">
-                  {formatDateSafe(dateKey)}
-                </span>
-                <span className="rounded bg-zinc-800/60 px-1 py-0.2 text-[9px] text-zinc-500">
-                  {groupedItems[dateKey].length} İş
-                </span>
-              </div>
-              <div className="space-y-2">
-                {groupedItems[dateKey].map((item) => {
-                  const isItemEditing = editingId === item.id;
-                  const currentStatus = (item.status as WorkPlanStatus) || "yapilacak";
-
-                  if (isItemEditing) {
-                    return (
-                      <div
-                        key={item.id}
-                        className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-2.5 space-y-2"
-                      >
-                        <Input
-                          value={editDescription}
-                          onChange={(e) => setEditDescription(e.target.value)}
-                          className="h-7 text-xs bg-zinc-950/60"
-                        />
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <Input
-                            type="date"
-                            value={editStartDate}
-                            onChange={(e) => setEditStartDate(e.target.value)}
-                            className="h-7 text-[11px]"
-                          />
-                          <Input
-                            type="date"
-                            value={editEndDate}
-                            onChange={(e) => setEditEndDate(e.target.value)}
-                            className="h-7 text-[11px]"
-                          />
+      {viewMode === "table" ? (
+        <>
+      <div className="min-w-0 overflow-x-auto">
+        <table className="w-full min-w-[900px] text-sm">
+          <thead className="border-b border-zinc-800 text-left text-xs text-zinc-500">
+            <tr>
+              <th className="px-4 py-3 font-medium">İş kalemi</th>
+              <th className="px-4 py-3 font-medium">Aktivite kodu</th>
+              <th className="px-4 py-3 font-medium">Başlangıç</th>
+              <th className="px-4 py-3 font-medium">Bitiş</th>
+              <th className="px-4 py-3 font-medium">İlerleme</th>
+              <th className="px-4 py-3 font-medium">Sorumlu</th>
+              <th className="px-4 py-3 font-medium">Durum</th>
+              {isEditing && <th className="w-20 px-4 py-3" />}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-800/70">
+            {items.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={isEditing ? 8 : 7}
+                  className="px-4 py-10 text-center text-sm text-zinc-500"
+                >
+                  Henüz iş planı yok.
+                </td>
+              </tr>
+            ) :
+              table.pageItems.map((item) => {
+                const isItemEditing = editingId === item.id;
+                const currentStatus = (item.status as WorkPlanStatus) || "yapilacak";
+                return (
+                  <Fragment key={item.id}>
+                    <tr className="text-zinc-300 hover:bg-zinc-900/50">
+                      <td className="max-w-[440px] px-4 py-3 font-medium text-zinc-100">
+                        <div><TruncateWithTooltip text={item.description} /></div>
+                        {item.wbsCode && <span className="mt-1 block text-[10px] font-normal text-zinc-500">WBS {item.wbsCode}</span>}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-zinc-400">
+                        {item.activityCode ?? "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-zinc-400">
+                        {formatDateSafe(item.startDate)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-zinc-400">
+                        {formatDateSafe(item.endDate)}
+                      </td>
+                      <td className="min-w-36 px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-zinc-800">
+                            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${item.percentComplete}%` }} />
+                          </div>
+                          <span className="w-10 text-right text-xs tabular-nums text-zinc-400">{item.percentComplete}%</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <Input
-                            value={editResponsible}
-                            onChange={(e) => setEditResponsible(e.target.value)}
-                            className="h-7 text-[11px]"
-                            placeholder="Sorumlu"
-                          />
-                          <Select
-                            value={editStatus}
-                            onChange={(e) => setEditStatus(e.target.value as WorkPlanStatus)}
-                            className="h-7 text-[11px] py-0 px-1"
-                          >
-                            <option value="yapilacak">Yapılacak</option>
-                            <option value="devam_ediyor">Devam Ediyor</option>
-                            <option value="tamamlandi">Tamamlandı</option>
-                          </Select>
-                        </div>
-                        <div className="flex justify-end gap-1.5 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(null)}
-                            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-800 cursor-pointer"
-                          >
-                            İptal
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateSave(item.id)}
-                            className="flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-0.5 text-[10px] font-medium text-white hover:bg-emerald-700 cursor-pointer"
-                          >
-                            <Check className="h-3 w-3" /> Kaydet
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="group flex flex-col gap-1.5 rounded-lg border border-zinc-850 bg-zinc-900/30 p-2.5 hover:border-zinc-700 hover:bg-zinc-900/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-medium text-xs text-zinc-200 min-w-0 flex-1">
-                          <TruncateWithTooltip text={item.description} />
-                        </div>
-                        {isEditing && (
-                          <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-zinc-400">
+                        {item.responsible || "-"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center rounded border px-2 py-1 text-xs font-medium ${statusColors[currentStatus]}`}
+                        >
+                          {statusLabels[currentStatus] ?? currentStatus}
+                        </span>
+                      </td>
+                      {isEditing && (
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => startEdit(item)}
-                              className="text-zinc-500 hover:text-cyan-400 cursor-pointer p-0.5"
-                              title="Düzenle"
+                              onClick={() =>
+                                isItemEditing ? setEditingId(null) : startEdit(item)
+                              }
+                              className="text-zinc-500 hover:text-cyan-400"
+                              aria-label={isItemEditing ? "Düzenlemeyi kapat" : "Düzenle"}
                             >
-                              <Edit2 className="h-3.5 w-3.5" />
+                              {isItemEditing ? (
+                                <X className="h-4 w-4" />
+                              ) : (
+                                <Edit2 className="h-4 w-4" />
+                              )}
                             </button>
                             <button
                               type="button"
                               onClick={() => onDelete(item.id)}
-                              className="text-zinc-500 hover:text-red-400 cursor-pointer p-0.5"
-                              title="Sil"
+                              className="text-zinc-500 hover:text-red-400"
+                              aria-label="Sil"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-500 border-t border-zinc-900/50 pt-1.5">
-                        <div>
-                          Sorumlu: <span className="text-zinc-400">{item.responsible}</span>
-                        </div>
-                        {item.endDate && (
-                          <div>
-                            Bitiş: <span className="text-zinc-400">{item.endDate}</span>
+                        </td>
+                      )}
+                    </tr>
+                    {isItemEditing && (
+                      <tr>
+                        <td colSpan={8} className="bg-emerald-500/5 px-4 py-3">
+                          <div className="grid gap-3 lg:grid-cols-4">
+                            <Input
+                              value={editDescription}
+                              onChange={(event) => setEditDescription(event.target.value)}
+                              aria-label="İş tanımı"
+                            />
+                            <Input
+                              value={editActivityCode}
+                              onChange={(event) => setEditActivityCode(event.target.value)}
+                              placeholder="Aktivite kodu"
+                              aria-label="Aktivite kodu"
+                            />
+                            <Input
+                              value={editWbsCode}
+                              onChange={(event) => setEditWbsCode(event.target.value)}
+                              placeholder="WBS"
+                              aria-label="WBS"
+                            />
+                            <Input
+                              type="date"
+                              value={editStartDate}
+                              onChange={(event) => setEditStartDate(event.target.value)}
+                              aria-label="Başlangıç"
+                            />
+                            <Input
+                              type="date"
+                              value={editEndDate}
+                              onChange={(event) => setEditEndDate(event.target.value)}
+                              min={editStartDate || undefined}
+                              aria-label="Bitiş"
+                            />
+                            <Input
+                              value={editResponsible}
+                              onChange={(event) => setEditResponsible(event.target.value)}
+                              aria-label="Sorumlu"
+                            />
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={editPercentComplete}
+                              onChange={(event) => setEditPercentComplete(Math.min(100, Math.max(0, Number(event.target.value) || 0)))}
+                              aria-label="Tamamlanma yüzdesi"
+                            />
+                            <Select
+                              value={editStatus}
+                              onChange={(event) => setEditStatus(event.target.value as WorkPlanStatus)}
+                              aria-label="Durum"
+                            >
+                              <option value="yapilacak">Yapılacak</option>
+                              <option value="devam_ediyor">Devam ediyor</option>
+                              <option value="tamamlandi">Tamamlandı</option>
+                            </Select>
+                            <label className="text-xs text-zinc-500">
+                              Öncül görevler
+                              <select
+                                multiple
+                                value={editPredecessorIds}
+                                onChange={(event) => setEditPredecessorIds(Array.from(event.target.selectedOptions, (option) => option.value))}
+                                className="mt-1 h-20 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs text-zinc-200"
+                              >
+                                {items.filter((candidate) => candidate.id !== item.id).map((candidate) => (
+                                  <option key={candidate.id} value={candidate.id}>
+                                    {candidate.activityCode ? `${candidate.activityCode} — ` : ""}{candidate.description}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <Button size="sm" onClick={() => handleUpdateSave(item.id)}>
+                              <Check className="h-3.5 w-3.5" />
+                              Kaydet
+                            </Button>
                           </div>
-                        )}
-                        <span className={`inline-flex items-center rounded border px-1.5 py-0.2 text-[9px] font-medium ${statusColors[currentStatus]}`}>
-                          {statusLabels[currentStatus]}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))
-        )}
+                          {editError && (
+                            <p role="alert" className="mt-2 text-xs text-red-400">
+                              {editError}
+                            </p>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+          </tbody>
+        </table>
       </div>
 
+      {items.length > 0 && (
+        <div className="border-t border-zinc-800 px-3 py-2">
+          <TablePagination
+            page={table.page}
+            totalPages={table.totalPages}
+            totalItems={table.totalItems}
+            rangeStart={table.rangeStart}
+            rangeEnd={table.rangeEnd}
+            onPageChange={table.setPage}
+            pageSize={table.pageSize}
+            onPageSizeChange={table.setPageSize}
+          />
+        </div>
+      )}
+        </>
+      ) : (
+        <WorkPlanGantt items={items} />
+      )}
+
       {items.length > 0 && isEditing && (
-        <div className="border-t border-zinc-800 px-3 py-3 z-10 bg-zinc-950/95">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="w-full text-xs text-red-400/80 cursor-pointer"
-            onClick={onClear}
-          >
-            Tümünü Temizle
+        <div className="border-t border-zinc-800 px-3 py-3">
+          <Button size="sm" variant="ghost" className="text-xs text-red-400/80" onClick={onClear}>
+            Tümünü temizle
           </Button>
         </div>
       )}
-    </div>
+    </section>
   );
 }

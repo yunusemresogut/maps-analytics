@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Edit2, Package, Plus, Trash2, X } from "lucide-react";
+import { useCallback, useState } from "react";
+import { Check, Edit2, Package, Plus, Trash2 } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import { formatCurrency } from "@/lib/excel-materials";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { TablePagination } from "@/components/modules/module-table";
 import { useStoreData } from "@/contexts/store-data-context";
+import { useTableState } from "@/hooks/use-table-state";
+import { cn } from "@/lib/utils";
 import type { MaterialStatus, StoreMaterial } from "@/types";
 
 type MaterialsPanelProps = {
   storeId: string;
   materials: StoreMaterial[];
   isEditing: boolean;
-  onClose: () => void;
   onDelete: (id: string) => void;
   onClear: () => void;
 };
@@ -31,11 +33,49 @@ const statusColors: Record<MaterialStatus, string> = {
   gitti: "bg-amber-500 text-amber-400 border-amber-500/20",
 };
 
+type MaterialSortKey = "name" | "quantity" | "unit" | "unitPrice" | "status";
+
+function FloatingInput({
+  label,
+  className,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+  const [focused, setFocused] = useState(false);
+  const floating = focused || Boolean(props.value);
+
+  return (
+    <div className="relative min-w-0">
+      <Input
+        {...props}
+        placeholder=" "
+        onFocus={(event) => {
+          setFocused(true);
+          props.onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          setFocused(false);
+          props.onBlur?.(event);
+        }}
+        className={cn("h-10 pt-3 text-xs", className)}
+      />
+      <label
+        className={cn(
+          "pointer-events-none absolute left-3 transition-all",
+          floating
+            ? "-top-1.5 bg-zinc-950 px-1 text-[10px] text-violet-400"
+            : "top-1/2 -translate-y-1/2 text-xs text-zinc-500"
+        )}
+      >
+        {label}
+      </label>
+    </div>
+  );
+}
+
 export function MaterialsPanel({
   storeId,
   materials,
   isEditing,
-  onClose,
   onDelete,
   onClear,
 }: MaterialsPanelProps) {
@@ -56,6 +96,20 @@ export function MaterialsPanel({
   const [editUnit, setEditUnit] = useState("");
   const [editUnitPrice, setEditUnitPrice] = useState("0");
   const [editStatus, setEditStatus] = useState<MaterialStatus>("bekleniyor");
+
+  const getSortValue = useCallback((item: StoreMaterial, key: MaterialSortKey) => {
+    if (key === "name") return item.name;
+    if (key === "quantity") return item.quantity;
+    if (key === "unit") return item.unit;
+    if (key === "unitPrice") return item.unitPrice;
+    return statusLabels[item.status] ?? item.status;
+  }, []);
+  const table = useTableState<StoreMaterial, MaterialSortKey>({
+    items: materials,
+    initialSort: { key: "name", direction: "asc" },
+    getSortValue,
+    resetKey: String(materials.length),
+  });
 
   const total = materials.reduce(
     (sum, m) => sum + m.quantity * m.unitPrice,
@@ -107,7 +161,7 @@ export function MaterialsPanel({
   };
 
   return (
-    <div className="flex max-h-[26rem] w-full max-w-[min(24rem,calc(100vw-1rem))] shrink-0 flex-col self-end overflow-hidden rounded-l-xl border border-r-0 border-zinc-700/60 bg-zinc-950/95 shadow-[-8px_0_24px_rgba(0,0,0,0.35)] backdrop-blur-md slide-in-from-left sm:max-h-[32rem] sm:w-[26rem]">
+    <section className="flex w-full min-w-0 flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40">
       <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-3">
         <div className="flex items-center gap-2">
           <Package className="h-4 w-4 text-violet-400" />
@@ -127,13 +181,6 @@ export function MaterialsPanel({
               Ekle
             </button>
           )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
@@ -147,40 +194,40 @@ export function MaterialsPanel({
             Yeni Malzeme Ekle
           </div>
           <div className="space-y-2">
-            <Input
+            <FloatingInput
+              label="Malzeme adı"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Malzeme Adı..."
               required
-              className="h-8 text-xs bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
+              className="bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
             />
-            <div className="grid grid-cols-3 gap-2">
-              <Input
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <FloatingInput
+                label="Miktar"
                 type="number"
                 min="0.01"
                 step="any"
                 value={newQuantity}
                 onChange={(e) => setNewQuantity(e.target.value)}
-                placeholder="Miktar"
                 required
-                className="h-8 text-xs bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
+                className="bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
               />
-              <Input
+              <FloatingInput
+                label="Birim"
                 value={newUnit}
                 onChange={(e) => setNewUnit(e.target.value)}
-                placeholder="Birim (Adet...)"
                 required
-                className="h-8 text-xs bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
+                className="bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
               />
-              <Input
+              <FloatingInput
+                label="Birim fiyat (TRY)"
                 type="number"
                 min="0"
                 step="any"
                 value={newUnitPrice}
                 onChange={(e) => setNewUnitPrice(e.target.value)}
-                placeholder="B. Fiyat"
                 required
-                className="h-8 text-xs bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
+                className="bg-zinc-950/60 border-zinc-800 focus:border-violet-500/50"
               />
             </div>
             <div>
@@ -218,7 +265,7 @@ export function MaterialsPanel({
       <div className="scrollbar-themed flex-1 overflow-y-auto">
         {materials.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-600">
-            Henüz malzeme yok. Excel import veya "+ Ekle" ile ekleyin.
+            Henüz malzeme yok. Excel import veya Ekle ile ekleyin.
           </p>
         ) : (
           <table className="w-full text-xs">
@@ -227,13 +274,13 @@ export function MaterialsPanel({
                 <th className="px-2.5 py-2 text-left font-medium">Açıklama</th>
                 <th className="px-2 py-2 text-right font-medium">Miktar</th>
                 <th className="px-2 py-2 text-left font-medium">Birim</th>
-                <th className="px-2 py-2 text-right font-medium">B.Fiyat</th>
+                <th className="px-2 py-2 text-right font-medium">Birim fiyat (TRY)</th>
                 <th className="px-2 py-2 text-center font-medium">Durum</th>
                 {isEditing && <th className="w-14" />}
               </tr>
             </thead>
             <tbody>
-              {materials.map((m) => {
+              {table.pageItems.map((m) => {
                 const isItemEditing = editingId === m.id;
 
                 if (isItemEditing) {
@@ -270,7 +317,7 @@ export function MaterialsPanel({
                               value={editUnitPrice}
                               onChange={(e) => setEditUnitPrice(e.target.value)}
                               className="h-7 text-[11px]"
-                              placeholder="Fiyat"
+                              placeholder="Birim fiyat (TRY)"
                             />
                             <Select
                               value={editStatus}
@@ -321,7 +368,7 @@ export function MaterialsPanel({
                       <TruncateWithTooltip text={m.unit || "—"} />
                     </td>
                     <td className="px-2 py-2 text-right text-zinc-400">
-                      {m.unitPrice.toLocaleString("tr-TR")}
+                      {formatCurrency(m.unitPrice)}
                     </td>
                     <td className="px-2 py-2 text-center">
                       <span className="inline-flex items-center gap-1 rounded-full border bg-zinc-950/40 px-1.5 py-0.5 text-[9px] font-medium">
@@ -362,6 +409,21 @@ export function MaterialsPanel({
       </div>
 
       {materials.length > 0 && (
+        <div className="border-t border-zinc-800 px-3 py-2">
+          <TablePagination
+            page={table.page}
+            totalPages={table.totalPages}
+            totalItems={table.totalItems}
+            rangeStart={table.rangeStart}
+            rangeEnd={table.rangeEnd}
+            onPageChange={table.setPage}
+            pageSize={table.pageSize}
+            onPageSizeChange={table.setPageSize}
+          />
+        </div>
+      )}
+
+      {materials.length > 0 && (
         <div className="border-t border-zinc-800 px-3 py-3 z-10 bg-zinc-950/95">
           <div className="flex items-center justify-between text-xs">
             <span className="text-zinc-500">Toplam Tutar</span>
@@ -381,6 +443,6 @@ export function MaterialsPanel({
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }

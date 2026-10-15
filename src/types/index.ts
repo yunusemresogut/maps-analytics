@@ -208,6 +208,14 @@ export type StoreMaterial = {
 
 export type WorkPlanStatus = "yapilacak" | "devam_ediyor" | "tamamlandi";
 
+export type WorkPlanDependencyType = "FS" | "SS" | "FF" | "SF";
+
+export type WorkPlanDependency = {
+  predecessorId: string;
+  type: WorkPlanDependencyType;
+  lagHours: number;
+};
+
 export type StoreWorkPlanItem = {
   id: string;
   storeId: string;
@@ -217,6 +225,11 @@ export type StoreWorkPlanItem = {
   endDate: string;
   responsible: string;
   status: WorkPlanStatus | string;
+  sourceTaskId?: string;
+  activityCode?: string;
+  wbsCode?: string;
+  percentComplete: number;
+  predecessors: WorkPlanDependency[];
   importedAt: string;
 };
 

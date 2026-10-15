@@ -11,13 +11,14 @@ import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity-log";
 import { isAllowedFileType } from "@/lib/file-types";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
-import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
+import type { ParsedWorkPlanPredecessor, ParsedWorkPlanRow } from "@/lib/excel-work-plan";
 import type {
   StoreFile,
   StoreMaterial,
   StoreNote,
   StoreUserData,
   StoreWorkPlanItem,
+  WorkPlanDependency,
 } from "@/types";
 
 type StoreDataContextValue = {
@@ -554,19 +555,53 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
     ) => {
       if (!user) return 0;
       const now = new Date().toISOString();
-      const imported: StoreWorkPlanItem[] = rows.map((row, i) => ({
-        id: `workplan-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
+      const current = data[storeId] ?? emptyData();
+      const importedIds = rows.map(
+        (_, index) => `workplan-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`
+      );
+      const idBySourceTaskId = new Map(
+        rows.flatMap((row, index) =>
+          row.sourceTaskId ? [[row.sourceTaskId, importedIds[index]] as const] : []
+        )
+      );
+      const imported: StoreWorkPlanItem[] = rows.map((row, index) => {
+        const status = row.status || "yapilacak";
+        const predecessors: WorkPlanDependency[] = (
+          row.predecessorSourceIds ?? []
+        ).flatMap((predecessor: ParsedWorkPlanPredecessor) => {
+          const predecessorId =
+            idBySourceTaskId.get(predecessor.sourceTaskId) ??
+            current.workPlan.find(
+              (existing) => existing.sourceTaskId === predecessor.sourceTaskId
+            )?.id;
+          return predecessorId
+            ? [{
+                predecessorId,
+                type: predecessor.type,
+                lagHours: predecessor.lagHours,
+              }]
+            : [];
+        });
+        return {
+        id: importedIds[index],
         storeId,
         userId: user.id,
         description: row.description,
         startDate: row.startDate,
         endDate: row.endDate,
         responsible: row.responsible,
-        status: row.status || "yapilacak",
+        status,
+        sourceTaskId: row.sourceTaskId,
+        activityCode: row.activityCode,
+        wbsCode: row.wbsCode,
+        percentComplete:
+          row.percentComplete ??
+          (status === "tamamlandi" ? 100 : status === "devam_ediyor" ? 50 : 0),
+        predecessors,
         importedAt: now,
-      }));
+        };
+      });
 
-      const current = data[storeId] ?? emptyData();
       const workPlan =
         mode === "append" ? [...current.workPlan, ...imported] : imported;
 
@@ -591,6 +626,11 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
           end_date: wp.endDate,
           responsible: wp.responsible,
           status: wp.status,
+          source_task_id: wp.sourceTaskId ?? null,
+          activity_code: wp.activityCode ?? null,
+          wbs_code: wp.wbsCode ?? null,
+          percent_complete: wp.percentComplete,
+          predecessors: wp.predecessors,
           imported_at: wp.importedAt,
         }));
 
@@ -648,6 +688,11 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
           end_date: newItem.endDate,
           responsible: newItem.responsible,
           status: newItem.status,
+          source_task_id: newItem.sourceTaskId ?? null,
+          activity_code: newItem.activityCode ?? null,
+          wbs_code: newItem.wbsCode ?? null,
+          percent_complete: newItem.percentComplete,
+          predecessors: newItem.predecessors,
           imported_at: newItem.importedAt,
         })
         .then(({ error }) => {
@@ -681,6 +726,11 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
       if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate;
       if (updates.responsible !== undefined) dbUpdates.responsible = updates.responsible;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
+      if (updates.sourceTaskId !== undefined) dbUpdates.source_task_id = updates.sourceTaskId || null;
+      if (updates.activityCode !== undefined) dbUpdates.activity_code = updates.activityCode || null;
+      if (updates.wbsCode !== undefined) dbUpdates.wbs_code = updates.wbsCode || null;
+      if (updates.percentComplete !== undefined) dbUpdates.percent_complete = updates.percentComplete;
+      if (updates.predecessors !== undefined) dbUpdates.predecessors = updates.predecessors;
 
       supabase
         .from("store_work_plan")
@@ -696,11 +746,26 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
   const deleteWorkPlanItem = useCallback(
     (storeId: string, itemId: string) => {
       const current = data[storeId] ?? emptyData();
+      // Silinen kaleme bağlı öncül referanslarını diğer kalemlerden temizle
+      const dependents = current.workPlan.filter(
+        (w) => w.id !== itemId && w.predecessors.some((p) => p.predecessorId === itemId)
+      );
+      const cleanedPredecessors = new Map(
+        dependents.map((w) => [
+          w.id,
+          w.predecessors.filter((p) => p.predecessorId !== itemId),
+        ])
+      );
       setData({
         ...data,
         [storeId]: {
           ...current,
-          workPlan: current.workPlan.filter((w) => w.id !== itemId),
+          workPlan: current.workPlan
+            .filter((w) => w.id !== itemId)
+            .map((w) => {
+              const predecessors = cleanedPredecessors.get(w.id);
+              return predecessors ? { ...w, predecessors } : w;
+            }),
         },
       });
 
@@ -711,6 +776,15 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         .then(({ error }) => {
           if (error) console.error("Error deleting work plan item:", error);
         });
+      cleanedPredecessors.forEach((predecessors, dependentId) => {
+        supabase
+          .from("store_work_plan")
+          .update({ predecessors })
+          .eq("id", dependentId)
+          .then(({ error }) => {
+            if (error) console.error("Error updating work plan predecessors:", error);
+          });
+      });
       if (user) {
         logActivity({
           category: "workplan",

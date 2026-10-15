@@ -16,6 +16,8 @@ import type {
   StoreFile,
   StoreMaterial,
   StoreWorkPlanItem,
+  WorkPlanDependency,
+  WorkPlanDependencyType,
   Ticket,
   Contract,
   ProgressPayment,
@@ -127,6 +129,26 @@ function mapInvoice(i: any): Invoice {
     updatedByName: i.updated_by_name || undefined,
     updatedAt: i.updated_at || undefined,
   };
+}
+
+function mapWorkPlanPredecessors(raw: unknown): WorkPlanDependency[] {
+  if (!Array.isArray(raw)) return [];
+  const validTypes: WorkPlanDependencyType[] = ["FS", "SS", "FF", "SF"];
+  return raw.flatMap((value): WorkPlanDependency[] => {
+    if (!value || typeof value !== "object") return [];
+    const dependency = value as Record<string, unknown>;
+    if (
+      typeof dependency.predecessorId !== "string" ||
+      !validTypes.includes(dependency.type as WorkPlanDependencyType)
+    ) {
+      return [];
+    }
+    return [{
+      predecessorId: dependency.predecessorId,
+      type: dependency.type as WorkPlanDependencyType,
+      lagHours: Number(dependency.lagHours) || 0,
+    }];
+  });
 }
 
 export function DbProvider({ children }: { children: React.ReactNode }) {
@@ -314,6 +336,20 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
           endDate: w.end_date,
           responsible: w.responsible,
           status: w.status,
+          sourceTaskId: w.source_task_id || undefined,
+          activityCode: w.activity_code || undefined,
+          wbsCode: w.wbs_code || undefined,
+          percentComplete: Math.min(
+            100,
+            Math.max(
+              0,
+              Number(
+                w.percent_complete ??
+                  (w.status === "tamamlandi" ? 100 : w.status === "devam_ediyor" ? 50 : 0)
+              ) || 0
+            )
+          ),
+          predecessors: mapWorkPlanPredecessors(w.predecessors),
           importedAt: w.imported_at,
         };
         tempStoreData[w.store_id].workPlan.push(wpItem);

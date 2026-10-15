@@ -3,11 +3,9 @@
 import { useRef, useState, type ReactNode } from "react";
 import { format, parseISO } from "date-fns";
 import {
-  CalendarRange,
   Download,
   FileText,
   MessageSquare,
-  Package,
   StickyNote,
   Trash2,
   Upload,
@@ -25,7 +23,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { ALLOWED_FILE_ACCEPT, ALLOWED_FILE_LABELS } from "@/lib/file-types";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
-import { supportsExcelImport } from "@/lib/project-status";
 import { cn } from "@/lib/utils";
 import type { Store } from "@/types";
 
@@ -69,43 +66,6 @@ function SectionCard({
   );
 }
 
-function SummaryTile({
-  icon: Icon,
-  label,
-  count,
-  emptyLabel,
-  onOpen,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  count: number;
-  emptyLabel: string;
-  onOpen?: () => void;
-}) {
-  return (
-    <div className="flex flex-col justify-between rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10">
-            <Icon className="h-4 w-4 text-cyan-400" />
-          </span>
-          <div>
-            <p className="text-sm font-medium text-zinc-200">{label}</p>
-            <p className="text-xs text-zinc-500">
-              {count > 0 ? `${count} kayıt` : emptyLabel}
-            </p>
-          </div>
-        </div>
-        {count > 0 && onOpen && (
-          <Button size="sm" variant="outline" onClick={onOpen}>
-            Görüntüle
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function StoreDetailSections({ store }: { store: Store }) {
   const { dateLocale } = useI18n();
   const { canEdit } = usePermissions("stores");
@@ -127,8 +87,6 @@ export function StoreDetailSections({ store }: { store: Store }) {
   const userData = getStoreData(store.id);
   const [noteText, setNoteText] = useState("");
   const [fileError, setFileError] = useState("");
-  const [materialsOpen, setMaterialsOpen] = useState(false);
-  const [workPlanOpen, setWorkPlanOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddNote = () => {
@@ -149,70 +107,37 @@ export function StoreDetailSections({ store }: { store: Store }) {
   const handleMaterialImport = (rows: ParsedMaterialRow[]) => {
     if (!canEdit || rows.length === 0) return;
     importMaterials(store.id, rows, "replace");
-    setMaterialsOpen(true);
   };
 
   const handleWorkPlanImport = (rows: ParsedWorkPlanRow[]) => {
     if (!canEdit || rows.length === 0) return;
     importWorkPlan(store.id, rows, "replace");
-    setWorkPlanOpen(true);
   };
 
   return (
     <div className="space-y-6">
-      {supportsExcelImport(store.projectStatus) && canEdit && (
+      {canEdit && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <ExcelImportPanel onImport={handleMaterialImport} />
           <ExcelWorkPlanImportPanel onImport={handleWorkPlanImport} />
+          <ExcelImportPanel onImport={handleMaterialImport} />
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <SummaryTile
-          icon={Package}
-          label="Malzemeler"
-          count={userData.materials.length}
-          emptyLabel="Henüz malzeme yok"
-          onOpen={
-            userData.materials.length > 0
-              ? () => setMaterialsOpen(true)
-              : undefined
-          }
-        />
-        <SummaryTile
-          icon={CalendarRange}
-          label="İş Planı"
-          count={userData.workPlan.length}
-          emptyLabel="Henüz iş planı yok"
-          onOpen={
-            userData.workPlan.length > 0
-              ? () => setWorkPlanOpen(true)
-              : undefined
-          }
-        />
-      </div>
+      <WorkPlanPanel
+        storeId={store.id}
+        items={userData.workPlan}
+        isEditing={canEdit}
+        onDelete={(id) => deleteWorkPlanItem(store.id, id)}
+        onClear={() => clearWorkPlan(store.id)}
+      />
 
-      {materialsOpen && (
-        <MaterialsPanel
-          storeId={store.id}
-          materials={userData.materials}
-          isEditing={canEdit}
-          onClose={() => setMaterialsOpen(false)}
-          onDelete={(id) => deleteMaterial(store.id, id)}
-          onClear={() => clearMaterials(store.id)}
-        />
-      )}
-
-      {workPlanOpen && (
-        <WorkPlanPanel
-          storeId={store.id}
-          items={userData.workPlan}
-          isEditing={canEdit}
-          onClose={() => setWorkPlanOpen(false)}
-          onDelete={(id) => deleteWorkPlanItem(store.id, id)}
-          onClear={() => clearWorkPlan(store.id)}
-        />
-      )}
+      <MaterialsPanel
+        storeId={store.id}
+        materials={userData.materials}
+        isEditing={canEdit}
+        onDelete={(id) => deleteMaterial(store.id, id)}
+        onClear={() => clearMaterials(store.id)}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
         <div className="space-y-4">
