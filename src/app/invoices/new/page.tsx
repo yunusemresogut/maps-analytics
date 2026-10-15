@@ -9,6 +9,8 @@ import { useDb } from "@/contexts/db-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { formatTry } from "@/lib/currency";
+import { calculateVat, VAT_RATE_OPTIONS } from "@/lib/module-finance";
 import type { InvoiceStatus } from "@/types";
 
 const STATUS_TR: Record<InvoiceStatus, string> = {
@@ -26,11 +28,14 @@ function NewInvoiceContent() {
 
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [amount, setAmount] = useState("");
-  const [taxAmount, setTaxAmount] = useState("");
+  const [vatRate, setVatRate] = useState(20);
   const [progressPaymentId, setProgressPaymentId] = useState("");
   const [storeId, setStoreId] = useState("");
   const [status, setStatus] = useState<InvoiceStatus>("draft");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const amountValue = Number(amount) || 0;
+  const taxAmount = calculateVat(amountValue, vatRate);
 
   if (!canAdd) {
     return <div className="flex h-full items-center justify-center text-sm text-zinc-500">Ekleme yetkiniz yok</div>;
@@ -43,22 +48,28 @@ function NewInvoiceContent() {
   };
 
   const save = async () => {
-    if (!invoiceNumber.trim() || !progressPaymentId) return;
+    if (!invoiceNumber.trim() || !progressPaymentId || amountValue <= 0) {
+      setSaveError("Fatura numarası, hakediş ve sıfırdan büyük tutar zorunludur.");
+      return;
+    }
+    setSaveError("");
     setSaving(true);
     const id = await createInvoice({
       invoiceNumber: invoiceNumber.trim(),
-      amount: Number(amount) || 0,
-      taxAmount: Number(taxAmount) || 0,
+      amount: amountValue,
+      taxAmount,
       progressPaymentId,
       storeId: storeId || undefined,
       status,
     });
     setSaving(false);
-    if (id) router.push(`/invoices/${id}/edit`);
+    if (id) router.push("/invoices");
+    else setSaveError("Fatura oluşturulamadı. Bağlantınızı kontrol edip tekrar deneyin.");
   };
 
   return (
-    <ModuleFormShell backHref="/invoices" backLabel="Faturalar" title="Yeni fatura" onSave={save} saving={saving} saveLabel="Oluştur" canSave>
+    <ModuleFormShell backHref="/invoices" backLabel="Faturalar" title="Yeni fatura" onSave={save} saving={saving} saveLabel="Oluştur" canSave={!!invoiceNumber.trim() && !!progressPaymentId && amountValue > 0}>
+      {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div>
           <label className="text-xs text-zinc-500">Hakediş *</label>
@@ -75,12 +86,18 @@ function NewInvoiceContent() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Tutar (TRY)</label>
-            <Input className="mt-1" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <label className="text-xs text-zinc-500">Tutar (TRY, KDV hariç)</label>
+            <Input className="mt-1" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">KDV (TRY)</label>
-            <Input className="mt-1" type="number" value={taxAmount} onChange={(e) => setTaxAmount(e.target.value)} />
+            <label className="text-xs text-zinc-500">KDV oranı</label>
+            <Select className="mt-1" value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))}>
+              {VAT_RATE_OPTIONS.map((rate) => <option key={rate} value={rate}>%{rate}</option>)}
+            </Select>
+          </div>
+          <div className="sm:col-span-2 flex flex-wrap gap-x-6 gap-y-2 border-t border-zinc-800 pt-3 text-sm">
+            <p className="text-zinc-500">KDV: <span className="font-medium text-zinc-200">{formatTry(taxAmount)}</span></p>
+            <p className="text-zinc-500">Toplam: <span className="font-semibold text-zinc-100">{formatTry(amountValue + taxAmount)}</span></p>
           </div>
           <div>
             <label className="text-xs text-zinc-500">Durum</label>

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth/auth-guard";
@@ -12,6 +12,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatTry } from "@/lib/currency";
+import { calculateVat, inferVatRate, VAT_RATE_OPTIONS } from "@/lib/module-finance";
 import type { InvoiceStatus } from "@/types";
 
 const STATUS_TR: Record<InvoiceStatus, string> = {
@@ -29,51 +30,54 @@ function EditInvoiceContent({ id }: { id: string }) {
   const t = useT();
   const invoice = invoices.find((i) => i.id === id);
 
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [amount, setAmount] = useState("");
-  const [taxAmount, setTaxAmount] = useState("");
-  const [progressPaymentId, setProgressPaymentId] = useState("");
-  const [status, setStatus] = useState<InvoiceStatus>("draft");
+  const [invoiceNumber, setInvoiceNumber] = useState(invoice?.invoiceNumber ?? "");
+  const [amount, setAmount] = useState(String(invoice?.amount ?? 0));
+  const [vatRate, setVatRate] = useState(inferVatRate(invoice?.amount ?? 0, invoice?.taxAmount ?? 0));
+  const [progressPaymentId, setProgressPaymentId] = useState(invoice?.progressPaymentId ?? "");
+  const [status, setStatus] = useState<InvoiceStatus>(invoice?.status ?? "draft");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!invoice) return;
-    setInvoiceNumber(invoice.invoiceNumber);
-    setAmount(String(invoice.amount));
-    setTaxAmount(String(invoice.taxAmount));
-    setProgressPaymentId(invoice.progressPaymentId ?? "");
-    setStatus(invoice.status);
-  }, [invoice]);
+  const [saveError, setSaveError] = useState("");
 
   if (!invoice) {
     return <div className="flex h-full items-center justify-center text-sm text-zinc-500">{t("common.noData")}</div>;
   }
 
-  const payment = progressPayments.find((p) => p.id === invoice.progressPaymentId);
+  const payment = progressPayments.find((p) => p.id === progressPaymentId);
+  const amountValue = Number(amount) || 0;
+  const taxAmount = calculateVat(amountValue, vatRate);
+  const isCustomVatRate = !VAT_RATE_OPTIONS.some((rate) => rate === vatRate);
 
   const save = async () => {
     if (!canEdit) return;
+    if (!invoiceNumber.trim() || !progressPaymentId || amountValue <= 0) {
+      setSaveError("Fatura numarası, hakediş ve sıfırdan büyük tutar zorunludur.");
+      return;
+    }
+    setSaveError("");
     setSaving(true);
-    await updateInvoice(id, {
+    const ok = await updateInvoice(id, {
       invoiceNumber: invoiceNumber.trim(),
-      amount: Number(amount) || 0,
-      taxAmount: Number(taxAmount) || 0,
+      amount: amountValue,
+      taxAmount,
       progressPaymentId: progressPaymentId || undefined,
       storeId: payment?.storeId,
       status,
     });
     setSaving(false);
-    router.push("/invoices");
+    if (ok) router.push("/invoices");
+    else setSaveError("Fatura kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.");
   };
 
   const remove = async () => {
     if (!canDelete || !confirm("Fatura silinsin mi?")) return;
-    await deleteInvoice(id);
-    router.push("/invoices");
+    const ok = await deleteInvoice(id);
+    if (ok) router.push("/invoices");
+    else setSaveError("Fatura silinemedi. Tekrar deneyin.");
   };
 
   return (
     <ModuleFormShell backHref="/invoices" backLabel="Faturalar" title={invoiceNumber || "Fatura düzenle"} onSave={save} onDelete={remove} saving={saving} canSave={canEdit} canDelete={canDelete}>
+      {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400">
         Toplam {formatTry(invoice.amount + invoice.taxAmount)}
         {payment && (
@@ -98,12 +102,19 @@ function EditInvoiceContent({ id }: { id: string }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Tutar (TRY)</label>
-            <Input className="mt-1" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!canEdit} />
+            <label className="text-xs text-zinc-500">Tutar (TRY, KDV hariç)</label>
+            <Input className="mt-1" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!canEdit} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">KDV (TRY)</label>
-            <Input className="mt-1" type="number" value={taxAmount} onChange={(e) => setTaxAmount(e.target.value)} disabled={!canEdit} />
+            <label className="text-xs text-zinc-500">KDV oranı</label>
+            <Select className="mt-1" value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))} disabled={!canEdit}>
+              {isCustomVatRate && <option value={vatRate}>Özel (%{vatRate})</option>}
+              {VAT_RATE_OPTIONS.map((rate) => <option key={rate} value={rate}>%{rate}</option>)}
+            </Select>
+          </div>
+          <div className="sm:col-span-2 flex flex-wrap gap-x-6 gap-y-2 border-t border-zinc-800 pt-3 text-sm">
+            <p className="text-zinc-500">KDV: <span className="font-medium text-zinc-200">{formatTry(taxAmount)}</span></p>
+            <p className="text-zinc-500">Toplam: <span className="font-semibold text-zinc-100">{formatTry(amountValue + taxAmount)}</span></p>
           </div>
           <div>
             <label className="text-xs text-zinc-500">Durum</label>

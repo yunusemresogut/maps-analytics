@@ -16,13 +16,11 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useModules } from "@/contexts/modules-context";
-import { useDb } from "@/contexts/db-context";
 import { useStores } from "@/contexts/stores-context";
 import { useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTableState } from "@/hooks/use-table-state";
 import { formatTry } from "@/lib/currency";
-import { contractProgressPercent, paidAmountForContract } from "@/lib/module-finance";
 import { cn } from "@/lib/utils";
 import type { Contract } from "@/types";
 
@@ -35,7 +33,7 @@ const STATUS_TR: Record<string, string> = {
   completed: "Tamamlandı",
 };
 
-type SortKey = "code" | "title" | "storeName" | "partyName" | "amount" | "progress" | "status" | "actions";
+type SortKey = "code" | "title" | "storeName" | "partyName" | "amount" | "status" | "actions";
 
 const COLUMNS: DataTableColumn<SortKey>[] = [
   { key: "code", label: "Kod" },
@@ -43,19 +41,17 @@ const COLUMNS: DataTableColumn<SortKey>[] = [
   { key: "storeName", label: "Mağaza" },
   { key: "partyName", label: "Taraf" },
   { key: "amount", label: "Tutar" },
-  { key: "progress", label: "İlerleme" },
   { key: "status", label: "Durum" },
   { key: "actions", label: "" },
 ];
 
-type ContractRow = Contract & { storeName: string; progress: number; paid: number };
+type ContractRow = Contract & { storeName: string };
 
 function ContractsContent() {
   const t = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { contracts, deleteContract } = useModules();
-  const { progressPayments, invoices } = useDb();
   const { stores } = useStores();
   const { canAdd, canEdit, canDelete } = usePermissions("contracts");
   const [query, setQuery] = useState("");
@@ -69,15 +65,12 @@ function ContractsContent() {
     () =>
       contracts.map((c) => {
         const store = stores.find((s) => s.id === c.storeId);
-        const paid = paidAmountForContract(c.id, progressPayments, invoices);
         return {
           ...c,
           storeName: store?.name ?? "—",
-          paid,
-          progress: contractProgressPercent(c, progressPayments, invoices),
         };
       }),
-    [contracts, stores, progressPayments, invoices]
+    [contracts, stores]
   );
 
   const filtered = useMemo(() => {
@@ -95,7 +88,6 @@ function ContractsContent() {
   const getSortValue = useCallback((item: ContractRow, key: SortKey) => {
     if (key === "actions") return "";
     if (key === "storeName") return item.storeName;
-    if (key === "progress") return item.progress;
     if (key === "amount") return item.amount;
     return item[key] ?? "";
   }, []);
@@ -148,9 +140,6 @@ function ContractsContent() {
             <td className="max-w-[180px] px-4 py-3 text-zinc-400">{item.partyName}</td>
             <td className="whitespace-nowrap px-4 py-3">{formatTry(item.amount)}</td>
             <td className="px-4 py-3">
-              <span className="text-xs tabular-nums">%{item.progress}</span>
-            </td>
-            <td className="px-4 py-3">
               <StatusBadge value={item.status} label={STATUS_TR[item.status] ?? item.status} />
             </td>
             <td className="whitespace-nowrap px-4 py-3">
@@ -170,7 +159,7 @@ function ContractsContent() {
           </tr>
         ))}
         {table.totalItems === 0 && (
-          <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
+          <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
         )}
       </DataTable>
     </ModuleTableShell>

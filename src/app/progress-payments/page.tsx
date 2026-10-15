@@ -18,11 +18,11 @@ import { Button } from "@/components/ui/button";
 import { useModules } from "@/contexts/modules-context";
 import { useDb } from "@/contexts/db-context";
 import { useStores } from "@/contexts/stores-context";
-import { useT } from "@/contexts/i18n-context";
+import { useI18n, useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTableState } from "@/hooks/use-table-state";
 import { formatTry } from "@/lib/currency";
-import { paidAmountForPayment } from "@/lib/module-finance";
+import { contractProgressPercent, formatPaymentPeriod, paidAmountForPayment } from "@/lib/module-finance";
 import type { ProgressPayment } from "@/types";
 
 const STATUS_TR: Record<string, string> = {
@@ -32,7 +32,7 @@ const STATUS_TR: Record<string, string> = {
   paid: "Ödendi",
 };
 
-type SortKey = "title" | "storeName" | "contractTitle" | "periodLabel" | "amount" | "paid" | "status" | "actions";
+type SortKey = "title" | "storeName" | "contractTitle" | "periodLabel" | "amount" | "paid" | "progress" | "status" | "actions";
 
 const COLUMNS: DataTableColumn<SortKey>[] = [
   { key: "title", label: "Hakediş" },
@@ -41,14 +41,16 @@ const COLUMNS: DataTableColumn<SortKey>[] = [
   { key: "periodLabel", label: "Dönem" },
   { key: "amount", label: "Toplam hakediş" },
   { key: "paid", label: "Ödenen" },
+  { key: "progress", label: "Sözleşme ilerlemesi" },
   { key: "status", label: "Durum" },
   { key: "actions", label: "" },
 ];
 
-type PaymentRow = ProgressPayment & { storeName: string; contractTitle: string; paid: number };
+type PaymentRow = ProgressPayment & { storeName: string; contractTitle: string; paid: number; progress: number };
 
 function ProgressPaymentsContent() {
   const t = useT();
+  const { dateLocale } = useI18n();
   const router = useRouter();
   const { progressPayments, deletePayment } = useModules();
   const { contracts, invoices } = useDb();
@@ -59,12 +61,18 @@ function ProgressPaymentsContent() {
 
   const rows: PaymentRow[] = useMemo(
     () =>
-      progressPayments.map((p) => ({
-        ...p,
-        storeName: stores.find((s) => s.id === p.storeId)?.name ?? "—",
-        contractTitle: contracts.find((c) => c.id === p.contractId)?.title ?? "—",
-        paid: paidAmountForPayment(p.id, invoices),
-      })),
+      progressPayments.map((p) => {
+        const contract = contracts.find((c) => c.id === p.contractId);
+        return {
+          ...p,
+          storeName: stores.find((s) => s.id === p.storeId)?.name ?? "—",
+          contractTitle: contract?.title ?? "—",
+          paid: paidAmountForPayment(p.id, invoices),
+          progress: contract
+            ? contractProgressPercent(contract, progressPayments, invoices)
+            : 0,
+        };
+      }),
     [progressPayments, stores, contracts, invoices]
   );
 
@@ -83,6 +91,7 @@ function ProgressPaymentsContent() {
   const getSortValue = useCallback((item: PaymentRow, key: SortKey) => {
     if (key === "actions") return "";
     if (key === "paid") return item.paid;
+    if (key === "progress") return item.progress;
     if (key === "storeName") return item.storeName;
     if (key === "contractTitle") return item.contractTitle;
     return item[key] ?? "";
@@ -127,7 +136,7 @@ function ProgressPaymentsContent() {
         <TablePagination page={table.page} totalPages={table.totalPages} totalItems={table.totalItems} rangeStart={table.rangeStart} rangeEnd={table.rangeEnd} onPageChange={table.setPage} pageSize={table.pageSize} onPageSizeChange={table.setPageSize} />
       }
     >
-      <DataTable columns={COLUMNS} sortKey={table.sort.key} sortDirection={table.sort.direction} onSort={table.toggleSort} minWidthClassName="min-w-[800px]">
+      <DataTable columns={COLUMNS} sortKey={table.sort.key} sortDirection={table.sort.direction} onSort={table.toggleSort} minWidthClassName="min-w-[960px]">
         {table.pageItems.map((item) => (
           <tr key={item.id} className="text-zinc-300 hover:bg-zinc-900/50">
             <td className="max-w-[240px] px-4 py-3 font-medium text-zinc-100">{item.title}</td>
@@ -137,9 +146,17 @@ function ProgressPaymentsContent() {
                 <Link href={`/contracts/${item.contractId}/edit`} className="hover:text-cyan-300">{item.contractTitle}</Link>
               ) : "—"}
             </td>
-            <td className="whitespace-nowrap px-4 py-3 text-zinc-400">{item.periodLabel || "—"}</td>
+            <td className="whitespace-nowrap px-4 py-3 text-zinc-400">{formatPaymentPeriod(item.periodLabel, dateLocale)}</td>
             <td className="whitespace-nowrap px-4 py-3">{formatTry(item.amount)}</td>
             <td className="whitespace-nowrap px-4 py-3 font-medium text-emerald-300/90">{formatTry(item.paid)}</td>
+            <td className="min-w-48 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-zinc-800">
+                  <div className="h-full rounded-full bg-emerald-500" style={{ width: `${item.progress}%` }} />
+                </div>
+                <span className="w-10 text-right text-xs tabular-nums text-zinc-400">{item.progress}%</span>
+              </div>
+            </td>
             <td className="px-4 py-3"><StatusBadge value={item.status} label={STATUS_TR[item.status] ?? item.status} /></td>
             <td className="whitespace-nowrap px-4 py-3">
               <div className="flex gap-1">
@@ -158,7 +175,7 @@ function ProgressPaymentsContent() {
           </tr>
         ))}
         {table.totalItems === 0 && (
-          <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
+          <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
         )}
       </DataTable>
     </ModuleTableShell>

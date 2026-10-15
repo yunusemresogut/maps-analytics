@@ -150,7 +150,11 @@ function TicketsContent() {
         {table.pageItems.map((item) => (
           <tr key={item.id} className="text-zinc-300 hover:bg-zinc-900/50">
             <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-cyan-400/90">{item.code ?? "—"}</td>
-            <td className="max-w-[280px] px-4 py-3 font-medium text-zinc-100">{item.title}</td>
+            <td className="max-w-[280px] px-4 py-3 font-medium text-zinc-100">
+              <Link href={`/tickets/${item.id}`} className="hover:text-cyan-300 hover:underline">
+                {item.title}
+              </Link>
+            </td>
             <td className="whitespace-nowrap px-4 py-3">{item.storeName}</td>
             <td className="px-4 py-3"><StatusBadge value={item.priority} label={PRIORITY_TR[item.priority]} /></td>
             <td className="px-4 py-3"><StatusBadge value={item.status} label={STATUS_TR[item.status]} /></td>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { ModuleFormShell } from "@/components/modules/module-form-shell";
@@ -30,17 +30,10 @@ function NewContractContent() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  useEffect(() => {
-    if (!codeTouched) setCode(nextContractCode(contracts));
-  }, [contracts, codeTouched]);
-
   const selectedStore = stores.find((s) => s.id === storeId);
-
-  useEffect(() => {
-    if (!titleTouched && selectedStore) {
-      setTitle(`${selectedStore.name} Sözleşmesi`);
-    }
-  }, [selectedStore, titleTouched]);
+  const contractCode = codeTouched ? code : nextContractCode(contracts);
+  const contractTitle =
+    titleTouched || !selectedStore ? title : `${selectedStore.name} Sözleşmesi`;
 
   if (!canAdd) {
     return (
@@ -51,15 +44,15 @@ function NewContractContent() {
   }
 
   const save = async () => {
-    if (!title.trim()) {
+    if (!contractTitle.trim()) {
       setSaveError("Başlık zorunludur.");
       return;
     }
     setSaveError("");
     setSaving(true);
     const id = await createContract({
-      title: title.trim(),
-      code: code.trim() || undefined,
+      title: contractTitle.trim(),
+      code: contractCode.trim() || undefined,
       partyName: partyName.trim(),
       amount: Number(amount) || 0,
       storeId: storeId || undefined,
@@ -67,7 +60,7 @@ function NewContractContent() {
     });
     setSaving(false);
     if (id) {
-      router.push(`/contracts/${id}/edit`);
+      router.push("/contracts");
       return;
     }
     setSaveError(
@@ -83,7 +76,7 @@ function NewContractContent() {
       onSave={save}
       saving={saving}
       saveLabel="Oluştur"
-      canSave={!!title.trim()}
+      canSave={!!contractTitle.trim()}
     >
       {saveError && (
         <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -96,7 +89,7 @@ function NewContractContent() {
             <label className="text-xs text-zinc-500">Başlık *</label>
             <Input
               className="mt-1"
-              value={title}
+              value={contractTitle}
               onChange={(e) => {
                 setTitleTouched(true);
                 setTitle(e.target.value);
@@ -107,7 +100,7 @@ function NewContractContent() {
             <label className="text-xs text-zinc-500">Kod</label>
             <Input
               className="mt-1 font-mono"
-              value={code}
+              value={contractCode}
               onChange={(e) => {
                 setCodeTouched(true);
                 setCode(e.target.value);

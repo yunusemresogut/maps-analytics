@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, FileText, Trash2, Upload } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabase";
-import { isAllowedFileType } from "@/lib/file-types";
+import { uploadModuleAttachment } from "@/lib/upload-module-attachment";
 import { Button } from "@/components/ui/button";
 import type { ModuleAttachment } from "@/types";
 
@@ -73,46 +73,27 @@ export function ModuleAttachments({
   }, [table, parentField, parentId]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !user?.organizationId) return;
-    if (!isAllowedFileType(file.name)) {
-      setError("Desteklenmeyen dosya türü");
-      return;
-    }
     setError("");
-    try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
-      const path = `${parentId}/${Date.now()}_${safeName}`;
-      const { error: uploadErr } = await supabase.storage
-        .from(bucket)
-        .upload(path, file, { cacheControl: "3600", upsert: false });
-      if (uploadErr) throw uploadErr;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(path);
-
-      const row: Record<string, unknown> = {
-        organization_id: user.organizationId,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        storage_path: publicUrl,
-        uploaded_by: user.id,
-        uploaded_by_name: user.name,
-        [parentField]: parentId,
-      };
-
-      const { error: dbErr } = await supabase.from(table).insert(row);
-      if (dbErr) throw dbErr;
+    const result = await uploadModuleAttachment({
+      table,
+      parentId,
+      parentField,
+      bucket,
+      file,
+      user,
+    });
+    if (!result.ok) {
+      setError(result.error);
+    } else {
       await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Yükleme başarısız");
     }
   };
 

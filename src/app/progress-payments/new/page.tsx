@@ -9,6 +9,7 @@ import { useDb } from "@/contexts/db-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { encodePaymentPeriod } from "@/lib/module-finance";
 import type { ProgressPaymentStatus } from "@/types";
 
 const STATUS_TR: Record<ProgressPaymentStatus, string> = {
@@ -25,12 +26,14 @@ function NewPaymentContent() {
   const { canAdd } = usePermissions("progressPayments");
 
   const [title, setTitle] = useState("");
-  const [periodLabel, setPeriodLabel] = useState("");
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
   const [amount, setAmount] = useState("");
   const [contractId, setContractId] = useState("");
   const [storeId, setStoreId] = useState("");
   const [status, setStatus] = useState<ProgressPaymentStatus>("draft");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   if (!canAdd) {
     return <div className="flex h-full items-center justify-center text-sm text-zinc-500">Ekleme yetkiniz yok</div>;
@@ -43,22 +46,32 @@ function NewPaymentContent() {
   };
 
   const save = async () => {
-    if (!title.trim() || !contractId) return;
+    if (!title.trim() || !contractId || !periodStart || !periodEnd) {
+      setSaveError("Başlık, sözleşme ve dönem tarihleri zorunludur.");
+      return;
+    }
+    if (periodEnd < periodStart) {
+      setSaveError("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+      return;
+    }
+    setSaveError("");
     setSaving(true);
     const id = await createPayment({
       title: title.trim(),
-      periodLabel: periodLabel.trim(),
+      periodLabel: encodePaymentPeriod(periodStart, periodEnd),
       amount: Number(amount) || 0,
       contractId,
       storeId: storeId || undefined,
       status,
     });
     setSaving(false);
-    if (id) router.push(`/progress-payments/${id}/edit`);
+    if (id) router.push("/progress-payments");
+    else setSaveError("Hakediş oluşturulamadı. Bağlantınızı kontrol edip tekrar deneyin.");
   };
 
   return (
-    <ModuleFormShell backHref="/progress-payments" backLabel="Hakedişler" title="Yeni hakediş" onSave={save} saving={saving} saveLabel="Oluştur" canSave>
+    <ModuleFormShell backHref="/progress-payments" backLabel="Hakedişler" title="Yeni hakediş" onSave={save} saving={saving} saveLabel="Oluştur" canSave={!!title.trim() && !!contractId && !!periodStart && !!periodEnd}>
+      {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div>
           <label className="text-xs text-zinc-500">Sözleşme *</label>
@@ -75,8 +88,12 @@ function NewPaymentContent() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Dönem</label>
-            <Input className="mt-1" value={periodLabel} onChange={(e) => setPeriodLabel(e.target.value)} placeholder="2026-Q1" />
+            <label className="text-xs text-zinc-500">Dönem başlangıcı *</label>
+            <Input className="mt-1" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500">Dönem bitişi *</label>
+            <Input className="mt-1" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} min={periodStart || undefined} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">Toplam hakediş (TRY)</label>

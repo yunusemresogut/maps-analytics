@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth/auth-guard";
@@ -12,7 +12,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatTry } from "@/lib/currency";
-import { paidAmountForPayment } from "@/lib/module-finance";
+import { encodePaymentPeriod, paidAmountForPayment, parsePaymentPeriod } from "@/lib/module-finance";
 import type { ProgressPaymentStatus } from "@/types";
 
 const STATUS_TR: Record<ProgressPaymentStatus, string> = {
@@ -29,53 +29,63 @@ function EditPaymentContent({ id }: { id: string }) {
   const { canEdit, canDelete } = usePermissions("progressPayments");
   const t = useT();
   const payment = progressPayments.find((p) => p.id === id);
+  const initialPeriod = parsePaymentPeriod(payment?.periodLabel ?? "");
 
-  const [title, setTitle] = useState("");
-  const [periodLabel, setPeriodLabel] = useState("");
-  const [amount, setAmount] = useState("");
-  const [contractId, setContractId] = useState("");
-  const [status, setStatus] = useState<ProgressPaymentStatus>("draft");
+  const [title, setTitle] = useState(payment?.title ?? "");
+  const periodLabel = payment?.periodLabel ?? "";
+  const [periodStart, setPeriodStart] = useState(initialPeriod.startDate);
+  const [periodEnd, setPeriodEnd] = useState(initialPeriod.endDate);
+  const [amount, setAmount] = useState(String(payment?.amount ?? 0));
+  const [contractId, setContractId] = useState(payment?.contractId ?? "");
+  const [status, setStatus] = useState<ProgressPaymentStatus>(payment?.status ?? "draft");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!payment) return;
-    setTitle(payment.title);
-    setPeriodLabel(payment.periodLabel);
-    setAmount(String(payment.amount));
-    setContractId(payment.contractId ?? "");
-    setStatus(payment.status);
-  }, [payment]);
+  const [saveError, setSaveError] = useState("");
 
   if (!payment) {
     return <div className="flex h-full items-center justify-center text-sm text-zinc-500">{t("common.noData")}</div>;
   }
 
-  const contract = contracts.find((c) => c.id === payment.contractId);
+  const contract = contracts.find((c) => c.id === contractId);
   const paid = paidAmountForPayment(id, invoices);
 
   const save = async () => {
     if (!canEdit) return;
+    if ((periodStart || periodEnd) && (!periodStart || !periodEnd)) {
+      setSaveError("Dönem için başlangıç ve bitiş tarihlerini birlikte girin.");
+      return;
+    }
+    if (periodStart && periodEnd && periodEnd < periodStart) {
+      setSaveError("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+      return;
+    }
+    setSaveError("");
     setSaving(true);
-    await updatePayment(id, {
+    const ok = await updatePayment(id, {
       title: title.trim(),
-      periodLabel,
+      periodLabel:
+        periodStart && periodEnd
+          ? encodePaymentPeriod(periodStart, periodEnd)
+          : periodLabel,
       amount: Number(amount) || 0,
       contractId: contractId || undefined,
       storeId: contract?.storeId,
       status,
     });
     setSaving(false);
-    router.push("/progress-payments");
+    if (ok) router.push("/progress-payments");
+    else setSaveError("Hakediş kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.");
   };
 
   const remove = async () => {
     if (!canDelete || !confirm("Hakediş silinsin mi?")) return;
-    await deletePayment(id);
-    router.push("/progress-payments");
+    const ok = await deletePayment(id);
+    if (ok) router.push("/progress-payments");
+    else setSaveError("Hakediş silinemedi. Tekrar deneyin.");
   };
 
   return (
     <ModuleFormShell backHref="/progress-payments" backLabel="Hakedişler" title={title || "Hakediş düzenle"} onSave={save} onDelete={remove} saving={saving} canSave={canEdit} canDelete={canDelete}>
+      {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400">
         Toplam hakediş {formatTry(payment.amount)} · Ödenen {formatTry(paid)}
         {contract && (
@@ -100,8 +110,13 @@ function EditPaymentContent({ id }: { id: string }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Dönem</label>
-            <Input className="mt-1" value={periodLabel} onChange={(e) => setPeriodLabel(e.target.value)} disabled={!canEdit} />
+            <label className="text-xs text-zinc-500">Dönem başlangıcı</label>
+            <Input className="mt-1" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} disabled={!canEdit} />
+            {!periodStart && periodLabel && <p className="mt-1 text-xs text-zinc-500">Mevcut dönem: {periodLabel}</p>}
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500">Dönem bitişi</label>
+            <Input className="mt-1" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} min={periodStart || undefined} disabled={!canEdit} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">Toplam hakediş (TRY)</label>
