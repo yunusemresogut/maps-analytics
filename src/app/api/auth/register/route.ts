@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getAdminPermissions } from "@/lib/permissions";
+import { authErrorMessage } from "@/lib/auth-errors";
 
 export async function POST(request: Request) {
   try {
@@ -45,10 +46,17 @@ export async function POST(request: Request) {
       });
 
     if (createError || !userData.user) {
+      console.error("Kayıt: auth kullanıcısı oluşturulamadı", createError);
       await adminClient.from("organizations").delete().eq("id", org.id);
+      const status = createError?.status && createError.status < 500 ? 400 : 500;
       return NextResponse.json(
-        { error: createError?.message || "Kullanıcı oluşturulamadı" },
-        { status: 400 }
+        {
+          error: authErrorMessage(
+            createError,
+            "Hesap oluşturulamadı. Lütfen biraz sonra tekrar deneyin."
+          ),
+        },
+        { status }
       );
     }
 
@@ -76,9 +84,10 @@ export async function POST(request: Request) {
       user: { id: userId, email, name, role: "admin" },
       organization: { id: org.id, name: org.name },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error("Kayıt başarısız", error);
     return NextResponse.json(
-      { error: error.message || "Kayıt başarısız" },
+      { error: error instanceof Error ? error.message : "Kayıt başarısız" },
       { status: 500 }
     );
   }

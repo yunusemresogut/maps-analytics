@@ -28,8 +28,11 @@ export function PasswordInput({
         type={visible ? "text" : "password"}
         className={cn("pr-10", className)}
       />
+      {/* Tab ile alanlar arasında geçerken atlanır; tıklamada odak input'ta kalır */}
       <button
         type="button"
+        tabIndex={-1}
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => setVisible((v) => !v)}
         className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-zinc-500 transition-colors hover:text-zinc-300"
         aria-label={visible ? hidePasswordLabel : showPasswordLabel}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { defaultMatrixForRole } from "@/lib/permissions";
 import { normalizeRole } from "@/lib/roles";
+import { authErrorMessage } from "@/lib/auth-errors";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Beklenmeyen bir sunucu hatası";
@@ -37,7 +38,12 @@ export async function POST(request: Request) {
       });
 
     if (createError) {
-      return NextResponse.json({ error: createError.message }, { status: 400 });
+      console.error("Admin: auth kullanıcısı oluşturulamadı", createError);
+      const status = createError.status && createError.status < 500 ? 400 : 500;
+      return NextResponse.json(
+        { error: authErrorMessage(createError, "Kullanıcı oluşturulamadı. Lütfen tekrar deneyin.") },
+        { status }
+      );
     }
 
     const userId = userData.user.id;
