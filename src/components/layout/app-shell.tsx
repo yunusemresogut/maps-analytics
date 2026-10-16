@@ -1,17 +1,9 @@
-"use client";
-
-import { usePathname } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AssistantWidget } from "@/components/assistant/assistant-widget";
 
+/** Panel iskeleti; yalnızca (panel) route group'unun layout'unda kullanılır */
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-
-  if (pathname === "/login" || pathname === "/register") {
-    return <>{children}</>;
-  }
-
   return (
     <>
       <Header />

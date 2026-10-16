@@ -1,10 +1,7 @@
 "use client";
 
-import { CalendarDays, MapPinned, PanelsTopLeft, Moon, Sun } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { CalendarDays, MapPinned, PanelsTopLeft } from "lucide-react";
 import { useI18n } from "@/contexts/i18n-context";
-import { useTheme } from "@/contexts/theme-context";
 
 type AuthLayoutProps = {
   title: string;
@@ -13,7 +10,6 @@ type AuthLayoutProps = {
 };
 
 export function AuthLayout({ title, description, children }: AuthLayoutProps) {
-  const { theme, toggleTheme } = useTheme();
   const { t } = useI18n();
   const features = [
     { icon: MapPinned, title: t("auth.featureMap"), description: t("auth.featureMapDescription") },
@@ -72,23 +68,6 @@ export function AuthLayout({ title, description, children }: AuthLayoutProps) {
       </aside>
 
       <section className="flex min-h-152 flex-col bg-background px-5 py-5 sm:px-10 sm:py-8 lg:min-h-screen lg:px-16 lg:py-10">
-        <div className="flex justify-end gap-1">
-          <LanguageSwitcher />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            title={theme === "light" ? t("header.darkMode") : t("header.lightMode")}
-            aria-label={theme === "light" ? t("header.darkMode") : t("header.lightMode")}
-          >
-            {theme === "light" ? (
-              <Moon className="h-4 w-4" aria-hidden />
-            ) : (
-              <Sun className="h-4 w-4" aria-hidden />
-            )}
-          </Button>
-        </div>
-
         <div className="flex flex-1 items-center justify-center py-8 lg:py-12">
           <div className="w-full max-w-md">
             <div className="mb-8">

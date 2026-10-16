@@ -39,6 +39,15 @@ const trDict = {
     stores: "Mağazalar",
     notifications: "Bildirimler",
   },
+  notFound: {
+    title: "Bu konum haritada yok",
+    description: "Aradığınız sayfa taşınmış, silinmiş ya da hiç var olmamış olabilir. Adresi kontrol edin veya aşağıdaki bağlantılardan devam edin.",
+    requestedPath: "İstenen adres",
+    goHome: "Haritaya dön",
+    goBack: "Geri git",
+    signIn: "Giriş yap",
+    quickLinks: "Hızlı erişim",
+  },
   common: {
     save: "Kaydet",
     cancel: "İptal",

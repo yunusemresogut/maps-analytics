@@ -41,6 +41,15 @@ export const en: Dictionary = {
     stores: "Stores",
     notifications: "Notifications",
   },
+  notFound: {
+    title: "This location isn't on the map",
+    description: "The page you're looking for may have been moved, deleted, or never existed. Check the address or continue with the links below.",
+    requestedPath: "Requested address",
+    goHome: "Back to map",
+    goBack: "Go back",
+    signIn: "Sign in",
+    quickLinks: "Quick access",
+  },
   common: {
     save: "Save",
     cancel: "Cancel",

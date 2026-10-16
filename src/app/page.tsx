@@ -19,7 +19,7 @@ export default function RootPage() {
   }, [user, isLoading, router]);
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400" />
     </div>
   );
