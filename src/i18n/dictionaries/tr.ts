@@ -73,6 +73,7 @@ const trDict = {
     noAccount: "Henüz bir hesabınız yok mu?",
     createAccount: "Firma hesabı oluşturun",
     haveAccount: "Zaten hesabınız var mı?",
+    sessionReplaced: "Bu hesaba başka bir yerden giriş yapıldığı için oturumunuz sonlandırıldı.",
     connectionError: "Bağlantı kurulamadı. Lütfen tekrar deneyin.",
     registrationError: "Kayıt tamamlanamadı. Bilgilerinizi kontrol edip tekrar deneyin.",
     brandEyebrow: "SAHA OPERASYON PLATFORMU",

@@ -20,6 +20,13 @@ import {
 import { normalizeRole } from "@/lib/roles";
 import { mapOrganizationFromDb } from "@/lib/migrations";
 import { resolveOrganizationId } from "@/lib/organization";
+import {
+  SESSION_REPLACED_BROADCAST,
+  SESSION_REVOKED_EVENT,
+  getSessionIdFromToken,
+  markSessionReplaced,
+  sessionChannelName,
+} from "@/lib/single-session";
 import type {
   Organization,
   PermissionMatrix,
@@ -84,6 +91,28 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+/** Bu girişi tek aktif oturum yapar ve açık kalan eski oturumlara haber verir */
+async function replaceOtherSessions(userId: string, accessToken?: string) {
+  const { error } = await supabase.auth.signOut({ scope: "others" });
+  if (error) {
+    console.error("Diğer oturumlar kapatılamadı:", error);
+    return;
+  }
+  const sessionId = getSessionIdFromToken(accessToken);
+  const channel = supabase.channel(sessionChannelName(userId));
+  try {
+    const result = await channel.httpSend(SESSION_REPLACED_BROADCAST, { sessionId });
+    if (!result.success) {
+      console.error("Oturum değişikliği yayınlanamadı:", result.error);
+    }
+  } catch (err) {
+    // Yayın gitmezse eski oturum periyodik kontrolde düşer
+    console.error("Oturum değişikliği yayınlanamadı:", err);
+  } finally {
+    void supabase.removeChannel(channel);
+  }
+}
 
 function mapProfile(profile: Record<string, unknown>): User {
   const role = normalizeRole(
@@ -190,6 +219,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Tek aktif oturum: başka yerden giriş yapılınca bu oturumu düşür
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    let handled = false;
+
+    const kick = async () => {
+      if (handled) return;
+      handled = true;
+      markSessionReplaced();
+      await supabase.auth.signOut({ scope: "local" });
+      // Bellekteki tüm veriyi de temizlemek için tam yönlendirme
+      window.location.replace("/login");
+    };
+
+    const verify = async () => {
+      if (handled) return;
+      const { error } = await supabase.auth.getUser();
+      // Ağ hataları oturumu düşürmesin; yalnızca sunucu oturumu tanımıyorsa
+      if (
+        error &&
+        (error.code === "session_not_found" ||
+          error.code === "refresh_token_not_found" ||
+          error.status === 401 ||
+          error.status === 403)
+      ) {
+        await kick();
+      }
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void verify();
+    };
+
+    const channel = supabase
+      .channel(sessionChannelName(userId))
+      // Yayını sunucuyla doğrula; sahte bir mesaj kimseyi düşüremez
+      .on("broadcast", { event: SESSION_REPLACED_BROADCAST }, () => void verify())
+      .subscribe();
+
+    const onRevoked = () => void kick();
+    window.addEventListener(SESSION_REVOKED_EVENT, onRevoked);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    const interval = window.setInterval(() => void verify(), 60 * 1000);
+
+    return () => {
+      window.removeEventListener(SESSION_REVOKED_EVENT, onRevoked);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.clearInterval(interval);
+      void supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   const login = useCallback(
     async (email: string, password: string) => {
       try {
@@ -234,6 +318,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await supabase.auth.signOut();
           return { ok: false, error: "Hesabınız kısıtlanmış" };
         }
+
+        await replaceOtherSessions(data.user.id, data.session?.access_token);
 
         let mapped = mapProfile(profile);
         if (!mapped.organizationId) {

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { useT } from "@/contexts/i18n-context";
 import { homePathForRole } from "@/lib/roles";
+import { clearSessionReplaced, wasSessionReplaced } from "@/lib/single-session";
 import { clearFieldError, hasErrors, validateLogin, type FieldErrors } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,15 @@ export function LoginForm() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
+  const [sessionReplaced, setSessionReplaced] = useState(
+    () => typeof window !== "undefined" && wasSessionReplaced()
+  );
+
+  // Mesaj bir kez gösterilsin; yenilemede tekrar çıkmasın
+  useEffect(() => {
+    clearSessionReplaced();
+  }, []);
+
   useEffect(() => {
     if (isLoading || !user) return;
     router.replace(homePathForRole(user.role));
@@ -37,6 +47,7 @@ export function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSessionReplaced(false);
 
     const errors = validateLogin({ email, password });
     setFieldErrors(errors);
@@ -103,7 +114,7 @@ export function LoginForm() {
           />
         </FormField>
 
-        <FormError message={error} />
+        <FormError message={error || (sessionReplaced ? t("auth.sessionReplaced") : "")} />
 
         <Button type="submit" className="w-full" loading={submitting}>
           {t("auth.submit")}

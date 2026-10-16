@@ -75,6 +75,7 @@ export const en: Dictionary = {
     noAccount: "Don't have an account yet?",
     createAccount: "Create a company account",
     haveAccount: "Already have an account?",
+    sessionReplaced: "You were signed out because this account was signed in from another place.",
     connectionError: "Could not connect. Please try again.",
     registrationError: "We couldn't complete registration. Check your details and try again.",
     brandEyebrow: "FIELD OPERATIONS PLATFORM",
