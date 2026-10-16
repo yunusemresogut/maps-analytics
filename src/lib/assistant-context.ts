@@ -5,7 +5,9 @@ import type {
   Invoice,
   ProgressPayment,
   Store,
-  StoreUserData,
+  StoreDetailSummary,
+  StoreMaterial,
+  StoreWorkPlanItem,
   Ticket,
 } from "@/types";
 
@@ -22,7 +24,9 @@ const STATUS_LABELS: Record<string, string> = {
 const MAX_STORES = 150;
 /** Route 60.000 karakterde keser; detaylar bu bütçeye sığdırılır */
 const MAX_CONTEXT_CHARS = 55000;
-const MAX_ITEMS_PER_STORE = 60;
+export const MAX_ITEMS_PER_STORE = 60;
+/** Bir soruda detayı çekilecek en fazla mağaza; bağlam sınırına zaten bu kadarı sığar */
+export const MAX_DETAIL_STORES = 8;
 
 const MATERIAL_STATUS: Record<string, string> = {
   bekleniyor: "bekleniyor",
@@ -46,12 +50,40 @@ type AssistantContextInput = {
   organizationName?: string;
   userName: string;
   stores: Store[];
-  storeData: Record<string, StoreUserData>;
+  storeSummaries: Record<string, StoreDetailSummary>;
+  /** pickDetailStores ile seçilen mağazaların ilk kalemleri */
+  storeDetails: Record<string, StoreDetails>;
   contracts: Contract[];
   progressPayments: ProgressPayment[];
   invoices: Invoice[];
   tickets: Ticket[];
 };
+
+export type StoreDetails = {
+  materials: StoreMaterial[];
+  workPlan: StoreWorkPlanItem[];
+};
+
+/**
+ * Detayı (malzeme/iş planı kalemleri) asistana gönderilecek mağazalar:
+ * soruda adı geçenler önce, kalemi olmayanlar hariç.
+ */
+export function pickDetailStores(
+  stores: Store[],
+  summaries: Record<string, StoreDetailSummary>,
+  question: string
+): Store[] {
+  const normalized = normalize(question);
+  const withDetails = stores.filter((store) => {
+    const summary = summaries[store.id];
+    return (summary?.materialCount ?? 0) + (summary?.workPlanCount ?? 0) > 0;
+  });
+  const mentioned = (store: Store) => normalized.includes(normalize(store.name));
+  return [
+    ...withDetails.filter(mentioned),
+    ...withDetails.filter((store) => !mentioned(store)),
+  ].slice(0, MAX_DETAIL_STORES);
+}
 
 function money(value: number): string {
   return `${Math.round(value).toLocaleString("tr-TR")} TRY`;
@@ -73,23 +105,22 @@ export function buildAssistantContext(input: AssistantContextInput): string {
   if (input.stores.length === 0) lines.push("Henüz mağaza yok.");
 
   for (const store of input.stores.slice(0, MAX_STORES)) {
-    const data = input.storeData[store.id];
+    const summary = input.storeSummaries[store.id];
     const alert = store.openingDate ? getOpeningAlert(store.openingDate) : null;
-    const workPlan = data?.workPlan ?? [];
-    const materials = data?.materials ?? [];
-    const progress =
-      workPlan.length > 0
-        ? Math.round(workPlan.reduce((sum, item) => sum + item.percentComplete, 0) / workPlan.length)
-        : null;
-    const materialTotal = materials.reduce((sum, m) => sum + m.quantity * m.unitPrice, 0);
+    const workPlanCount = summary?.workPlanCount ?? 0;
+    const materialCount = summary?.materialCount ?? 0;
     const parts = [
       `- ${store.name} | ${store.city} | durum: ${STATUS_LABELS[store.projectStatus] ?? store.projectStatus}`,
       store.openingDate ? `açılış: ${store.openingDate}${alert ? ` (${alert.label})` : ""}` : null,
       store.totalBudget ? `bütçe: ${money(store.totalBudget)}` : null,
       store.contractorCompany ? `yüklenici: ${store.contractorCompany}` : null,
       store.siteManager ? `şantiye şefi: ${store.siteManager}` : null,
-      workPlan.length > 0 ? `iş planı: ${workPlan.length} kalem, ort. %${progress}` : null,
-      materials.length > 0 ? `malzeme: ${materials.length} kalem, ${money(materialTotal)}` : null,
+      workPlanCount > 0
+        ? `iş planı: ${workPlanCount} kalem, ort. %${summary?.workPlanAvgProgress ?? 0}`
+        : null,
+      materialCount > 0
+        ? `keşif: ${materialCount} kalem, ${money(summary?.materialTotal ?? 0)}`
+        : null,
     ];
     lines.push(parts.filter(Boolean).join(" | "));
   }
@@ -129,33 +160,28 @@ export function buildAssistantContext(input: AssistantContextInput): string {
     );
   }
 
-  // Mağaza detayları: malzeme ve iş planı kalemleri (birim fiyat, tarih vb.)
-  const question = normalize(input.question ?? "");
-  const storesWithDetails = input.stores.filter((store) => {
-    const data = input.storeData[store.id];
-    return (data?.materials.length ?? 0) + (data?.workPlan.length ?? 0) > 0;
-  });
-  const mentioned = (store: Store) => question.includes(normalize(store.name));
-  const ordered = [
-    ...storesWithDetails.filter(mentioned),
-    ...storesWithDetails.filter((store) => !mentioned(store)),
-  ];
+  // Mağaza detayları: keşif ve iş planı kalemleri (birim fiyat, tarih vb.)
+  const ordered = pickDetailStores(input.stores, input.storeSummaries, input.question ?? "");
+  const storesWithDetails = ordered.filter((store) => input.storeDetails[store.id]);
 
-  lines.push("", "## Mağaza detayları (malzemeler ve iş planı)");
+  lines.push("", "## Mağaza detayları (keşif ve iş planı)");
   let length = lines.join("\n").length;
   let skipped = 0;
-  for (const store of ordered) {
-    const data = input.storeData[store.id];
+  for (const store of storesWithDetails) {
+    const data = input.storeDetails[store.id];
+    const summary = input.storeSummaries[store.id];
+    const materialCount = summary?.materialCount ?? data.materials.length;
+    const workPlanCount = summary?.workPlanCount ?? data.workPlan.length;
     const block: string[] = [`### ${store.name} (${store.city})`];
     if (data.materials.length > 0) {
-      block.push("Malzemeler (ad | miktar | birim fiyat | tutar | durum):");
+      block.push("Keşif (kalem | miktar | birim fiyat | tutar | durum):");
       for (const m of data.materials.slice(0, MAX_ITEMS_PER_STORE)) {
         block.push(
           `- ${m.name} | ${m.quantity} ${m.unit} | ${money(m.unitPrice)} | ${money(m.quantity * m.unitPrice)} | ${MATERIAL_STATUS[m.status] ?? m.status}`
         );
       }
-      if (data.materials.length > MAX_ITEMS_PER_STORE) {
-        block.push(`… ve ${data.materials.length - MAX_ITEMS_PER_STORE} malzeme daha`);
+      if (materialCount > data.materials.length) {
+        block.push(`… ve ${materialCount - data.materials.length} keşif kalemi daha`);
       }
     }
     if (data.workPlan.length > 0) {
@@ -165,8 +191,8 @@ export function buildAssistantContext(input: AssistantContextInput): string {
           `- ${w.activityCode ? `${w.activityCode} ` : ""}${w.description} | ${w.startDate || "—"} – ${w.endDate || "—"} | %${w.percentComplete} | ${w.responsible || "—"} | ${WORK_PLAN_STATUS[w.status] ?? w.status}`
         );
       }
-      if (data.workPlan.length > MAX_ITEMS_PER_STORE) {
-        block.push(`… ve ${data.workPlan.length - MAX_ITEMS_PER_STORE} iş kalemi daha`);
+      if (workPlanCount > data.workPlan.length) {
+        block.push(`… ve ${workPlanCount - data.workPlan.length} iş kalemi daha`);
       }
     }
     const text = block.join("\n");
@@ -177,7 +203,13 @@ export function buildAssistantContext(input: AssistantContextInput): string {
     lines.push(text);
     length += text.length + 1;
   }
-  if (storesWithDetails.length === 0) lines.push("Kayıtlı malzeme veya iş planı yok.");
+  const totalWithDetails = input.stores.filter((store) => {
+    const summary = input.storeSummaries[store.id];
+    return (summary?.materialCount ?? 0) + (summary?.workPlanCount ?? 0) > 0;
+  }).length;
+  if (totalWithDetails === 0) lines.push("Kayıtlı keşif veya iş planı yok.");
+  // Detayı hiç çekilmeyen mağazalar da atlanmış sayılır
+  skipped += totalWithDetails - storesWithDetails.length;
   if (skipped > 0) {
     lines.push(`(${skipped} mağazanın detayı boyut sınırı nedeniyle eklenmedi; soruda mağaza adını belirtin.)`);
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -16,13 +16,12 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useModules } from "@/contexts/modules-context";
-import { useDb } from "@/contexts/db-context";
-import { useStores } from "@/contexts/stores-context";
+import { mapPayment, useDb } from "@/contexts/db-context";
 import { useI18n, useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useTableState } from "@/hooks/use-table-state";
+import { useServerTable } from "@/hooks/use-server-table";
 import { formatTry } from "@/lib/currency";
-import { contractProgressPercent, formatPaymentPeriod, paidAmountForPayment } from "@/lib/module-finance";
+import { formatPaymentPeriod } from "@/lib/module-finance";
 import type { ProgressPayment } from "@/types";
 
 const STATUS_TR: Record<string, string> = {
@@ -48,60 +47,53 @@ const COLUMNS: DataTableColumn<SortKey>[] = [
 
 type PaymentRow = ProgressPayment & { storeName: string; contractTitle: string; paid: number; progress: number };
 
+function mapPaymentRow(row: Record<string, unknown>): PaymentRow {
+  return {
+    ...mapPayment(row),
+    storeName: typeof row.store_name === "string" ? row.store_name : "—",
+    contractTitle: typeof row.contract_title === "string" ? row.contract_title : "—",
+    paid: Number(row.paid ?? 0),
+    progress: Number(row.progress ?? 0),
+  };
+}
+
+const SORT_COLUMNS: Partial<Record<SortKey, string>> = {
+  title: "title",
+  storeName: "store_name",
+  contractTitle: "contract_title",
+  periodLabel: "period_label",
+  amount: "amount",
+  paid: "paid",
+  progress: "progress",
+  status: "status",
+};
+const SEARCH_COLUMNS = ["title", "store_name", "contract_title", "period_label"];
+
 function ProgressPaymentsContent() {
   const t = useT();
   const { dateLocale } = useI18n();
   const router = useRouter();
   const { progressPayments, deletePayment } = useModules();
   const { contracts, invoices } = useDb();
-  const { stores } = useStores();
   const { canAdd, canEdit, canDelete } = usePermissions("progressPayments");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
 
-  const rows: PaymentRow[] = useMemo(
-    () =>
-      progressPayments.map((p) => {
-        const contract = contracts.find((c) => c.id === p.contractId);
-        return {
-          ...p,
-          storeName: stores.find((s) => s.id === p.storeId)?.name ?? "—",
-          contractTitle: contract?.title ?? "—",
-          paid: paidAmountForPayment(p.id, invoices),
-          progress: contract
-            ? contractProgressPercent(contract, progressPayments, invoices)
-            : 0,
-        };
-      }),
-    [progressPayments, stores, contracts, invoices]
+  // Ödenen/ilerleme fatura ve sözleşmelerden hesaplanır; bunlar değişince tazele
+  const refreshKey = useMemo(
+    () => [progressPayments, contracts, invoices],
+    [progressPayments, contracts, invoices]
   );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase("tr");
-    return rows.filter((item) => {
-      if (status !== "all" && item.status !== status) return false;
-      if (!q) return true;
-      return [item.title, item.storeName, item.contractTitle, item.periodLabel]
-        .join(" ")
-        .toLocaleLowerCase("tr")
-        .includes(q);
-    });
-  }, [rows, query, status]);
-
-  const getSortValue = useCallback((item: PaymentRow, key: SortKey) => {
-    if (key === "actions") return "";
-    if (key === "paid") return item.paid;
-    if (key === "progress") return item.progress;
-    if (key === "storeName") return item.storeName;
-    if (key === "contractTitle") return item.contractTitle;
-    return item[key] ?? "";
-  }, []);
-
-  const table = useTableState<PaymentRow, SortKey>({
-    items: filtered,
-    initialSort: { key: "periodLabel", direction: "desc" },
-    getSortValue,
-    resetKey: `${query}|${status}`,
+  const table = useServerTable<PaymentRow, SortKey>({
+    source: "progress_payments_list",
+    mapRow: mapPaymentRow,
+    searchColumns: SEARCH_COLUMNS,
+    search: query,
+    filters: { status },
+    sortColumns: SORT_COLUMNS,
+    initialSort: { key: "title", direction: "asc" },
+    refreshKey,
   });
 
   const handleDelete = async (id: string, title: string) => {
@@ -174,7 +166,7 @@ function ProgressPaymentsContent() {
             </td>
           </tr>
         ))}
-        {table.totalItems === 0 && (
+        {!table.isLoading && table.totalItems === 0 && (
           <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
         )}
       </DataTable>

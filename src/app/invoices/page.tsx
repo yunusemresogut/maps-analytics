@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -16,11 +16,10 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useModules } from "@/contexts/modules-context";
-import { useDb } from "@/contexts/db-context";
-import { useStores } from "@/contexts/stores-context";
+import { mapInvoice, useDb } from "@/contexts/db-context";
 import { useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useTableState } from "@/hooks/use-table-state";
+import { useServerTable } from "@/hooks/use-server-table";
 import { formatTry } from "@/lib/currency";
 import type { Invoice } from "@/types";
 
@@ -45,52 +44,49 @@ const COLUMNS: DataTableColumn<SortKey>[] = [
 
 type InvoiceRow = Invoice & { storeName: string; paymentTitle: string; total: number };
 
+function mapInvoiceRow(row: Record<string, unknown>): InvoiceRow {
+  const invoice = mapInvoice(row);
+  return {
+    ...invoice,
+    storeName: typeof row.store_name === "string" ? row.store_name : "—",
+    paymentTitle: typeof row.payment_title === "string" ? row.payment_title : "—",
+    total: invoice.amount + invoice.taxAmount,
+  };
+}
+
+const SORT_COLUMNS: Partial<Record<SortKey, string>> = {
+  invoiceNumber: "invoice_number",
+  storeName: "store_name",
+  paymentTitle: "payment_title",
+  amount: "amount",
+  total: "total",
+  status: "status",
+};
+const SEARCH_COLUMNS = ["invoice_number", "store_name", "payment_title"];
+
 function InvoicesContent() {
   const t = useT();
   const router = useRouter();
   const { invoices, deleteInvoice } = useModules();
   const { progressPayments } = useDb();
-  const { stores } = useStores();
   const { canAdd, canEdit, canDelete } = usePermissions("invoices");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
 
-  const rows: InvoiceRow[] = useMemo(
-    () =>
-      invoices.map((inv) => ({
-        ...inv,
-        storeName: stores.find((s) => s.id === inv.storeId)?.name ?? "—",
-        paymentTitle: progressPayments.find((p) => p.id === inv.progressPaymentId)?.title ?? "—",
-        total: inv.amount + inv.taxAmount,
-      })),
-    [invoices, stores, progressPayments]
+  const refreshKey = useMemo(
+    () => [invoices, progressPayments],
+    [invoices, progressPayments]
   );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase("tr");
-    return rows.filter((item) => {
-      if (status !== "all" && item.status !== status) return false;
-      if (!q) return true;
-      return [item.invoiceNumber, item.storeName, item.paymentTitle]
-        .join(" ")
-        .toLocaleLowerCase("tr")
-        .includes(q);
-    });
-  }, [rows, query, status]);
-
-  const getSortValue = useCallback((item: InvoiceRow, key: SortKey) => {
-    if (key === "actions") return "";
-    if (key === "total") return item.total;
-    if (key === "storeName") return item.storeName;
-    if (key === "paymentTitle") return item.paymentTitle;
-    return item[key] ?? "";
-  }, []);
-
-  const table = useTableState<InvoiceRow, SortKey>({
-    items: filtered,
+  const table = useServerTable<InvoiceRow, SortKey>({
+    source: "invoices_list",
+    mapRow: mapInvoiceRow,
+    searchColumns: SEARCH_COLUMNS,
+    search: query,
+    filters: { status },
+    sortColumns: SORT_COLUMNS,
     initialSort: { key: "invoiceNumber", direction: "desc" },
-    getSortValue,
-    resetKey: `${query}|${status}`,
+    refreshKey,
   });
 
   const handleDelete = async (id: string, label: string) => {
@@ -150,7 +146,7 @@ function InvoicesContent() {
             </td>
           </tr>
         ))}
-        {table.totalItems === 0 && (
+        {!table.isLoading && table.totalItems === 0 && (
           <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
         )}
       </DataTable>

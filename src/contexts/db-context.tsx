@@ -1,11 +1,13 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { mapStoreFromDb } from "@/lib/store-mapper";
 import { mapOrganizationFromDb } from "@/lib/migrations";
 import { normalizeRole } from "@/lib/roles";
 import { normalizePermissions } from "@/lib/permissions";
+import { fetchAllRows } from "@/lib/supabase-query";
+import { fetchStoreSummaries } from "@/lib/store-details";
 import type {
   Organization,
   Store,
@@ -14,10 +16,7 @@ import type {
   ActivityLogEntry,
   StoreNote,
   StoreFile,
-  StoreMaterial,
-  StoreWorkPlanItem,
-  WorkPlanDependency,
-  WorkPlanDependencyType,
+  StoreDetailSummary,
   Ticket,
   Contract,
   ProgressPayment,
@@ -27,6 +26,9 @@ import type {
 type DbContextType = {
   stores: Store[];
   storeData: Record<string, StoreUserData>;
+  /** Mağaza başına malzeme/iş planı özeti */
+  storeSummaries: Record<string, StoreDetailSummary>;
+  setStoreSummary: (storeId: string, summary: StoreDetailSummary) => void;
   users: User[];
   activityLogs: ActivityLogEntry[];
   organization: Organization | null;
@@ -49,7 +51,7 @@ type DbContextType = {
 
 const DbContext = createContext<DbContextType | null>(null);
 
-function mapTicket(t: any): Ticket {
+export function mapTicket(t: any): Ticket {
   return {
     id: t.id,
     organizationId: t.organization_id,
@@ -70,7 +72,7 @@ function mapTicket(t: any): Ticket {
   };
 }
 
-function mapContract(c: any): Contract {
+export function mapContract(c: any): Contract {
   return {
     id: c.id,
     organizationId: c.organization_id,
@@ -92,7 +94,7 @@ function mapContract(c: any): Contract {
   };
 }
 
-function mapPayment(p: any): ProgressPayment {
+export function mapPayment(p: any): ProgressPayment {
   return {
     id: p.id,
     organizationId: p.organization_id,
@@ -111,7 +113,7 @@ function mapPayment(p: any): ProgressPayment {
   };
 }
 
-function mapInvoice(i: any): Invoice {
+export function mapInvoice(i: any): Invoice {
   return {
     id: i.id,
     organizationId: i.organization_id,
@@ -131,29 +133,12 @@ function mapInvoice(i: any): Invoice {
   };
 }
 
-function mapWorkPlanPredecessors(raw: unknown): WorkPlanDependency[] {
-  if (!Array.isArray(raw)) return [];
-  const validTypes: WorkPlanDependencyType[] = ["FS", "SS", "FF", "SF"];
-  return raw.flatMap((value): WorkPlanDependency[] => {
-    if (!value || typeof value !== "object") return [];
-    const dependency = value as Record<string, unknown>;
-    if (
-      typeof dependency.predecessorId !== "string" ||
-      !validTypes.includes(dependency.type as WorkPlanDependencyType)
-    ) {
-      return [];
-    }
-    return [{
-      predecessorId: dependency.predecessorId,
-      type: dependency.type as WorkPlanDependencyType,
-      lagHours: Number(dependency.lagHours) || 0,
-    }];
-  });
-}
-
 export function DbProvider({ children }: { children: React.ReactNode }) {
   const [stores, setStoresState] = useState<Store[]>([]);
   const [storeData, setStoreDataState] = useState<Record<string, StoreUserData>>({});
+  const [storeSummaries, setStoreSummariesState] = useState<
+    Record<string, StoreDetailSummary>
+  >({});
   const [users, setUsersState] = useState<User[]>([]);
   const [activityLogs, setActivityLogsState] = useState<ActivityLogEntry[]>([]);
   const [organization, setOrganizationState] = useState<Organization | null>(null);
@@ -166,6 +151,7 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
   const clearLocalState = () => {
     setStoresState([]);
     setStoreDataState({});
+    setStoreSummariesState({});
     setUsersState([]);
     setActivityLogsState([]);
     setOrganizationState(null);
@@ -181,10 +167,15 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
     }
     try {
       // 1. Fetch stores
-      const { data: storesDataRes, error: storesErr } = await supabase
-        .from("stores")
-        .select("*")
-        .order("created_at", { ascending: false });
+      // Tüm sorgular parça parça çekilir; PostgREST'in satır sınırına takılmaz
+      const { data: storesDataRes, error: storesErr } = await fetchAllRows<Record<string, unknown>>((from, to) =>
+        supabase
+          .from("stores")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to)
+      );
       if (storesErr) throw storesErr;
 
       const mappedStores: Store[] = (storesDataRes || []).map((s: any) =>
@@ -192,9 +183,9 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
       );
 
       // 2. Fetch profiles
-      const { data: profilesRes, error: profilesErr } = await supabase
-        .from("profiles")
-        .select("*");
+      const { data: profilesRes, error: profilesErr } = await fetchAllRows<Record<string, unknown>>((from, to) =>
+        supabase.from("profiles").select("*").order("id").range(from, to)
+      );
       if (profilesErr) throw profilesErr;
 
       const mappedUsers: User[] = (profilesRes || []).map((p: any) => {
@@ -250,18 +241,34 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
         createdAt: l.created_at,
       }));
 
-      // 4. Fetch store details (notes, files, materials, work plans)
-      const [notesRes, filesRes, materialsRes, workPlanRes] = await Promise.all([
-        supabase.from("store_notes").select("*").order("created_at", { ascending: true }),
-        supabase.from("store_files").select("*").order("uploaded_at", { ascending: true }),
-        supabase.from("store_materials").select("*").order("imported_at", { ascending: true }),
-        supabase.from("store_work_plan").select("*").order("imported_at", { ascending: true }),
+      // 4. Mağaza detayları: notlar, dosyalar ve malzeme/iş planı özetleri.
+      // Malzeme ve iş planı satırları burada çekilmez; ekranlar sayfa sayfa ister.
+      const [notesRes, filesRes, summaries] = await Promise.all([
+        fetchAllRows<Record<string, unknown>>((from, to) =>
+          supabase
+            .from("store_notes")
+            .select("*")
+            .order("created_at", { ascending: true })
+            .order("id")
+            .range(from, to)
+        ),
+        fetchAllRows<Record<string, unknown>>((from, to) =>
+          supabase
+            .from("store_files")
+            .select("*")
+            .order("uploaded_at", { ascending: true })
+            .order("id")
+            .range(from, to)
+        ),
+        // Özetler yüklenemezse (örn. migration eksik) uygulamanın geri kalanı açılsın
+        fetchStoreSummaries().catch((err) => {
+          console.error("Mağaza özetleri yüklenemedi:", err);
+          return {} as Record<string, StoreDetailSummary>;
+        }),
       ]);
 
       if (notesRes.error) throw notesRes.error;
       if (filesRes.error) throw filesRes.error;
-      if (materialsRes.error) throw materialsRes.error;
-      if (workPlanRes.error) throw workPlanRes.error;
 
       const tempStoreData: Record<string, StoreUserData> = {};
       const specialNotesMap: Record<string, string> = {};
@@ -273,8 +280,6 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
         tempStoreData[st.id] = {
           notes: [],
           files: [],
-          materials: [],
-          workPlan: [],
           specialNote: specialNotesMap[st.id] || "",
         };
       });
@@ -309,76 +314,27 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
         tempStoreData[f.store_id].files.push(fileEntry);
       });
 
-      (materialsRes.data || []).forEach((m: any) => {
-        if (!tempStoreData[m.store_id]) return;
-        const material: StoreMaterial = {
-          id: m.id,
-          storeId: m.store_id,
-          userId: m.user_id,
-          name: m.name,
-          quantity: Number(m.quantity || 0),
-          unit: m.unit,
-          unitPrice: Number(m.unit_price || 0),
-          status: m.status,
-          importedAt: m.imported_at,
-        };
-        tempStoreData[m.store_id].materials.push(material);
-      });
-
-      (workPlanRes.data || []).forEach((w: any) => {
-        if (!tempStoreData[w.store_id]) return;
-        const wpItem: StoreWorkPlanItem = {
-          id: w.id,
-          storeId: w.store_id,
-          userId: w.user_id,
-          description: w.description,
-          startDate: w.start_date,
-          endDate: w.end_date,
-          responsible: w.responsible,
-          status: w.status,
-          sourceTaskId: w.source_task_id || undefined,
-          activityCode: w.activity_code || undefined,
-          wbsCode: w.wbs_code || undefined,
-          percentComplete: Math.min(
-            100,
-            Math.max(
-              0,
-              Number(
-                w.percent_complete ??
-                  (w.status === "tamamlandi" ? 100 : w.status === "devam_ediyor" ? 50 : 0)
-              ) || 0
-            )
-          ),
-          predecessors: mapWorkPlanPredecessors(w.predecessors),
-          importedAt: w.imported_at,
-        };
-        tempStoreData[w.store_id].workPlan.push(wpItem);
-      });
-
       // 5. Module tables (ignore if migration not applied yet)
       let mappedTickets: Ticket[] = [];
       let mappedContracts: Contract[] = [];
       let mappedPayments: ProgressPayment[] = [];
       let mappedInvoices: Invoice[] = [];
 
+      const newestFirst = (table: string) =>
+        fetchAllRows<Record<string, unknown>>((from, to) =>
+          supabase
+            .from(table)
+            .select("*")
+            .order("created_at", { ascending: false })
+            .order("id")
+            .range(from, to)
+        );
       const [ticketsRes, contractsRes, paymentsRes, invoicesRes] =
         await Promise.all([
-          supabase
-            .from("tickets")
-            .select("*")
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("contracts")
-            .select("*")
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("progress_payments")
-            .select("*")
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("invoices")
-            .select("*")
-            .order("created_at", { ascending: false }),
+          newestFirst("tickets"),
+          newestFirst("contracts"),
+          newestFirst("progress_payments"),
+          newestFirst("invoices"),
         ]);
 
       if (!ticketsRes.error) {
@@ -396,6 +352,7 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
 
       setStoresState(mappedStores);
       setStoreDataState(tempStoreData);
+      setStoreSummariesState(summaries);
       setUsersState(mappedUsers);
       setActivityLogsState(mappedLogs);
       setOrganizationState(org);
@@ -458,6 +415,13 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
     setStoreDataState(nextStoreData);
   };
 
+  const setStoreSummary = useCallback(
+    (storeId: string, summary: StoreDetailSummary) => {
+      setStoreSummariesState((prev) => ({ ...prev, [storeId]: summary }));
+    },
+    []
+  );
+
   const setUsers = async (nextUsers: User[]) => {
     setUsersState(nextUsers);
   };
@@ -471,6 +435,8 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
       value={{
         stores,
         storeData,
+        storeSummaries,
+        setStoreSummary,
         users,
         activityLogs,
         organization,

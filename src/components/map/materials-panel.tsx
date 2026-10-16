@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useId, useState } from "react";
-import { ChevronDown, Edit2, Package, Plus, Trash2 } from "lucide-react";
+import { useId, useMemo, useState } from "react";
+import { ChevronDown, Edit2, Package, Plus, Search, Trash2 } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import { formatCurrency } from "@/lib/excel-materials";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,18 @@ import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { TablePagination } from "@/components/modules/module-table";
 import { useStoreData } from "@/contexts/store-data-context";
-import { useTableState } from "@/hooks/use-table-state";
+import { useDb } from "@/contexts/db-context";
+import { useServerTable } from "@/hooks/use-server-table";
+import type { SortState } from "@/hooks/use-table-state";
+import {
+  EMPTY_SUMMARY,
+  MATERIAL_SEARCH_COLUMNS,
+  MATERIALS_SOURCE,
+  fetchMatchingIds,
+  mapMaterialFromDb,
+} from "@/lib/store-details";
+import { useRowSelection } from "@/hooks/use-row-selection";
+import { BulkSelectionBar, SelectCheckbox } from "@/components/ui/row-selection";
 import { cn } from "@/lib/utils";
 import { MaterialsImportMenu } from "@/components/map/materials-import-menu";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
@@ -18,12 +29,13 @@ import type { MaterialStatus, StoreMaterial } from "@/types";
 
 type MaterialsPanelProps = {
   storeId: string;
-  materials: StoreMaterial[];
   isEditing: boolean;
-  onDelete: (id: string) => void;
-  onClear: () => void;
+  onDelete: (ids: string[]) => Promise<void>;
   onImport: (rows: ParsedMaterialRow[]) => void;
 };
+
+const SORT_COLUMNS = { seq: "seq" };
+const INITIAL_SORT: SortState<"seq"> = { key: "seq", direction: "asc" };
 
 const statusLabels: Record<MaterialStatus, string> = {
   bekleniyor: "Bekleniyor",
@@ -36,8 +48,6 @@ const statusColors: Record<MaterialStatus, string> = {
   geldi: "bg-emerald-500 text-emerald-400 border-emerald-500/20",
   gitti: "bg-amber-500 text-amber-400 border-amber-500/20",
 };
-
-type MaterialSortKey = "name" | "quantity" | "unit" | "unitPrice" | "status";
 
 function FloatingInput({
   label,
@@ -99,7 +109,7 @@ function MaterialFormModal({
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!name.trim()) {
-      setError("Malzeme adı zorunludur");
+      setError("Kalem adı zorunludur");
       return;
     }
     onSubmit({
@@ -115,7 +125,7 @@ function MaterialFormModal({
     <Modal
       open
       onClose={onClose}
-      title={material ? "Malzemeyi düzenle" : "Yeni malzeme"}
+      title={material ? "Keşif kalemini düzenle" : "Yeni keşif kalemi"}
       description="Miktar, birim ve fiyat bilgilerini girin."
       footer={
         <>
@@ -123,7 +133,7 @@ function MaterialFormModal({
             Vazgeç
           </Button>
           <Button type="submit" form={formId}>
-            {material ? "Değişiklikleri kaydet" : "Malzemeyi ekle"}
+            {material ? "Değişiklikleri kaydet" : "Kalemi ekle"}
           </Button>
         </>
       }
@@ -131,7 +141,7 @@ function MaterialFormModal({
       <form id={formId} onSubmit={handleSubmit} className="space-y-4 pt-1" noValidate>
         <div>
           <FloatingInput
-            label="Malzeme adı"
+            label="Kalem adı"
             value={name}
             onChange={(e) => {
               setName(e.target.value);
@@ -181,35 +191,60 @@ function MaterialFormModal({
 
 export function MaterialsPanel({
   storeId,
-  materials,
   isEditing,
   onDelete,
-  onClear,
   onImport,
 }: MaterialsPanelProps) {
-  const { addMaterial, updateMaterial } = useStoreData();
+  const { addMaterial, updateMaterial, getDetailVersion } = useStoreData();
+  const { storeSummaries } = useDb();
+  const summary = storeSummaries[storeId] ?? EMPTY_SUMMARY;
   const [modal, setModal] = useState<{ key: number; material: StoreMaterial | null } | null>(null);
   const [expanded, setExpanded] = useState(true);
+  const [query, setQuery] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const bodyId = useId();
 
-  const getSortValue = useCallback((item: StoreMaterial, key: MaterialSortKey) => {
-    if (key === "name") return item.name;
-    if (key === "quantity") return item.quantity;
-    if (key === "unit") return item.unit;
-    if (key === "unitPrice") return item.unitPrice;
-    return statusLabels[item.status] ?? item.status;
-  }, []);
-  const table = useTableState<StoreMaterial, MaterialSortKey>({
-    items: materials,
-    initialSort: { key: "name", direction: "asc" },
-    getSortValue,
-    resetKey: String(materials.length),
+  // Sunucuda aranır ve sayfalanır; sıra her zaman eklenme sırasıdır (seq)
+  const filters = useMemo(() => ({ store_id: storeId }), [storeId]);
+  const table = useServerTable<StoreMaterial, "seq">({
+    source: MATERIALS_SOURCE,
+    mapRow: mapMaterialFromDb,
+    searchColumns: MATERIAL_SEARCH_COLUMNS,
+    search: query,
+    filters,
+    sortColumns: SORT_COLUMNS,
+    initialSort: INITIAL_SORT,
+    refreshKey: getDetailVersion(storeId),
   });
 
-  const total = materials.reduce(
-    (sum, m) => sum + m.quantity * m.unitPrice,
-    0
-  );
+  const pageIds = useMemo(() => table.pageItems.map((m) => m.id), [table.pageItems]);
+  const selection = useRowSelection({
+    pageIds,
+    totalCount: table.totalItems,
+    resetKey: `${storeId}|${table.appliedSearch}`,
+  });
+
+  const handleBulkDelete = async () => {
+    const count = selection.selectedCount;
+    if (count === 0 || !confirm(`${count} keşif kalemi silinsin mi?`)) return;
+    setDeleting(true);
+    try {
+      const ids = selection.allMatching
+        ? await fetchMatchingIds({
+            source: MATERIALS_SOURCE,
+            filters,
+            searchColumns: MATERIAL_SEARCH_COLUMNS,
+            search: table.appliedSearch,
+          })
+        : [...selection.selected];
+      await onDelete(ids);
+      selection.clear();
+    } catch (err) {
+      console.error("Toplu keşif kalemi silme başarısız:", err);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const openModal = (material: StoreMaterial | null) =>
     setModal({ key: Date.now(), material });
@@ -237,28 +272,64 @@ export function MaterialsPanel({
             aria-hidden
           />
           <Package className="h-4 w-4 text-violet-400" />
-          <span className="text-sm font-medium text-zinc-200">Malzemeler</span>
+          <span className="text-sm font-medium text-zinc-200">Keşif</span>
           <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-xs text-violet-300">
-            {materials.length}
+            {summary.materialCount}
           </span>
         </button>
         {isEditing && (
           <div className="flex items-center gap-2">
-            <MaterialsImportMenu existingCount={materials.length} onImport={onImport} />
+            <MaterialsImportMenu existingCount={summary.materialCount} onImport={onImport} />
             <Button size="sm" onClick={() => openModal(null)}>
               <Plus className="h-3.5 w-3.5" />
-              Malzeme ekle
+              Kalem ekle
             </Button>
           </div>
         )}
       </div>
 
       <div id={bodyId} hidden={!expanded}>
+        {summary.materialCount > 0 && (
+          <div className="border-b border-zinc-800 px-4 py-3">
+            <div className="relative max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" aria-hidden />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Kalem, birim veya durum ara…"
+                aria-label="Keşifte ara"
+                className="h-9 pl-9"
+              />
+            </div>
+          </div>
+        )}
+        {isEditing && (
+          <BulkSelectionBar
+            selectedCount={selection.selectedCount}
+            totalCount={table.totalItems}
+            isPageSelected={selection.isPageSelected}
+            isAllSelected={selection.isAllSelected}
+            onSelectAll={selection.selectAll}
+            onClear={selection.clear}
+            onDelete={handleBulkDelete}
+            busy={deleting}
+          />
+        )}
         <div className="min-w-0 overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="border-b border-zinc-800 text-xs text-zinc-500">
               <tr>
-                <th className="px-4 py-3 text-left font-medium">Malzeme</th>
+                {isEditing && (
+                  <th className="w-10 py-3 pl-4">
+                    <SelectCheckbox
+                      checked={selection.isPageSelected}
+                      indeterminate={selection.isPagePartiallySelected}
+                      onChange={selection.togglePage}
+                      label="Bu sayfadaki keşif kalemlerini seç"
+                    />
+                  </th>
+                )}
+                <th className="px-4 py-3 text-left font-medium">Kalem</th>
                 <th className="px-4 py-3 text-right font-medium">Miktar</th>
                 <th className="px-4 py-3 text-left font-medium">Birim</th>
                 <th className="px-4 py-3 text-right font-medium">Birim fiyat</th>
@@ -268,17 +339,36 @@ export function MaterialsPanel({
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/70">
-              {materials.length === 0 ? (
+              {table.totalItems === 0 ? (
                 <tr>
-                  <td colSpan={isEditing ? 7 : 6} className="px-4 py-10 text-center text-sm text-zinc-500">
-                    Henüz malzeme yok. Excel ile içe aktarın veya &quot;Malzeme ekle&quot; ile ekleyin.
+                  <td colSpan={isEditing ? 8 : 6} className="px-4 py-10 text-center text-sm text-zinc-500">
+                    {table.isLoading
+                      ? "Yükleniyor…"
+                      : summary.materialCount === 0
+                      ? <>Henüz keşif kalemi yok. Excel ile içe aktarın veya &quot;Kalem ekle&quot; ile ekleyin.</>
+                      : "Aramayla eşleşen keşif kalemi yok."}
                   </td>
                 </tr>
               ) : (
                 table.pageItems.map((m) => {
                   const currentStatus = m.status || "bekleniyor";
                   return (
-                    <tr key={m.id} className="text-zinc-300 hover:bg-zinc-900/50">
+                    <tr
+                      key={m.id}
+                      className={cn(
+                        "text-zinc-300 hover:bg-zinc-900/50",
+                        selection.isSelected(m.id) && "bg-cyan-500/5"
+                      )}
+                    >
+                      {isEditing && (
+                        <td className="w-10 py-3 pl-4">
+                          <SelectCheckbox
+                            checked={selection.isSelected(m.id)}
+                            onChange={() => selection.toggle(m.id)}
+                            label={`${m.name} seç`}
+                          />
+                        </td>
+                      )}
                       <td className="max-w-[360px] px-4 py-3 font-medium text-zinc-100">
                         <TruncateWithTooltip text={m.name} />
                       </td>
@@ -315,7 +405,7 @@ export function MaterialsPanel({
                             </button>
                             <button
                               type="button"
-                              onClick={() => onDelete(m.id)}
+                              onClick={() => void onDelete([m.id])}
                               className="text-zinc-500 hover:text-red-400"
                               aria-label="Sil"
                             >
@@ -329,14 +419,14 @@ export function MaterialsPanel({
                 })
               )}
             </tbody>
-            {materials.length > 0 && (
+            {table.totalItems > 0 && (
               <tfoot className="border-t border-zinc-800">
                 <tr>
-                  <td colSpan={4} className="px-4 py-3 text-right text-xs text-zinc-500">
-                    Toplam tutar
+                  <td colSpan={isEditing ? 5 : 4} className="px-4 py-3 text-right text-xs text-zinc-500">
+                    {table.appliedSearch ? "Tüm keşif toplamı" : "Toplam tutar"}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-cyan-300">
-                    {formatCurrency(total)}
+                    {formatCurrency(summary.materialTotal)}
                   </td>
                   <td colSpan={isEditing ? 2 : 1} />
                 </tr>
@@ -345,7 +435,7 @@ export function MaterialsPanel({
           </table>
         </div>
 
-        {materials.length > 0 && (
+        {table.totalItems > 0 && (
           <div className="border-t border-zinc-800 px-3 py-2">
             <TablePagination
               page={table.page}
@@ -357,14 +447,6 @@ export function MaterialsPanel({
               pageSize={table.pageSize}
               onPageSizeChange={table.setPageSize}
             />
-          </div>
-        )}
-
-        {materials.length > 0 && isEditing && (
-          <div className="border-t border-zinc-800 px-3 py-3">
-            <Button size="sm" variant="ghost" className="text-xs text-red-400/80" onClick={onClear}>
-              Tümünü temizle
-            </Button>
           </div>
         )}
       </div>

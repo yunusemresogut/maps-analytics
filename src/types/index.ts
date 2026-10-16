@@ -234,12 +234,24 @@ export type StoreWorkPlanItem = {
   importedAt: string;
 };
 
+/**
+ * Mağazanın açılışta yüklenen detayları. Malzeme ve iş planı burada tutulmaz:
+ * sayfa sayfa sunucudan çekilir, özetleri StoreDetailSummary'dedir.
+ */
 export type StoreUserData = {
   notes: StoreNote[];
   files: StoreFile[];
-  materials: StoreMaterial[];
-  workPlan: StoreWorkPlanItem[];
   specialNote: string;
+};
+
+/** Mağazanın malzeme ve iş planı özeti (store_detail_summary view'ı) */
+export type StoreDetailSummary = {
+  materialCount: number;
+  /** Miktar × birim fiyat toplamı */
+  materialTotal: number;
+  workPlanCount: number;
+  /** İş kalemlerinin ortalama ilerleme yüzdesi; kalem yoksa null */
+  workPlanAvgProgress: number | null;
 };
 
 export type Region = {

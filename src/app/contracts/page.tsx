@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -16,10 +16,10 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useModules } from "@/contexts/modules-context";
-import { useStores } from "@/contexts/stores-context";
+import { mapContract } from "@/contexts/db-context";
 import { useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useTableState } from "@/hooks/use-table-state";
+import { useServerTable } from "@/hooks/use-server-table";
 import { formatTry } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import type { Contract } from "@/types";
@@ -47,12 +47,28 @@ const COLUMNS: DataTableColumn<SortKey>[] = [
 
 type ContractRow = Contract & { storeName: string };
 
+function mapContractRow(row: Record<string, unknown>): ContractRow {
+  return {
+    ...mapContract(row),
+    storeName: typeof row.store_name === "string" ? row.store_name : "—",
+  };
+}
+
+const SORT_COLUMNS: Partial<Record<SortKey, string>> = {
+  code: "code",
+  title: "title",
+  storeName: "store_name",
+  partyName: "party_name",
+  amount: "amount",
+  status: "status",
+};
+const SEARCH_COLUMNS = ["code", "title", "store_name", "party_name"];
+
 function ContractsContent() {
   const t = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { contracts, deleteContract } = useModules();
-  const { stores } = useStores();
   const { canAdd, canEdit, canDelete } = usePermissions("contracts");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -61,42 +77,15 @@ function ContractsContent() {
     ? `/contracts/new?storeId=${searchParams.get("storeId")}`
     : "/contracts/new";
 
-  const rows: ContractRow[] = useMemo(
-    () =>
-      contracts.map((c) => {
-        const store = stores.find((s) => s.id === c.storeId);
-        return {
-          ...c,
-          storeName: store?.name ?? "—",
-        };
-      }),
-    [contracts, stores]
-  );
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase("tr");
-    return rows.filter((item) => {
-      if (status !== "all" && item.status !== status) return false;
-      if (!q) return true;
-      return [item.code, item.title, item.storeName, item.partyName]
-        .join(" ")
-        .toLocaleLowerCase("tr")
-        .includes(q);
-    });
-  }, [rows, query, status]);
-
-  const getSortValue = useCallback((item: ContractRow, key: SortKey) => {
-    if (key === "actions") return "";
-    if (key === "storeName") return item.storeName;
-    if (key === "amount") return item.amount;
-    return item[key] ?? "";
-  }, []);
-
-  const table = useTableState<ContractRow, SortKey>({
-    items: filtered,
-    initialSort: { key: "title", direction: "asc" },
-    getSortValue,
-    resetKey: `${query}|${status}`,
+  const table = useServerTable<ContractRow, SortKey>({
+    source: "contracts_list",
+    mapRow: mapContractRow,
+    searchColumns: SEARCH_COLUMNS,
+    search: query,
+    filters: { status },
+    sortColumns: SORT_COLUMNS,
+    initialSort: { key: "code", direction: "asc" },
+    refreshKey: contracts,
   });
 
   const handleDelete = async (id: string, title: string) => {
@@ -158,7 +147,7 @@ function ContractsContent() {
             </td>
           </tr>
         ))}
-        {table.totalItems === 0 && (
+        {!table.isLoading && table.totalItems === 0 && (
           <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
         )}
       </DataTable>

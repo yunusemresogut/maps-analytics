@@ -92,7 +92,7 @@ export async function parseMaterialsFromExcel(
     status: statusCol,
   };
 
-  if (!descriptionCol) errors.push('"Açıklama" veya "Malzeme Adı" sütunu bulunamadı');
+  if (!descriptionCol) errors.push('"Açıklama" veya "Kalem Adı" sütunu bulunamadı');
   if (!quantityCol) errors.push('"Miktar" sütunu bulunamadı');
   if (!unitPriceCol) errors.push('"Birim Fiyat" sütunu bulunamadı');
 
@@ -122,7 +122,7 @@ export async function parseMaterialsFromExcel(
   }
 
   if (materials.length === 0) {
-    errors.push("Geçerli malzeme satırı bulunamadı");
+    errors.push("Geçerli keşif satırı bulunamadı");
   }
 
   return { materials, errors, matchedColumns };
@@ -133,7 +133,7 @@ export function formatCurrency(value: number): string {
 }
 
 export function downloadMaterialsTemplate() {
-  const headers = [["Malzeme Adı", "Miktar", "Birim", "Birim Fiyat", "Durum"]];
+  const headers = [["Kalem Adı", "Miktar", "Birim", "Birim Fiyat", "Durum"]];
   const sampleData = [
     ["Cement / Çimento", 150, "torba", 320, "bekleniyor"],
     ["Steel Bars / İnşaat Demiri", 12, "ton", 28000, "geldi"],
@@ -142,13 +142,13 @@ export function downloadMaterialsTemplate() {
 
   const ws = XLSX.utils.aoa_to_sheet([...headers, ...sampleData]);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Malzemeler");
+  XLSX.utils.book_append_sheet(wb, ws, "Keşif");
 
   const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
   const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "malzeme_sablonu.xlsx";
+  link.download = "kesif_sablonu.xlsx";
   link.click();
 }

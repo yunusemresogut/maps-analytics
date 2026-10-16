@@ -76,7 +76,7 @@ export function AdminUsersPanel() {
 
   const onSortKeyChange = (key: UserSortKey) => {
     if (table.sort.key !== key) {
-      table.toggleSort(key);
+      table.setSortKey(key);
     }
   };
 

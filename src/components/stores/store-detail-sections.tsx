@@ -76,10 +76,8 @@ export function StoreDetailSections({ store }: { store: Store }) {
     deleteFile,
     importMaterials,
     deleteMaterial,
-    clearMaterials,
     importWorkPlan,
     deleteWorkPlanItem,
-    clearWorkPlan,
   } = useStoreData();
 
   const userData = getStoreData(store.id);
@@ -116,19 +114,15 @@ export function StoreDetailSections({ store }: { store: Store }) {
     <div className="space-y-6">
       <WorkPlanPanel
         storeId={store.id}
-        items={userData.workPlan}
         isEditing={canEdit}
-        onDelete={(id) => deleteWorkPlanItem(store.id, id)}
-        onClear={() => clearWorkPlan(store.id)}
+        onDelete={(ids) => deleteWorkPlanItem(store.id, ids)}
         onImport={handleWorkPlanImport}
       />
 
       <MaterialsPanel
         storeId={store.id}
-        materials={userData.materials}
         isEditing={canEdit}
-        onDelete={(id) => deleteMaterial(store.id, id)}
-        onClear={() => clearMaterials(store.id)}
+        onDelete={(ids) => deleteMaterial(store.id, ids)}
         onImport={handleMaterialImport}
       />
 

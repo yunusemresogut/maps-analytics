@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useId, useState } from "react";
-import { ChevronDown, CalendarRange, Edit2, List, Plus, Trash2 } from "lucide-react";
+import { useId, useMemo, useState } from "react";
+import { ChevronDown, CalendarRange, Edit2, List, Plus, Search, Trash2 } from "lucide-react";
 import {
   addMonths,
   differenceInCalendarDays,
@@ -15,9 +15,23 @@ import {
 import { tr } from "date-fns/locale";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { BulkSelectionBar, SelectCheckbox } from "@/components/ui/row-selection";
 import { TablePagination } from "@/components/modules/module-table";
 import { useStoreData } from "@/contexts/store-data-context";
-import { useTableState } from "@/hooks/use-table-state";
+import { useDb } from "@/contexts/db-context";
+import { useServerTable } from "@/hooks/use-server-table";
+import { useStoreWorkPlan } from "@/hooks/use-store-work-plan";
+import type { SortState } from "@/hooks/use-table-state";
+import {
+  EMPTY_SUMMARY,
+  WORK_PLAN_SEARCH_COLUMNS,
+  WORK_PLAN_SOURCE,
+  fetchMatchingIds,
+  mapWorkPlanFromDb,
+} from "@/lib/store-details";
+import { useRowSelection } from "@/hooks/use-row-selection";
+import { cn } from "@/lib/utils";
 import { WorkPlanImportMenu } from "@/components/map/work-plan-import-menu";
 import { WorkPlanFormModal, type WorkPlanFormValues } from "@/components/map/work-plan-form-modal";
 import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
@@ -25,19 +39,13 @@ import type { StoreWorkPlanItem, WorkPlanStatus } from "@/types";
 
 type WorkPlanPanelProps = {
   storeId: string;
-  items: StoreWorkPlanItem[];
   isEditing: boolean;
-  onDelete: (id: string) => void;
-  onClear: () => void;
+  onDelete: (ids: string[]) => Promise<void>;
   onImport: (rows: ParsedWorkPlanRow[]) => void;
 };
 
-type WorkPlanSortKey =
-  | "description"
-  | "startDate"
-  | "endDate"
-  | "responsible"
-  | "status";
+const SORT_COLUMNS = { seq: "seq" };
+const INITIAL_SORT: SortState<"seq"> = { key: "seq", direction: "asc" };
 
 const statusLabels: Record<WorkPlanStatus, string> = {
   yapilacak: "Yapılacak",
@@ -233,33 +241,69 @@ function WorkPlanGantt({ items }: { items: StoreWorkPlanItem[] }) {
 
 export function WorkPlanPanel({
   storeId,
-  items,
   isEditing,
   onDelete,
-  onClear,
   onImport,
 }: WorkPlanPanelProps) {
-  const { addWorkPlanItem, updateWorkPlanItem } = useStoreData();
+  const { addWorkPlanItem, updateWorkPlanItem, getDetailVersion } = useStoreData();
+  const { storeSummaries } = useDb();
+  const summary = storeSummaries[storeId] ?? EMPTY_SUMMARY;
+  const version = getDetailVersion(storeId);
   const [viewMode, setViewMode] = useState<"table" | "gantt">("table");
   const [modal, setModal] = useState<{ key: number; item: StoreWorkPlanItem | null } | null>(null);
   const [expanded, setExpanded] = useState(true);
+  const [query, setQuery] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const bodyId = useId();
 
-  const getSortValue = useCallback(
-    (item: StoreWorkPlanItem, key: WorkPlanSortKey) => {
-      if (key === "status") {
-        return statusLabels[item.status as WorkPlanStatus] ?? item.status;
-      }
-      return item[key] ?? "";
-    },
-    []
-  );
-  const table = useTableState<StoreWorkPlanItem, WorkPlanSortKey>({
-    items,
-    initialSort: { key: "startDate", direction: "asc" },
-    getSortValue,
-    resetKey: String(items.length),
+  // Tablo: sunucuda aranır ve sayfalanır; sıra her zaman eklenme sırasıdır (seq)
+  const filters = useMemo(() => ({ store_id: storeId }), [storeId]);
+  const table = useServerTable<StoreWorkPlanItem, "seq">({
+    source: WORK_PLAN_SOURCE,
+    mapRow: mapWorkPlanFromDb,
+    searchColumns: WORK_PLAN_SEARCH_COLUMNS,
+    search: query,
+    filters,
+    sortColumns: SORT_COLUMNS,
+    initialSort: INITIAL_SORT,
+    refreshKey: version,
   });
+
+  // Gantt ve öncül seçimi tüm kalemlere ihtiyaç duyar; yalnızca açıkken çekilir
+  const fullPlan = useStoreWorkPlan(
+    storeId,
+    expanded && (viewMode === "gantt" || modal !== null),
+    version
+  );
+
+  const pageIds = useMemo(() => table.pageItems.map((item) => item.id), [table.pageItems]);
+  const selection = useRowSelection({
+    pageIds,
+    totalCount: table.totalItems,
+    resetKey: `${storeId}|${table.appliedSearch}`,
+  });
+
+  const handleBulkDelete = async () => {
+    const count = selection.selectedCount;
+    if (count === 0 || !confirm(`${count} iş kalemi silinsin mi?`)) return;
+    setDeleting(true);
+    try {
+      const ids = selection.allMatching
+        ? await fetchMatchingIds({
+            source: WORK_PLAN_SOURCE,
+            filters,
+            searchColumns: WORK_PLAN_SEARCH_COLUMNS,
+            search: table.appliedSearch,
+          })
+        : [...selection.selected];
+      await onDelete(ids);
+      selection.clear();
+    } catch (err) {
+      console.error("Toplu iş kalemi silme başarısız:", err);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const openModal = (item: StoreWorkPlanItem | null) =>
     setModal({ key: Date.now(), item });
@@ -289,7 +333,7 @@ export function WorkPlanPanel({
           <CalendarRange className="h-4 w-4 text-emerald-400" />
           <span className="text-sm font-medium text-zinc-200">İş Planı</span>
           <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-xs text-emerald-300">
-            {items.length}
+            {summary.workPlanCount}
           </span>
         </button>
         <div className="flex items-center gap-2">
@@ -315,7 +359,7 @@ export function WorkPlanPanel({
           </div>
           {isEditing && (
             <>
-              <WorkPlanImportMenu existingCount={items.length} onImport={onImport} />
+              <WorkPlanImportMenu existingCount={summary.workPlanCount} onImport={onImport} />
               <Button size="sm" onClick={() => openModal(null)}>
                 <Plus className="h-3.5 w-3.5" />
                 İş ekle
@@ -328,10 +372,46 @@ export function WorkPlanPanel({
       <div id={bodyId} hidden={!expanded}>
         {viewMode === "table" ? (
           <>
+            {summary.workPlanCount > 0 && (
+              <div className="border-b border-zinc-800 px-4 py-3">
+                <div className="relative max-w-sm">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" aria-hidden />
+                  <Input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="İş kalemi, kod, sorumlu ara…"
+                    aria-label="İş planında ara"
+                    className="h-9 pl-9"
+                  />
+                </div>
+              </div>
+            )}
+            {isEditing && (
+              <BulkSelectionBar
+                selectedCount={selection.selectedCount}
+                totalCount={table.totalItems}
+                isPageSelected={selection.isPageSelected}
+                isAllSelected={selection.isAllSelected}
+                onSelectAll={selection.selectAll}
+                onClear={selection.clear}
+                onDelete={handleBulkDelete}
+                busy={deleting}
+              />
+            )}
             <div className="min-w-0 overflow-x-auto">
               <table className="w-full min-w-[900px] text-sm">
                 <thead className="border-b border-zinc-800 text-left text-xs text-zinc-500">
                   <tr>
+                    {isEditing && (
+                      <th className="w-10 py-3 pl-4">
+                        <SelectCheckbox
+                          checked={selection.isPageSelected}
+                          indeterminate={selection.isPagePartiallySelected}
+                          onChange={selection.togglePage}
+                          label="Bu sayfadaki iş kalemlerini seç"
+                        />
+                      </th>
+                    )}
                     <th className="px-4 py-3 font-medium">İş kalemi</th>
                     <th className="px-4 py-3 font-medium">Aktivite kodu</th>
                     <th className="px-4 py-3 font-medium">Başlangıç</th>
@@ -343,20 +423,39 @@ export function WorkPlanPanel({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/70">
-                  {items.length === 0 ? (
+                  {table.totalItems === 0 ? (
                     <tr>
                       <td
-                        colSpan={isEditing ? 8 : 7}
+                        colSpan={isEditing ? 9 : 7}
                         className="px-4 py-10 text-center text-sm text-zinc-500"
                       >
-                        Henüz iş planı yok.
+                        {table.isLoading
+                          ? "Yükleniyor…"
+                          : summary.workPlanCount === 0
+                            ? "Henüz iş planı yok."
+                            : "Aramayla eşleşen iş kalemi yok."}
                       </td>
                     </tr>
                   ) : (
                     table.pageItems.map((item) => {
                       const currentStatus = (item.status as WorkPlanStatus) || "yapilacak";
                       return (
-                        <tr key={item.id} className="text-zinc-300 hover:bg-zinc-900/50">
+                        <tr
+                          key={item.id}
+                          className={cn(
+                            "text-zinc-300 hover:bg-zinc-900/50",
+                            selection.isSelected(item.id) && "bg-cyan-500/5"
+                          )}
+                        >
+                          {isEditing && (
+                            <td className="w-10 py-3 pl-4">
+                              <SelectCheckbox
+                                checked={selection.isSelected(item.id)}
+                                onChange={() => selection.toggle(item.id)}
+                                label={`${item.description} seç`}
+                              />
+                            </td>
+                          )}
                           <td className="max-w-[440px] px-4 py-3 font-medium text-zinc-100">
                             <div><TruncateWithTooltip text={item.description} /></div>
                             {item.wbsCode && <span className="mt-1 block text-[10px] font-normal text-zinc-500">WBS {item.wbsCode}</span>}
@@ -401,7 +500,7 @@ export function WorkPlanPanel({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => onDelete(item.id)}
+                                  onClick={() => void onDelete([item.id])}
                                   className="text-zinc-500 hover:text-red-400"
                                   aria-label="Sil"
                                 >
@@ -418,7 +517,7 @@ export function WorkPlanPanel({
               </table>
             </div>
 
-            {items.length > 0 && (
+            {table.totalItems > 0 && (
               <div className="border-t border-zinc-800 px-3 py-2">
                 <TablePagination
                   page={table.page}
@@ -434,15 +533,11 @@ export function WorkPlanPanel({
             )}
           </>
         ) : (
-          <WorkPlanGantt items={items} />
-        )}
-
-        {items.length > 0 && isEditing && (
-          <div className="border-t border-zinc-800 px-3 py-3">
-            <Button size="sm" variant="ghost" className="text-xs text-red-400/80" onClick={onClear}>
-              Tümünü temizle
-            </Button>
-          </div>
+          fullPlan.isLoading ? (
+            <p className="px-4 py-10 text-center text-sm text-zinc-500">Yükleniyor…</p>
+          ) : (
+            <WorkPlanGantt items={fullPlan.items} />
+          )
         )}
       </div>
 
@@ -451,7 +546,7 @@ export function WorkPlanPanel({
           key={modal.key}
           open
           item={modal.item}
-          candidates={items}
+          candidates={fullPlan.items}
           onClose={() => setModal(null)}
           onSubmit={handleSubmit}
         />

@@ -31,7 +31,7 @@ const CATEGORY_LABELS: Record<ActivityCategory, string> = {
   budget: "Bütçe",
   note: "Not",
   file: "Dosya",
-  material: "Malzeme",
+  material: "Keşif",
   workplan: "İş programı",
 };
 

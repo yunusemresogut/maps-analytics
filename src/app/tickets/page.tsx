@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -16,9 +16,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useModules } from "@/contexts/modules-context";
-import { useStores } from "@/contexts/stores-context";
+import { mapTicket } from "@/contexts/db-context";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useTableState } from "@/hooks/use-table-state";
+import { useServerTable } from "@/hooks/use-server-table";
 import type { Ticket } from "@/types";
 
 const PRIORITY_TR: Record<string, string> = {
@@ -48,50 +48,43 @@ const COLUMNS: DataTableColumn<SortKey>[] = [
 
 type TicketRow = Ticket & { storeName: string; assignee: string };
 
+function mapTicketRow(row: Record<string, unknown>): TicketRow {
+  const ticket = mapTicket(row);
+  return {
+    ...ticket,
+    storeName: typeof row.store_name === "string" ? row.store_name : "—",
+    assignee: ticket.assigneeName ?? "—",
+  };
+}
+
+const SORT_COLUMNS: Partial<Record<SortKey, string>> = {
+  code: "code",
+  title: "title",
+  storeName: "store_name",
+  priority: "priority",
+  status: "status",
+  assignee: "assignee_name",
+};
+const SEARCH_COLUMNS = ["code", "title", "store_name", "assignee_name"];
+
 function TicketsContent() {
   const router = useRouter();
   const { tickets, deleteTicket } = useModules();
-  const { stores } = useStores();
   const { canAdd, canEdit, canDelete } = usePermissions("tickets");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
 
-  const rows: TicketRow[] = useMemo(
-    () =>
-      tickets.map((item) => ({
-        ...item,
-        storeName: stores.find((s) => s.id === item.storeId)?.name ?? "—",
-        assignee: item.assigneeName ?? "—",
-      })),
-    [tickets, stores]
-  );
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase("tr");
-    return rows.filter((item) => {
-      if (status !== "all" && item.status !== status) return false;
-      if (priority !== "all" && item.priority !== priority) return false;
-      if (!q) return true;
-      return [item.code, item.title, item.storeName, item.assignee]
-        .join(" ")
-        .toLocaleLowerCase("tr")
-        .includes(q);
-    });
-  }, [rows, query, status, priority]);
-
-  const getSortValue = useCallback((item: TicketRow, key: SortKey) => {
-    if (key === "actions") return "";
-    if (key === "assignee") return item.assignee;
-    if (key === "storeName") return item.storeName;
-    return item[key] ?? "";
-  }, []);
-
-  const table = useTableState<TicketRow, SortKey>({
-    items: filtered,
-    initialSort: { key: "title", direction: "asc" },
-    getSortValue,
-    resetKey: `${query}|${status}|${priority}`,
+  const table = useServerTable<TicketRow, SortKey>({
+    source: "tickets_list",
+    mapRow: mapTicketRow,
+    searchColumns: SEARCH_COLUMNS,
+    search: query,
+    filters: { status, priority },
+    sortColumns: SORT_COLUMNS,
+    initialSort: { key: "code", direction: "asc" },
+    // Ekleme/düzenleme/silme sonrası listeyi tazele
+    refreshKey: tickets,
   });
 
   const handleDelete = async (id: string, title: string) => {
@@ -179,7 +172,7 @@ function TicketsContent() {
             </td>
           </tr>
         ))}
-        {table.totalItems === 0 && (
+        {!table.isLoading && table.totalItems === 0 && (
           <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
         )}
       </DataTable>

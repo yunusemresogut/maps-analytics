@@ -54,7 +54,7 @@ function ApprovalsContent() {
 
   const onSortKeyChange = (key: SortKey) => {
     if (table.sort.key !== key) {
-      table.toggleSort(key);
+      table.setSortKey(key);
     }
   };
 

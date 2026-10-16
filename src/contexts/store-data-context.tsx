@@ -4,12 +4,15 @@ import {
   createContext,
   useCallback,
   useContext,
+  useState,
 } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useDb } from "@/contexts/db-context";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity-log";
 import { isAllowedFileType } from "@/lib/file-types";
+import { chunk } from "@/lib/supabase-query";
+import { fetchStoreSummary, fetchStoreWorkPlan } from "@/lib/store-details";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { ParsedWorkPlanPredecessor, ParsedWorkPlanRow } from "@/lib/excel-work-plan";
 import type {
@@ -28,6 +31,8 @@ type StoreDataContextValue = {
   updateSpecialNote: (storeId: string, note: string) => void;
   addFile: (storeId: string, file: File) => Promise<{ success: boolean; error?: string }>;
   deleteFile: (storeId: string, fileId: string) => void;
+  /** Malzeme/iş planı her değiştiğinde artar; listeler bunu izleyip yeniden çeker */
+  getDetailVersion: (storeId: string) => number;
   // Materials
   importMaterials: (
     storeId: string,
@@ -37,14 +42,14 @@ type StoreDataContextValue = {
   addMaterial: (
     storeId: string,
     material: Omit<StoreMaterial, "id" | "storeId" | "userId" | "importedAt">
-  ) => void;
+  ) => Promise<void>;
   updateMaterial: (
     storeId: string,
     materialId: string,
     updates: Partial<StoreMaterial>
-  ) => void;
-  deleteMaterial: (storeId: string, materialId: string) => void;
-  clearMaterials: (storeId: string) => void;
+  ) => Promise<void>;
+  /** Tek veya çoklu silme */
+  deleteMaterial: (storeId: string, materialIds: string | string[]) => Promise<void>;
   // Work Plan
   importWorkPlan: (
     storeId: string,
@@ -54,14 +59,14 @@ type StoreDataContextValue = {
   addWorkPlanItem: (
     storeId: string,
     item: Omit<StoreWorkPlanItem, "id" | "storeId" | "userId" | "importedAt">
-  ) => void;
+  ) => Promise<void>;
   updateWorkPlanItem: (
     storeId: string,
     itemId: string,
     updates: Partial<StoreWorkPlanItem>
-  ) => void;
-  deleteWorkPlanItem: (storeId: string, itemId: string) => void;
-  clearWorkPlan: (storeId: string) => void;
+  ) => Promise<void>;
+  /** Tek veya çoklu silme; silinenlere bağlı öncüller de temizlenir */
+  deleteWorkPlanItem: (storeId: string, itemIds: string | string[]) => Promise<void>;
 };
 
 const StoreDataContext = createContext<StoreDataContextValue | null>(null);
@@ -69,14 +74,79 @@ const StoreDataContext = createContext<StoreDataContextValue | null>(null);
 const emptyData = (): StoreUserData => ({
   notes: [],
   files: [],
-  materials: [],
-  workPlan: [],
   specialNote: "",
 });
 
+function materialToDb(m: StoreMaterial) {
+  return {
+    id: m.id,
+    store_id: m.storeId,
+    user_id: m.userId,
+    name: m.name,
+    quantity: m.quantity,
+    unit: m.unit,
+    unit_price: m.unitPrice,
+    status: m.status,
+    imported_at: m.importedAt,
+  };
+}
+
+function workPlanToDb(w: StoreWorkPlanItem) {
+  return {
+    id: w.id,
+    store_id: w.storeId,
+    user_id: w.userId,
+    description: w.description,
+    start_date: w.startDate,
+    end_date: w.endDate,
+    responsible: w.responsible,
+    status: w.status,
+    source_task_id: w.sourceTaskId ?? null,
+    activity_code: w.activityCode ?? null,
+    wbs_code: w.wbsCode ?? null,
+    percent_complete: w.percentComplete,
+    predecessors: w.predecessors,
+    imported_at: w.importedAt,
+  };
+}
+
+/** Büyük içe aktarmalar tek istekte gönderilmez; sıra korunarak parça parça eklenir */
+async function insertInChunks(table: string, rows: Record<string, unknown>[]) {
+  for (const part of chunk(rows, 500)) {
+    const { error } = await supabase.from(table).insert(part);
+    if (error) throw error;
+  }
+}
+
+async function deleteByIds(table: string, ids: string[]) {
+  for (const part of chunk(ids)) {
+    const { error } = await supabase.from(table).delete().in("id", part);
+    if (error) throw error;
+  }
+}
+
 export function StoreDataProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const { storeData: data, setStoreData: setData } = useDb();
+  const { storeData: data, setStoreData: setData, setStoreSummary } = useDb();
+  const [detailVersions, setDetailVersions] = useState<Record<string, number>>({});
+
+  const getDetailVersion = useCallback(
+    (storeId: string) => detailVersions[storeId] ?? 0,
+    [detailVersions]
+  );
+
+  /** Yazma sonrası: açık listeler yeniden çekilir, mağaza özeti tazelenir */
+  const refreshDetails = useCallback(
+    async (storeId: string) => {
+      setDetailVersions((prev) => ({ ...prev, [storeId]: (prev[storeId] ?? 0) + 1 }));
+      try {
+        setStoreSummary(storeId, await fetchStoreSummary(storeId));
+      } catch (err) {
+        console.error("Mağaza özeti güncellenemedi:", err);
+      }
+    },
+    [setStoreSummary]
+  );
 
   const getStoreData = useCallback(
     (storeId: string): StoreUserData => data[storeId] ?? emptyData(),
@@ -355,196 +425,99 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         importedAt: now,
       }));
 
-      const current = data[storeId] ?? emptyData();
-      const materials =
-        mode === "append"
-          ? [...current.materials, ...imported]
-          : imported;
-
-      setData({
-        ...data,
-        [storeId]: { ...current, materials },
-      });
-
       try {
         if (mode === "replace") {
-          // Clear existing materials in Supabase first
-          await supabase.from("store_materials").delete().eq("store_id", storeId);
+          const { error } = await supabase.from("store_materials").delete().eq("store_id", storeId);
+          if (error) throw error;
         }
-
-        // Insert new ones in bulk
-        const dbRows = imported.map((m) => ({
-          id: m.id,
-          store_id: m.storeId,
-          user_id: m.userId,
-          name: m.name,
-          quantity: m.quantity,
-          unit: m.unit,
-          unit_price: m.unitPrice,
-          status: m.status,
-          imported_at: m.importedAt,
-        }));
-
-        const { error } = await supabase.from("store_materials").insert(dbRows);
-        if (error) throw error;
+        // Satırlar dosyadaki sırayla eklenir; seq bu sırayı kalıcı kılar
+        await insertInChunks("store_materials", imported.map(materialToDb));
       } catch (err) {
         console.error("Bulk materials insert error:", err);
+        await refreshDetails(storeId);
+        return 0;
       }
 
       logActivity({
         category: "material",
         action: "import",
-        message: `Malzeme ${mode === "replace" ? "içe aktarıldı" : "eklendi"}: ${imported.length} satır (${storeId})`,
+        message: `Keşif ${mode === "replace" ? "içe aktarıldı" : "eklendi"}: ${imported.length} kalem (${storeId})`,
         actorId: user.id,
         actorName: user.name,
         targetId: storeId,
         targetLabel: storeId,
       });
-
+      await refreshDetails(storeId);
       return imported.length;
     },
-    [user, data, setData]
+    [user, refreshDetails]
   );
 
   const addMaterial = useCallback(
-    (
+    async (
       storeId: string,
       material: Omit<StoreMaterial, "id" | "storeId" | "userId" | "importedAt">
     ) => {
       if (!user) return;
-      const now = new Date().toISOString();
       const newMaterial: StoreMaterial = {
         ...material,
         id: `material-${Date.now()}`,
         storeId,
         userId: user.id,
-        importedAt: now,
+        importedAt: new Date().toISOString(),
       };
-      const current = data[storeId] ?? emptyData();
-      setData({
-        ...data,
-        [storeId]: {
-          ...current,
-          materials: [...current.materials, newMaterial],
-        },
-      });
-
-      supabase
-        .from("store_materials")
-        .insert({
-          id: newMaterial.id,
-          store_id: newMaterial.storeId,
-          user_id: newMaterial.userId,
-          name: newMaterial.name,
-          quantity: newMaterial.quantity,
-          unit: newMaterial.unit,
-          unit_price: newMaterial.unitPrice,
-          status: newMaterial.status,
-          imported_at: newMaterial.importedAt,
-        })
-        .then(({ error }) => {
-          if (error) console.error("Error adding material:", error);
-        });
+      const { error } = await supabase.from("store_materials").insert(materialToDb(newMaterial));
+      if (error) console.error("Error adding material:", error);
+      await refreshDetails(storeId);
     },
-    [user, data, setData]
+    [user, refreshDetails]
   );
 
   const updateMaterial = useCallback(
-    (
-      storeId: string,
-      materialId: string,
-      updates: Partial<StoreMaterial>
-    ) => {
-      const current = data[storeId] ?? emptyData();
-      setData({
-        ...data,
-        [storeId]: {
-          ...current,
-          materials: current.materials.map((m) =>
-            m.id === materialId ? { ...m, ...updates } : m
-          ),
-        },
-      });
-
-      // Map to db columns
-      const dbUpdates: any = {};
+    async (storeId: string, materialId: string, updates: Partial<StoreMaterial>) => {
+      const dbUpdates: Record<string, unknown> = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity;
       if (updates.unit !== undefined) dbUpdates.unit = updates.unit;
       if (updates.unitPrice !== undefined) dbUpdates.unit_price = updates.unitPrice;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
 
-      supabase
+      const { error } = await supabase
         .from("store_materials")
         .update(dbUpdates)
-        .eq("id", materialId)
-        .then(({ error }) => {
-          if (error) console.error("Error updating material:", error);
-        });
+        .eq("id", materialId);
+      if (error) console.error("Error updating material:", error);
+      await refreshDetails(storeId);
     },
-    [data, setData]
+    [refreshDetails]
   );
 
   const deleteMaterial = useCallback(
-    (storeId: string, materialId: string) => {
-      const current = data[storeId] ?? emptyData();
-      setData({
-        ...data,
-        [storeId]: {
-          ...current,
-          materials: current.materials.filter((m) => m.id !== materialId),
-        },
-      });
-
-      supabase
-        .from("store_materials")
-        .delete()
-        .eq("id", materialId)
-        .then(({ error }) => {
-          if (error) console.error("Error deleting material:", error);
-        });
+    async (storeId: string, materialIds: string | string[]) => {
+      const ids = [...new Set(Array.isArray(materialIds) ? materialIds : [materialIds])];
+      if (ids.length === 0) return;
+      try {
+        await deleteByIds("store_materials", ids);
+      } catch (err) {
+        console.error("Error deleting material:", err);
+      }
       if (user) {
         logActivity({
           category: "material",
           action: "delete",
-          message: `Malzeme silindi (${storeId})`,
+          message:
+            ids.length === 1
+              ? `Keşif kalemi silindi (${storeId})`
+              : `${ids.length} keşif kalemi silindi (${storeId})`,
           actorId: user.id,
           actorName: user.name,
-          targetId: materialId,
+          targetId: ids.length === 1 ? ids[0] : storeId,
           targetLabel: storeId,
         });
       }
+      await refreshDetails(storeId);
     },
-    [data, setData, user]
-  );
-
-  const clearMaterials = useCallback(
-    (storeId: string) => {
-      const current = data[storeId] ?? emptyData();
-      setData({
-        ...data,
-        [storeId]: { ...current, materials: [] },
-      });
-
-      supabase
-        .from("store_materials")
-        .delete()
-        .eq("store_id", storeId)
-        .then(({ error }) => {
-          if (error) console.error("Error clearing materials:", error);
-        });
-      if (user) {
-        logActivity({
-          category: "material",
-          action: "clear",
-          message: `Malzeme listesi temizlendi (${storeId})`,
-          actorId: user.id,
-          actorName: user.name,
-          targetId: storeId,
-        });
-      }
-    },
-    [data, setData, user]
+    [user, refreshDetails]
   );
 
   const importWorkPlan = useCallback(
@@ -555,172 +528,97 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
     ) => {
       if (!user) return 0;
       const now = new Date().toISOString();
-      const current = data[storeId] ?? emptyData();
-      const importedIds = rows.map(
-        (_, index) => `workplan-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`
-      );
-      const idBySourceTaskId = new Map(
-        rows.flatMap((row, index) =>
-          row.sourceTaskId ? [[row.sourceTaskId, importedIds[index]] as const] : []
-        )
-      );
-      const imported: StoreWorkPlanItem[] = rows.map((row, index) => {
-        const status = row.status || "yapilacak";
-        const predecessors: WorkPlanDependency[] = (
-          row.predecessorSourceIds ?? []
-        ).flatMap((predecessor: ParsedWorkPlanPredecessor) => {
-          const predecessorId =
-            idBySourceTaskId.get(predecessor.sourceTaskId) ??
-            current.workPlan.find(
-              (existing) => existing.sourceTaskId === predecessor.sourceTaskId
-            )?.id;
-          return predecessorId
-            ? [{
-                predecessorId,
-                type: predecessor.type,
-                lagHours: predecessor.lagHours,
-              }]
-            : [];
-        });
-        return {
-        id: importedIds[index],
-        storeId,
-        userId: user.id,
-        description: row.description,
-        startDate: row.startDate,
-        endDate: row.endDate,
-        responsible: row.responsible,
-        status,
-        sourceTaskId: row.sourceTaskId,
-        activityCode: row.activityCode,
-        wbsCode: row.wbsCode,
-        percentComplete:
-          row.percentComplete ??
-          (status === "tamamlandi" ? 100 : status === "devam_ediyor" ? 50 : 0),
-        predecessors,
-        importedAt: now,
-        };
-      });
-
-      const workPlan =
-        mode === "append" ? [...current.workPlan, ...imported] : imported;
-
-      setData({
-        ...data,
-        [storeId]: { ...current, workPlan },
-      });
-
       try {
+        // Eklemede öncüller mevcut kalemlere de bağlanabilir
+        const existing = mode === "append" ? await fetchStoreWorkPlan(storeId) : [];
+        const importedIds = rows.map(
+          (_, index) => `workplan-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`
+        );
+        const idBySourceTaskId = new Map(
+          rows.flatMap((row, index) =>
+            row.sourceTaskId ? [[row.sourceTaskId, importedIds[index]] as const] : []
+          )
+        );
+        const imported: StoreWorkPlanItem[] = rows.map((row, index) => {
+          const status = row.status || "yapilacak";
+          const predecessors: WorkPlanDependency[] = (
+            row.predecessorSourceIds ?? []
+          ).flatMap((predecessor: ParsedWorkPlanPredecessor) => {
+            const predecessorId =
+              idBySourceTaskId.get(predecessor.sourceTaskId) ??
+              existing.find((item) => item.sourceTaskId === predecessor.sourceTaskId)?.id;
+            return predecessorId
+              ? [{ predecessorId, type: predecessor.type, lagHours: predecessor.lagHours }]
+              : [];
+          });
+          return {
+            id: importedIds[index],
+            storeId,
+            userId: user.id,
+            description: row.description,
+            startDate: row.startDate,
+            endDate: row.endDate,
+            responsible: row.responsible,
+            status,
+            sourceTaskId: row.sourceTaskId,
+            activityCode: row.activityCode,
+            wbsCode: row.wbsCode,
+            percentComplete:
+              row.percentComplete ??
+              (status === "tamamlandi" ? 100 : status === "devam_ediyor" ? 50 : 0),
+            predecessors,
+            importedAt: now,
+          };
+        });
+
         if (mode === "replace") {
-          // Clear existing work plan items in Supabase first
-          await supabase.from("store_work_plan").delete().eq("store_id", storeId);
+          const { error } = await supabase.from("store_work_plan").delete().eq("store_id", storeId);
+          if (error) throw error;
         }
+        await insertInChunks("store_work_plan", imported.map(workPlanToDb));
 
-        // Insert new ones in bulk
-        const dbRows = imported.map((wp) => ({
-          id: wp.id,
-          store_id: wp.storeId,
-          user_id: wp.userId,
-          description: wp.description,
-          start_date: wp.startDate,
-          end_date: wp.endDate,
-          responsible: wp.responsible,
-          status: wp.status,
-          source_task_id: wp.sourceTaskId ?? null,
-          activity_code: wp.activityCode ?? null,
-          wbs_code: wp.wbsCode ?? null,
-          percent_complete: wp.percentComplete,
-          predecessors: wp.predecessors,
-          imported_at: wp.importedAt,
-        }));
-
-        const { error } = await supabase.from("store_work_plan").insert(dbRows);
-        if (error) throw error;
+        logActivity({
+          category: "workplan",
+          action: "import",
+          message: `İş programı ${mode === "replace" ? "içe aktarıldı" : "eklendi"}: ${imported.length} satır (${storeId})`,
+          actorId: user.id,
+          actorName: user.name,
+          targetId: storeId,
+        });
+        await refreshDetails(storeId);
+        return imported.length;
       } catch (err) {
         console.error("Bulk work plan insert error:", err);
+        await refreshDetails(storeId);
+        return 0;
       }
-
-      logActivity({
-        category: "workplan",
-        action: "import",
-        message: `İş programı ${mode === "replace" ? "içe aktarıldı" : "eklendi"}: ${imported.length} satır (${storeId})`,
-        actorId: user.id,
-        actorName: user.name,
-        targetId: storeId,
-      });
-
-      return imported.length;
     },
-    [user, data, setData]
+    [user, refreshDetails]
   );
 
   const addWorkPlanItem = useCallback(
-    (
+    async (
       storeId: string,
       item: Omit<StoreWorkPlanItem, "id" | "storeId" | "userId" | "importedAt">
     ) => {
       if (!user) return;
-      const now = new Date().toISOString();
       const newItem: StoreWorkPlanItem = {
         ...item,
         id: `workplan-${Date.now()}`,
         storeId,
         userId: user.id,
-        importedAt: now,
+        importedAt: new Date().toISOString(),
       };
-      const current = data[storeId] ?? emptyData();
-      setData({
-        ...data,
-        [storeId]: {
-          ...current,
-          workPlan: [...current.workPlan, newItem],
-        },
-      });
-
-      supabase
-        .from("store_work_plan")
-        .insert({
-          id: newItem.id,
-          store_id: newItem.storeId,
-          user_id: newItem.userId,
-          description: newItem.description,
-          start_date: newItem.startDate,
-          end_date: newItem.endDate,
-          responsible: newItem.responsible,
-          status: newItem.status,
-          source_task_id: newItem.sourceTaskId ?? null,
-          activity_code: newItem.activityCode ?? null,
-          wbs_code: newItem.wbsCode ?? null,
-          percent_complete: newItem.percentComplete,
-          predecessors: newItem.predecessors,
-          imported_at: newItem.importedAt,
-        })
-        .then(({ error }) => {
-          if (error) console.error("Error adding work plan item:", error);
-        });
+      const { error } = await supabase.from("store_work_plan").insert(workPlanToDb(newItem));
+      if (error) console.error("Error adding work plan item:", error);
+      await refreshDetails(storeId);
     },
-    [user, data, setData]
+    [user, refreshDetails]
   );
 
   const updateWorkPlanItem = useCallback(
-    (
-      storeId: string,
-      itemId: string,
-      updates: Partial<StoreWorkPlanItem>
-    ) => {
-      const current = data[storeId] ?? emptyData();
-      setData({
-        ...data,
-        [storeId]: {
-          ...current,
-          workPlan: current.workPlan.map((w) =>
-            w.id === itemId ? { ...w, ...updates } : w
-          ),
-        },
-      });
-
-      // Map to db columns
-      const dbUpdates: any = {};
+    async (storeId: string, itemId: string, updates: Partial<StoreWorkPlanItem>) => {
+      const dbUpdates: Record<string, unknown> = {};
       if (updates.description !== undefined) dbUpdates.description = updates.description;
       if (updates.startDate !== undefined) dbUpdates.start_date = updates.startDate;
       if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate;
@@ -732,107 +630,61 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
       if (updates.percentComplete !== undefined) dbUpdates.percent_complete = updates.percentComplete;
       if (updates.predecessors !== undefined) dbUpdates.predecessors = updates.predecessors;
 
-      supabase
+      const { error } = await supabase
         .from("store_work_plan")
         .update(dbUpdates)
-        .eq("id", itemId)
-        .then(({ error }) => {
-          if (error) console.error("Error updating work plan item:", error);
-        });
+        .eq("id", itemId);
+      if (error) console.error("Error updating work plan item:", error);
+      await refreshDetails(storeId);
     },
-    [data, setData]
+    [refreshDetails]
   );
 
   const deleteWorkPlanItem = useCallback(
-    (storeId: string, itemId: string) => {
-      const current = data[storeId] ?? emptyData();
-      // Silinen kaleme bağlı öncül referanslarını diğer kalemlerden temizle
-      const dependents = current.workPlan.filter(
-        (w) => w.id !== itemId && w.predecessors.some((p) => p.predecessorId === itemId)
-      );
-      const cleanedPredecessors = new Map(
-        dependents.map((w) => [
-          w.id,
-          w.predecessors.filter((p) => p.predecessorId !== itemId),
-        ])
-      );
-      setData({
-        ...data,
-        [storeId]: {
-          ...current,
-          workPlan: current.workPlan
-            .filter((w) => w.id !== itemId)
-            .map((w) => {
-              const predecessors = cleanedPredecessors.get(w.id);
-              return predecessors ? { ...w, predecessors } : w;
-            }),
-        },
-      });
-
-      supabase
-        .from("store_work_plan")
-        .delete()
-        .eq("id", itemId)
-        .then(({ error }) => {
-          if (error) console.error("Error deleting work plan item:", error);
-        });
-      cleanedPredecessors.forEach((predecessors, dependentId) => {
-        supabase
-          .from("store_work_plan")
-          .update({ predecessors })
-          .eq("id", dependentId)
-          .then(({ error }) => {
-            if (error) console.error("Error updating work plan predecessors:", error);
-          });
-      });
+    async (storeId: string, itemIds: string | string[]) => {
+      const ids = new Set(Array.isArray(itemIds) ? itemIds : [itemIds]);
+      if (ids.size === 0) return;
+      try {
+        await deleteByIds("store_work_plan", [...ids]);
+        // Silinen kalemlere bağlı öncül referanslarını kalan kalemlerden temizle
+        const remaining = await fetchStoreWorkPlan(storeId);
+        for (const item of remaining) {
+          if (!item.predecessors.some((p) => ids.has(p.predecessorId))) continue;
+          const { error } = await supabase
+            .from("store_work_plan")
+            .update({
+              predecessors: item.predecessors.filter((p) => !ids.has(p.predecessorId)),
+            })
+            .eq("id", item.id);
+          if (error) console.error("Error updating work plan predecessors:", error);
+        }
+      } catch (err) {
+        console.error("Error deleting work plan item:", err);
+      }
       if (user) {
         logActivity({
           category: "workplan",
           action: "delete",
-          message: `İş programı kalemi silindi (${storeId})`,
+          message:
+            ids.size === 1
+              ? `İş programı kalemi silindi (${storeId})`
+              : `${ids.size} iş programı kalemi silindi (${storeId})`,
           actorId: user.id,
           actorName: user.name,
-          targetId: itemId,
+          targetId: ids.size === 1 ? [...ids][0] : storeId,
           targetLabel: storeId,
         });
       }
+      await refreshDetails(storeId);
     },
-    [data, setData, user]
-  );
-
-  const clearWorkPlan = useCallback(
-    (storeId: string) => {
-      const current = data[storeId] ?? emptyData();
-      setData({
-        ...data,
-        [storeId]: { ...current, workPlan: [] },
-      });
-
-      supabase
-        .from("store_work_plan")
-        .delete()
-        .eq("store_id", storeId)
-        .then(({ error }) => {
-          if (error) console.error("Error clearing work plan:", error);
-        });
-      if (user) {
-        logActivity({
-          category: "workplan",
-          action: "clear",
-          message: `İş programı temizlendi (${storeId})`,
-          actorId: user.id,
-          actorName: user.name,
-          targetId: storeId,
-        });
-      }
-    },
-    [data, setData, user]
+    [user, refreshDetails]
   );
 
   return (
     <StoreDataContext.Provider
       value={{
         getStoreData,
+        getDetailVersion,
         addNote,
         deleteNote,
         updateSpecialNote,
@@ -842,12 +694,10 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         addMaterial,
         updateMaterial,
         deleteMaterial,
-        clearMaterials,
         importWorkPlan,
         addWorkPlanItem,
         updateWorkPlanItem,
         deleteWorkPlanItem,
-        clearWorkPlan,
       }}
     >
       {children}

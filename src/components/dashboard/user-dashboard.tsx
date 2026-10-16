@@ -32,7 +32,7 @@ const LOCATION_TYPE_LABELS: Record<string, string> = {
 export function UserDashboard() {
   const { stores } = useStores();
   const { regions } = useRegions();
-  const { storeData } = useDb();
+  const { storeSummaries } = useDb();
   const t = useT();
 
   // Status distributions
@@ -99,15 +99,10 @@ export function UserDashboard() {
     .slice(0, 4);
 
   // Financial calculations
-  const totalSpent = Object.values(storeData).reduce((total, sData) => {
-    return (
-      total +
-      (sData.materials ?? []).reduce(
-        (sum, m) => sum + m.quantity * m.unitPrice,
-        0
-      )
-    );
-  }, 0);
+  const totalSpent = Object.values(storeSummaries).reduce(
+    (total, summary) => total + summary.materialTotal,
+    0
+  );
 
   const formattedSpent = formatTry(totalSpent);
 
@@ -153,7 +148,7 @@ export function UserDashboard() {
             color="text-amber-400"
           />
           <MetricCard
-            label="Toplam Malzeme Harcaması"
+            label="Toplam Keşif Tutarı"
             value={formattedSpent}
             icon={Coins}
             color="text-emerald-400"

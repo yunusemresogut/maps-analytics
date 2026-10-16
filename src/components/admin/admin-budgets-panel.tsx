@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useStores } from "@/contexts/stores-context";
-import { useStoreData } from "@/contexts/store-data-context";
+import { useDb } from "@/contexts/db-context";
 import { useTableState } from "@/hooks/use-table-state";
 import { formatCurrency } from "@/lib/excel-materials";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ type SortKey =
 
 export function AdminBudgetsPanel() {
   const { stores, updateStore } = useStores();
-  const { getStoreData } = useStoreData();
+  const { storeSummaries } = useDb();
   const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
   const [editBudgetValue, setEditBudgetValue] = useState("");
   const [message, setMessage] = useState("");
@@ -47,11 +47,7 @@ export function AdminBudgetsPanel() {
   const storesData = useMemo(
     () =>
       stores.map((store) => {
-        const sData = getStoreData(store.id);
-        const spentAmount = sData.materials.reduce(
-          (sum, m) => sum + m.quantity * m.unitPrice,
-          0
-        );
+        const spentAmount = storeSummaries[store.id]?.materialTotal ?? 0;
         const remainingBudget = store.totalBudget - spentAmount;
         const isOverrun = spentAmount > store.totalBudget;
         const percentSpent =
@@ -65,7 +61,7 @@ export function AdminBudgetsPanel() {
           percentSpent,
         };
       }),
-    [stores, getStoreData]
+    [stores, storeSummaries]
   );
 
   const getSortValue = useCallback((item: BudgetRow, key: SortKey) => {

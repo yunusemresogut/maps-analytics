@@ -5,9 +5,16 @@ import { usePathname } from "next/navigation";
 import { ArrowUp, ChevronDown, RotateCcw, Sparkles, Square } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useDb } from "@/contexts/db-context";
-import { buildAssistantContext } from "@/lib/assistant-context";
+import {
+  MAX_ITEMS_PER_STORE,
+  buildAssistantContext,
+  pickDetailStores,
+  type StoreDetails,
+} from "@/lib/assistant-context";
+import { fetchStoreMaterialsPreview, fetchStoreWorkPlanPreview } from "@/lib/store-details";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import type { Store } from "@/types";
 
 type ChatMessage = { role: "user" | "assistant"; content: string; error?: boolean };
 
@@ -81,10 +88,29 @@ function MessageContent({ text }: { text: string }) {
   return <div className="space-y-2">{blocks}</div>;
 }
 
+/** Seçilen mağazaların ilk kalemlerini paralel çeker; hata veren mağaza atlanır */
+async function loadStoreDetails(stores: Store[]): Promise<Record<string, StoreDetails>> {
+  const entries = await Promise.all(
+    stores.map(async (store) => {
+      try {
+        const [materials, workPlan] = await Promise.all([
+          fetchStoreMaterialsPreview(store.id, MAX_ITEMS_PER_STORE),
+          fetchStoreWorkPlanPreview(store.id, MAX_ITEMS_PER_STORE),
+        ]);
+        return [[store.id, { materials, workPlan }] as const];
+      } catch (err) {
+        console.error("Asistan için mağaza detayı alınamadı:", err);
+        return [];
+      }
+    })
+  );
+  return Object.fromEntries(entries.flat());
+}
+
 export function AssistantWidget() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { stores, storeData, contracts, progressPayments, invoices, tickets, organization } = useDb();
+  const { stores, storeSummaries, contracts, progressPayments, invoices, tickets, organization } = useDb();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -126,6 +152,9 @@ export function AssistantWidget() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+      const storeDetails = await loadStoreDetails(
+        pickDetailStores(stores, storeSummaries, content)
+      );
       const response = await fetch("/api/assistant", {
         method: "POST",
         headers: {
@@ -139,7 +168,8 @@ export function AssistantWidget() {
             organizationName: organization?.name,
             userName: user.name,
             stores,
-            storeData,
+            storeSummaries,
+            storeDetails,
             contracts,
             progressPayments,
             invoices,

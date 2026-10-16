@@ -16,19 +16,9 @@ type MaterialsImportMenuProps = {
 
 async function parseMaterials(file: File) {
   const result = await parseMaterialsFromExcel(file);
-  const columns = result.matchedColumns;
   return {
     rows: result.materials,
     error: result.errors.join(" · "),
-    info: [
-      columns.description && `Açıklama → ${columns.description}`,
-      columns.quantity && `Miktar → ${columns.quantity}`,
-      columns.unit && `Birim → ${columns.unit}`,
-      columns.unitPrice && `Birim Fiyat → ${columns.unitPrice}`,
-      columns.status && `Durum → ${columns.status}`,
-    ]
-      .filter(Boolean)
-      .join(" · "),
   };
 }
 
@@ -36,7 +26,7 @@ export function MaterialsImportMenu({ existingCount, onImport }: MaterialsImport
   return (
     <ImportMenu
       accept=".xlsx,.xls"
-      itemLabel="malzeme"
+      itemLabel="keşif kalemi"
       existingCount={existingCount}
       hint="Excel dosyası seçin (Açıklama, Miktar, Birim, Birim Fiyat)"
       parse={parseMaterials}

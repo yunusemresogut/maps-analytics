@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pencil } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { ApprovalSwitches } from "@/components/projects/approval-switches";
@@ -13,7 +13,8 @@ import {
 } from "@/components/modules/module-table";
 import { useStores } from "@/contexts/stores-context";
 import { useT } from "@/contexts/i18n-context";
-import { useTableState } from "@/hooks/use-table-state";
+import { useServerTable } from "@/hooks/use-server-table";
+import { mapStoreFromDb } from "@/lib/store-mapper";
 import { usePermissions } from "@/hooks/use-permissions";
 import { getProjectStatusLabel } from "@/lib/project-status";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,13 @@ function isPendingApproval(store: Store) {
   );
 }
 
+const SORT_COLUMNS: Partial<Record<SortKey, string>> = {
+  name: "name",
+  city: "city",
+  status: "project_status",
+  approvals: "approval_count",
+};
+
 function StoresList() {
   const searchParams = useSearchParams();
   const initialTab =
@@ -58,23 +66,16 @@ function StoresList() {
   const { canEdit } = usePermissions("stores");
   const t = useT();
 
-  const filtered = useMemo(() => {
-    if (tab === "pending") return stores.filter(isPendingApproval);
-    return stores;
-  }, [stores, tab]);
-
-  const getSortValue = useCallback((store: Store, key: SortKey) => {
-    if (key === "actions") return "";
-    if (key === "status") return store.projectStatus;
-    if (key === "approvals") return approvalCount(store);
-    return store[key];
-  }, []);
-
-  const table = useTableState<Store, SortKey>({
-    items: filtered,
+  const table = useServerTable<Store, SortKey>({
+    source: "stores_list",
+    mapRow: mapStoreFromDb,
+    searchColumns: [],
+    search: "",
+    filters: { pending_approval: tab === "pending" ? true : undefined },
+    sortColumns: SORT_COLUMNS,
     initialSort: { key: "name", direction: "asc" },
-    getSortValue,
-    resetKey: `${tab}|${filtered.length}`,
+    // Onay değişiklikleri mağaza listesini günceller
+    refreshKey: stores,
   });
 
   const pendingCount = useMemo(
@@ -163,7 +164,7 @@ function StoresList() {
             onSort={table.toggleSort}
             minWidthClassName="min-w-[520px]"
           >
-            {table.totalItems === 0 && (
+            {!table.isLoading && table.totalItems === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-zinc-600">
                   {t("common.noData")}

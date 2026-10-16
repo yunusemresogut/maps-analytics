@@ -81,7 +81,7 @@ export function AdminRegionsPanel() {
           value={table.sort.key}
           onChange={(e) => {
             const key = e.target.value as SortKey;
-            if (table.sort.key !== key) table.toggleSort(key);
+            if (table.sort.key !== key) table.setSortKey(key);
           }}
           className="h-9 w-auto min-w-[160px]"
         >

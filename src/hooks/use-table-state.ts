@@ -33,6 +33,38 @@ function compareValues(a: SortValue, b: SortValue, direction: SortDirection) {
   );
 }
 
+/**
+ * Başlık tıklamasında sıradaki sıralama durumu; null = varsayılan (initialSort).
+ * Döngü: varsayılan → artan → azalan → varsayılan
+ */
+export function nextSortState<K extends string>(
+  prev: SortState<K> | null,
+  key: K,
+  initialSort: SortState<K>
+): SortState<K> | null {
+  let next: SortState<K> | null;
+  if (prev?.key === key) {
+    next = prev.direction === "asc" ? { key, direction: "desc" } : null;
+  } else if (key === initialSort.key) {
+    // Varsayılan kolonda ilk tık görünür bir değişiklik yapsın
+    next = {
+      key,
+      direction: initialSort.direction === "asc" ? "desc" : "asc",
+    };
+  } else {
+    next = { key, direction: "asc" };
+  }
+  // Varsayılanla aynı duruma gelindiyse varsayılana dön
+  if (
+    next &&
+    next.key === initialSort.key &&
+    next.direction === initialSort.direction
+  ) {
+    return null;
+  }
+  return next;
+}
+
 export function useTableState<T, K extends string>(options: {
   items: T[];
   initialSort: SortState<K>;
@@ -41,7 +73,10 @@ export function useTableState<T, K extends string>(options: {
   /** When this string changes, page resets to 1 (e.g. filter signature) */
   resetKey?: string;
 }) {
-  const [sort, setSort] = useState<SortState<K>>(options.initialSort);
+  // null = varsayılan sıralama (initialSort)
+  const [userSort, setUserSort] = useState<SortState<K> | null>(null);
+  const initialSort = options.initialSort;
+  const sort = userSort ?? initialSort;
   const [page, setPage] = useState(1);
   const [pageSize, setPageSizeState] = useState(options.initialPageSize ?? 10);
   const [prevResetKey, setPrevResetKey] = useState(options.resetKey ?? "");
@@ -74,14 +109,25 @@ export function useTableState<T, K extends string>(options: {
     return sorted.slice(start, start + pageSize);
   }, [sorted, currentPage, pageSize]);
 
-  const toggleSort = useCallback((key: K) => {
-    setSort((prev) =>
-      prev.key === key
-        ? { key, direction: prev.direction === "asc" ? "desc" : "asc" }
-        : { key, direction: "asc" }
-    );
-    setPage(1);
-  }, []);
+  const { key: initialKey, direction: initialDirection } = initialSort;
+  const toggleSort = useCallback(
+    (key: K) => {
+      setUserSort((prev) =>
+        nextSortState(prev, key, { key: initialKey, direction: initialDirection })
+      );
+      setPage(1);
+    },
+    [initialKey, initialDirection]
+  );
+
+  /** Açılır menü gibi tek seçimli kontroller için: kolonu varsayılan yönüyle seçer */
+  const setSortKey = useCallback(
+    (key: K) => {
+      setUserSort(key === initialSort.key ? null : { key, direction: "asc" });
+      setPage(1);
+    },
+    [initialSort.key]
+  );
 
   const setPageSize = useCallback((size: number) => {
     setPageSizeState(size);
@@ -94,6 +140,7 @@ export function useTableState<T, K extends string>(options: {
   return {
     sort,
     toggleSort,
+    setSortKey,
     page: currentPage,
     setPage,
     pageSize,
