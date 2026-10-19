@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import {
   activeFilters,
+  chunk,
   fetchAllRows,
   searchFilter,
   type ListFilterValue,
@@ -45,6 +46,7 @@ export function mapMaterialFromDb(m: Record<string, unknown>): StoreMaterial {
     unitPrice: Number(m.unit_price || 0),
     status: m.status as StoreMaterial["status"],
     importedAt: String(m.imported_at ?? ""),
+    seq: m.seq === null || m.seq === undefined ? undefined : Number(m.seq),
   };
 }
 
@@ -172,6 +174,18 @@ export async function fetchStoreWorkPlanPreview(
  * "Tüm sonuçları seç" ile yapılan toplu işlemler, ekranda görünmeyen
  * sayfalardaki satırları da bu şekilde hedefler.
  */
+/** Seçili keşif kalemlerinin güncel hâli (sayfalar arası seçim için) */
+export async function fetchMaterialsByIds(ids: string[]): Promise<StoreMaterial[]> {
+  const rows: StoreMaterial[] = [];
+  for (const part of chunk(ids, 200)) {
+    const { data, error } = await supabase.from("store_materials").select("*").in("id", part);
+    if (error) throw error;
+    rows.push(...(data ?? []).map((row) => mapMaterialFromDb(row as Record<string, unknown>)));
+  }
+  // Tablodaki sırayla gösterilsin
+  return rows.sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+}
+
 export async function fetchMatchingIds(options: {
   source: string;
   filters: Record<string, ListFilterValue>;

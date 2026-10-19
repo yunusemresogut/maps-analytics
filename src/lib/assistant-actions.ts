@@ -11,6 +11,7 @@ import type {
 } from "@/types";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
+import { materialLineTotal } from "@/lib/material-totals";
 
 /**
  * Asistanın önerdiği kayıt ekleme eylemleri.
@@ -394,7 +395,7 @@ function buildMaterials(raw: Record<string, unknown>, ctx: BuildContext): Action
     if (unitPrice < 0) errors.push(`${label}: birim fiyat negatif olamaz.`);
     return { name, quantity: quantity ?? 0, unit: str(item.unit) || "adet", unitPrice };
   });
-  const total = rows.reduce((sum, row) => sum + row.quantity * row.unitPrice, 0);
+  const total = rows.reduce((sum, row) => sum + materialLineTotal(row), 0);
 
   return {
     title: `Keşfe ${rows.length} kalem`,
@@ -408,7 +409,7 @@ function buildMaterials(raw: Record<string, unknown>, ctx: BuildContext): Action
         row.name || "—",
         `${row.quantity.toLocaleString("tr-TR")} ${row.unit}`,
         money(row.unitPrice),
-        money(row.quantity * row.unitPrice),
+        money(materialLineTotal(row)),
       ]),
     },
     warnings: rows.some((row) => row.unitPrice === 0) ? ["Birim fiyatı belirtilmeyen kalemler 0 TRY olarak eklenecek."] : [],

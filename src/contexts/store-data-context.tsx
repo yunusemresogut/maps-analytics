@@ -38,9 +38,11 @@ type StoreDataContextValue = {
     rows: ParsedMaterialRow[],
     mode?: "append" | "replace"
   ) => Promise<number>;
+  /** options.afterSeq verilirse kalem o sıradaki kalemin hemen altına eklenir */
   addMaterial: (
     storeId: string,
-    material: Omit<StoreMaterial, "id" | "storeId" | "userId" | "importedAt">
+    material: Omit<StoreMaterial, "id" | "storeId" | "userId" | "importedAt" | "seq">,
+    options?: { afterSeq?: number }
   ) => Promise<void>;
   updateMaterial: (
     storeId: string,
@@ -424,7 +426,8 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
   const addMaterial = useCallback(
     async (
       storeId: string,
-      material: Omit<StoreMaterial, "id" | "storeId" | "userId" | "importedAt">
+      material: Omit<StoreMaterial, "id" | "storeId" | "userId" | "importedAt" | "seq">,
+      options?: { afterSeq?: number }
     ) => {
       if (!user) return;
       const newMaterial: StoreMaterial = {
@@ -434,7 +437,20 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         userId: user.id,
         importedAt: new Date().toISOString(),
       };
-      const { error } = await supabase.from("store_materials").insert(materialToDb(newMaterial));
+      // Araya ekleme: sonraki kalemlerin sırası tek işlemde kaydırılır (veritabanı fonksiyonu)
+      const { error } =
+        options?.afterSeq !== undefined
+          ? await supabase.rpc("insert_store_material_after", {
+              p_id: newMaterial.id,
+              p_store_id: storeId,
+              p_after_seq: options.afterSeq,
+              p_name: newMaterial.name,
+              p_quantity: newMaterial.quantity,
+              p_unit: newMaterial.unit,
+              p_unit_price: newMaterial.unitPrice,
+              p_status: newMaterial.status,
+            })
+          : await supabase.from("store_materials").insert(materialToDb(newMaterial));
       if (error) console.error("Error adding material:", error);
       await refreshDetails(storeId);
     },

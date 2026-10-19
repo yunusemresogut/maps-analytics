@@ -10,6 +10,7 @@ import type {
   StoreWorkPlanItem,
   Ticket,
 } from "@/types";
+import { materialLineTotal } from "@/lib/material-totals";
 
 const STATUS_LABELS: Record<string, string> = {
   proje: "Proje",
@@ -177,7 +178,7 @@ export function buildAssistantContext(input: AssistantContextInput): string {
       block.push("Keşif (kalem | miktar | birim fiyat | tutar | durum):");
       for (const m of data.materials.slice(0, MAX_ITEMS_PER_STORE)) {
         block.push(
-          `- ${m.name} | ${m.quantity} ${m.unit} | ${money(m.unitPrice)} | ${money(m.quantity * m.unitPrice)} | ${MATERIAL_STATUS[m.status] ?? m.status}`
+          `- ${m.name} | ${m.quantity} ${m.unit} | ${money(m.unitPrice)} | ${money(materialLineTotal(m))} | ${MATERIAL_STATUS[m.status] ?? m.status}`
         );
       }
       if (materialCount > data.materials.length) {

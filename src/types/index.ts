@@ -210,6 +210,8 @@ export type StoreMaterial = {
   unitPrice: number;
   status: MaterialStatus;
   importedAt: string;
+  /** Listedeki sıra (eklenme sırası; araya eklemede kaydırılır) */
+  seq?: number;
 };
 
 export type WorkPlanStatus = "yapilacak" | "devam_ediyor" | "tamamlandi";
