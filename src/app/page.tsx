@@ -3,20 +3,21 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { homePathForRole } from "@/lib/roles";
+import { useSettings } from "@/contexts/settings-context";
 
 export default function RootPage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const { homePath, prefsLoaded } = useSettings();
 
   useEffect(() => {
     if (isLoading) return;
     if (!user) {
       router.replace("/login");
-    } else {
-      router.replace(homePathForRole(user.role));
+    } else if (prefsLoaded) {
+      router.replace(homePath);
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, prefsLoaded, homePath, router]);
 
   return (
     <div className="flex min-h-screen items-center justify-center">

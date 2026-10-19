@@ -8,6 +8,7 @@ import { appendActivityLog, logActivity } from "@/lib/activity-log";
 import { approvalsToDb } from "@/lib/store-mapper";
 import { emptyApprovals } from "@/types";
 import type { ProjectApprovals, Store, StoreInput } from "@/types";
+import { useSettings } from "@/contexts/settings-context";
 
 function describeStoreUpdate(
   prev: Store,
@@ -24,21 +25,6 @@ function describeStoreUpdate(
   if (data.approvals) {
     const next = data.approvals;
     const prevA = prev.approvals ?? emptyApprovals();
-
-    if (next.projectOpened && !prevA.projectOpened) {
-      return {
-        category: "approval",
-        action: "open",
-        message: `Proje açıldı: ${prev.name}`,
-      };
-    }
-    if (!next.projectOpened && prevA.projectOpened) {
-      return {
-        category: "approval",
-        action: "close",
-        message: `Proje kapatıldı: ${prev.name}`,
-      };
-    }
 
     const disciplines: Array<{
       key: keyof Pick<
@@ -93,6 +79,8 @@ function buildStoreDbUpdates(
 
   if (data.name !== undefined) dbUpdates.name = data.name;
   if (data.city !== undefined) dbUpdates.city = data.city;
+  if (data.district !== undefined) dbUpdates.district = data.district || null;
+  if (data.country !== undefined) dbUpdates.country = data.country || null;
   if (data.address !== undefined) dbUpdates.address = data.address;
   if (data.latitude !== undefined) dbUpdates.latitude = data.latitude;
   if (data.longitude !== undefined) dbUpdates.longitude = data.longitude;
@@ -146,13 +134,14 @@ const StoresContext = createContext<StoresContextValue | null>(null);
 export function StoresProvider({ children }: { children: React.ReactNode }) {
   const { stores, setStores, contracts, setContracts } = useDb();
   const { user } = useAuth();
+  const { org } = useSettings();
 
   const addStore = useCallback(
     (data: StoreInput, meta: { userId: string; userName: string }) => {
       const now = new Date().toISOString();
       const approvals = data.approvals ?? emptyApprovals();
       const store: Store = {
-        totalBudget: 1500000,
+        totalBudget: org.defaults.storeBudget,
         ...data,
         id: `custom-${Date.now()}`,
         isCustom: true,
@@ -174,6 +163,8 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
           ...(store.organizationId ? { organization_id: store.organizationId } : {}),
           name: store.name,
           city: store.city,
+          district: store.district ?? null,
+          country: store.country ?? null,
           address: store.address,
           latitude: store.latitude,
           longitude: store.longitude,
@@ -208,7 +199,7 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
       });
       return store;
     },
-    [stores, setStores, user?.organizationId]
+    [stores, setStores, user?.organizationId, org.defaults.storeBudget]
   );
 
   const updateStore = useCallback(
@@ -254,23 +245,17 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      // Açık sözleşmeleri veritabanı tetikleyicisi tamamlar (kullanıcının sözleşme
+      // yetkisinden bağımsız); burada yalnızca ekrandaki liste güncellenir
       if (data.projectStatus === "hakedis") {
-        const { error: contractErr } = await supabase
-          .from("contracts")
-          .update({ status: "completed" })
-          .eq("store_id", id)
-          .in("status", ["active", "draft"]);
-
-        if (!contractErr) {
-          setContracts(
-            contracts.map((c) =>
-              c.storeId === id &&
-              (c.status === "active" || c.status === "draft")
-                ? { ...c, status: "completed" as const }
-                : c
-            )
-          );
-        }
+        setContracts(
+          contracts.map((c) =>
+            c.storeId === id &&
+            (c.status === "active" || c.status === "draft")
+              ? { ...c, status: "completed" as const }
+              : c
+          )
+        );
       }
 
       const desc = describeStoreUpdate(target, data);

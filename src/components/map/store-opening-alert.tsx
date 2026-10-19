@@ -54,7 +54,6 @@ export function StoreOpeningAlert({
         isOverdue
           ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
           : "border-red-500/30 bg-red-500/10 text-red-300",
-        !isOverdue && "animate-pulse",
         className
       )}
     >

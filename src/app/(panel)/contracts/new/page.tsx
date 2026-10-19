@@ -1,13 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { ModuleFormShell } from "@/components/modules/module-form-shell";
+import { PendingAttachments } from "@/components/modules/pending-attachments";
+import { useAuth } from "@/contexts/auth-context";
+import { uploadModuleAttachments } from "@/lib/upload-module-attachment";
 import { useModules } from "@/contexts/modules-context";
 import { useStores } from "@/contexts/stores-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { nextContractCode } from "@/lib/module-codes";
+import { useSettings } from "@/contexts/settings-context";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { ContractStatus } from "@/types";
@@ -18,6 +23,8 @@ function NewContractContent() {
   const { contracts, createContract } = useModules();
   const { stores } = useStores();
   const { canAdd } = usePermissions("contracts");
+  const { org } = useSettings();
+  const { user } = useAuth();
 
   const [title, setTitle] = useState("");
   const [titleTouched, setTitleTouched] = useState(false);
@@ -29,9 +36,11 @@ function NewContractContent() {
   const [status, setStatus] = useState<ContractStatus>("active");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [createdId, setCreatedId] = useState<string | null>(null);
 
   const selectedStore = stores.find((s) => s.id === storeId);
-  const contractCode = codeTouched ? code : nextContractCode(contracts);
+  const contractCode = codeTouched ? code : nextContractCode(contracts, org.defaults.contractCodePrefix);
   const contractTitle =
     titleTouched || !selectedStore ? title : `${selectedStore.name} Sözleşmesi`;
 
@@ -44,6 +53,7 @@ function NewContractContent() {
   }
 
   const save = async () => {
+    if (createdId) return;
     if (!contractTitle.trim()) {
       setSaveError("Başlık zorunludur.");
       return;
@@ -58,11 +68,25 @@ function NewContractContent() {
       storeId: storeId || undefined,
       status,
     });
-    setSaving(false);
     if (id) {
+      setCreatedId(id);
+      if (attachments.length > 0 && user) {
+        const errors = await uploadModuleAttachments({
+          table: "contract_attachments",
+          parentId: id,
+          files: attachments,
+          user,
+        });
+        if (errors.length > 0) {
+          setSaving(false);
+          setSaveError(`Sözleşme kaydedildi ancak bazı ekler yüklenemedi: ${errors.join(" ")}`);
+          return;
+        }
+      }
       router.push("/contracts");
       return;
     }
+    setSaving(false);
     setSaveError(
       "Sözleşme oluşturulamadı. Organizasyon bağlantısı veya yetkinizi kontrol edin."
     );
@@ -76,11 +100,16 @@ function NewContractContent() {
       onSave={save}
       saving={saving}
       saveLabel="Oluştur"
-      canSave={!!contractTitle.trim()}
+      canSave={!!contractTitle.trim() && !createdId}
     >
       {saveError && (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           {saveError}
+          {createdId && (
+            <Link href={`/contracts/${createdId}/edit`} className="ml-2 underline underline-offset-2">
+              Sözleşmeyi aç
+            </Link>
+          )}
         </p>
       )}
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
@@ -134,10 +163,8 @@ function NewContractContent() {
             </Select>
           </div>
         </div>
+        <PendingAttachments files={attachments} onChange={setAttachments} />
       </div>
-      <p className="text-xs text-zinc-500">
-        Kaydettikten sonra sözleşme eklerini (dosya) düzenleme ekranından yükleyebilirsiniz.
-      </p>
     </ModuleFormShell>
   );
 }

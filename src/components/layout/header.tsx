@@ -6,8 +6,9 @@ import { useAuth } from "@/contexts/auth-context";
 import { useTheme } from "@/contexts/theme-context";
 import { useSidebar } from "@/contexts/sidebar-context";
 import { useT } from "@/contexts/i18n-context";
-import { homePathForRole } from "@/lib/roles";
+import { useSettings } from "@/contexts/settings-context";
 import { MapHeaderActions } from "@/components/layout/map-header-actions";
+import { NotificationsBell } from "@/components/layout/notifications-bell";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { Button } from "@/components/ui/button";
 
@@ -17,7 +18,8 @@ export function Header() {
   const { isOpen, isPinned, toggle } = useSidebar();
   const t = useT();
 
-  const homeHref = user ? homePathForRole(user.role) : "/login";
+  const { homePath } = useSettings();
+  const homeHref = user ? homePath : "/login";
   const menuActive = isPinned || isOpen;
   const menuLabel =
     isPinned || isOpen ? t("nav.closeMenu") : t("nav.openMenu");
@@ -44,8 +46,8 @@ export function Header() {
           ) : null}
 
           <Link href={homeHref} className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-500/20 shadow-[0_0_15px_var(--glow-accent)]">
-              <Map className="h-4 w-4 text-cyan-400" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand">
+              <Map className="h-4 w-4 text-brand-on" />
             </div>
             <span className="truncate text-sm font-semibold text-zinc-100">
               Maps Analytics
@@ -55,6 +57,7 @@ export function Header() {
 
         <nav className="flex items-center gap-1">
           {user ? <MapHeaderActions /> : null}
+          {user ? <NotificationsBell /> : null}
 
           <LanguageSwitcher />
 

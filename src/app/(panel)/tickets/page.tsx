@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -20,6 +20,7 @@ import { mapTicket } from "@/contexts/db-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerTable } from "@/hooks/use-server-table";
 import type { Ticket } from "@/types";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 const PRIORITY_TR: Record<string, string> = {
   low: "Düşük",
@@ -71,11 +72,12 @@ function TicketsContent() {
   const router = useRouter();
   const { tickets, deleteTicket } = useModules();
   const { canAdd, canEdit, canDelete } = usePermissions("tickets");
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
-  const [priority, setPriority] = useState("all");
+  const [query, setQuery] = usePersistentState("tickets", "query", "");
+  const [status, setStatus] = usePersistentState("tickets", "status", "all");
+  const [priority, setPriority] = usePersistentState("tickets", "priority", "all");
 
   const table = useServerTable<TicketRow, SortKey>({
+    memoryKey: "tickets",
     source: "tickets_list",
     mapRow: mapTicketRow,
     searchColumns: SEARCH_COLUMNS,

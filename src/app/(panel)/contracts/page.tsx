@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -23,6 +23,7 @@ import { useServerTable } from "@/hooks/use-server-table";
 import { formatTry } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import type { Contract } from "@/types";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 const STATUS_TR: Record<string, string> = {
   draft: "Taslak",
@@ -70,14 +71,15 @@ function ContractsContent() {
   const searchParams = useSearchParams();
   const { contracts, deleteContract } = useModules();
   const { canAdd, canEdit, canDelete } = usePermissions("contracts");
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
+  const [query, setQuery] = usePersistentState("contracts", "query", "");
+  const [status, setStatus] = usePersistentState("contracts", "status", "all");
 
   const newHref = searchParams.get("storeId")
     ? `/contracts/new?storeId=${searchParams.get("storeId")}`
     : "/contracts/new";
 
   const table = useServerTable<ContractRow, SortKey>({
+    memoryKey: "contracts",
     source: "contracts_list",
     mapRow: mapContractRow,
     searchColumns: SEARCH_COLUMNS,

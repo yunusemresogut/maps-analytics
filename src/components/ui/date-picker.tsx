@@ -327,7 +327,7 @@ export function DatePicker({
                         className={cn(
                           "flex h-9 items-center justify-center rounded-lg text-sm tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50",
                           isSelected
-                            ? "bg-cyan-500 font-semibold text-white"
+                            ? "bg-brand font-semibold text-brand-on"
                             : isToday(day)
                               ? "font-semibold text-cyan-400 ring-1 ring-inset ring-cyan-500/40 hover:bg-cyan-500/10"
                               : outside

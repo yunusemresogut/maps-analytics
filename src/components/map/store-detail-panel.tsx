@@ -8,14 +8,12 @@ import { useT } from "@/contexts/i18n-context";
 import { useDb } from "@/contexts/db-context";
 import { useStores } from "@/contexts/stores-context";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useStoreForm } from "@/hooks/use-store-form";
+import { useMapPickBridge } from "@/hooks/use-map-pick-bridge";
 import { ContractIhaleWarning } from "@/components/contracts/contract-ihale-warning";
 import { StoreOpeningAlert, storeOpeningBadgeLabel, storeOpeningIsOverdue } from "@/components/map/store-opening-alert";
-import {
-  StoreFormFields,
-  formToStoreData,
-  storeToForm,
-  type StoreFormData,
-} from "@/components/map/store-form-fields";
+import { StoreFormFields } from "@/components/map/store-form-fields";
+import { StoreLocationFields } from "@/components/location/store-location-fields";
 import { StoreViewFields } from "@/components/map/store-view-fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,62 +27,141 @@ import {
   getProjectStatusLabel,
   projectStatusConfig,
 } from "@/lib/project-status";
+import type { Coords, MapPick } from "@/lib/geocode";
 import type { Store } from "@/types";
 
-type StoreDetailPanelProps = {
-  store: Store;
-  onClose: () => void;
+type MapBridgeProps = {
+  /** Ana haritadan gelen son seçim (tıklama ya da taslak pini sürükleme) */
+  mapPick: MapPick | null;
+  onPickModeChange: (active: boolean) => void;
+  onDraftChange: (coords: Coords | null) => void;
 };
 
-export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
-  const router = useRouter();
+type StoreDetailPanelProps = MapBridgeProps & {
+  store: Store;
+  onClose: () => void;
+  /** Düzenleme açıkken harita tıklamaları paneli kapatmaz */
+  onEditingChange: (editing: boolean) => void;
+};
+
+/** Düzenleme oturumu: her açılışta mağazanın güncel hâlinden başlar */
+function StoreEditor({
+  store,
+  mapPick,
+  onPickModeChange,
+  onDraftChange,
+  canDelete,
+  onDelete,
+  onCancel,
+  onSaved,
+}: MapBridgeProps & {
+  store: Store;
+  canDelete: boolean;
+  onDelete: () => void;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
   const { user } = useAuth();
-  const t = useT();
-  const { canEdit, canDelete } = usePermissions("map");
-  const { updateStore, deleteStore } = useStores();
-  const { contracts } = useDb();
-
-  const [isEditing, setIsEditing] = useState(false);
-  const [form, setForm] = useState<StoreFormData>(storeToForm(store));
-  const [saved, setSaved] = useState(false);
+  const { updateStore } = useStores();
+  const { form, setForm, errors, setErrors, location, prepare } = useStoreForm(store);
+  const [picking, setPicking] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const storeId = store.id;
 
-  useEffect(() => {
-    setForm(storeToForm(store));
-    setIsEditing(false);
-    setSaved(false);
-    setSaveError("");
-  }, [storeId]);
-
-  useEffect(() => {
-    if (!isEditing) {
-      setForm(storeToForm(store));
-    }
-  }, [store, isEditing]);
-
-  const projectConfig = projectStatusConfig[store.projectStatus];
-  const openingBadge = storeOpeningBadgeLabel(store);
+  useMapPickBridge({
+    mapPick,
+    controller: location,
+    pickActive: picking,
+    // Taslak pin yalnızca konum değiştiyse ya da seçim yapılırken gösterilir
+    showDraft: picking || location.changed,
+    onPickModeChange,
+    onDraftChange,
+  });
 
   const handleSave = async () => {
-    if (!user || !canEdit) return;
+    if (!user) return;
     setSaveError("");
-    const ok = await updateStore(
-      store.id,
-      formToStoreData(form, {
-        latitude: store.latitude,
-        longitude: store.longitude,
-      }),
-      { userId: user.id, userName: user.name }
-    );
+    const prepared = prepare();
+    if (!prepared.ok) {
+      setSaveError(prepared.message);
+      return;
+    }
+    setSaving(true);
+    const ok = await updateStore(store.id, prepared.data, { userId: user.id, userName: user.name });
+    setSaving(false);
     if (!ok) {
       setSaveError("Kayıt başarısız. Yetkinizi veya bağlantınızı kontrol edin.");
       return;
     }
-    setSaved(true);
-    setIsEditing(false);
-    setTimeout(() => setSaved(false), 2000);
+    onSaved();
   };
+
+  return (
+    <>
+      <div className="scrollbar-themed min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <StoreLocationFields
+          controller={location}
+          mapPick={{
+            active: picking,
+            onToggle: () => setPicking((value) => !value),
+            hint: picking
+              ? "Haritaya tıklayın ya da pini sürükleyin"
+              : "Konumu haritadan değiştirebilirsiniz",
+          }}
+          errors={{ city: errors.city, address: errors.address }}
+        />
+        <StoreFormFields form={form} onChange={setForm} errors={errors} onErrorsChange={setErrors} />
+      </div>
+
+      <div className="flex shrink-0 flex-wrap gap-2 border-t border-zinc-800 p-4">
+        {saveError && (
+          <p className="w-full text-xs text-red-400" role="alert">
+            {saveError}
+          </p>
+        )}
+        {canDelete && (
+          <Button variant="danger" size="sm" onClick={onDelete} aria-label="Sil">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          İptal
+        </Button>
+        <Button className="flex-1" size="sm" loading={saving} onClick={() => void handleSave()}>
+          <Save className="h-3.5 w-3.5" />
+          Kaydet
+        </Button>
+      </div>
+    </>
+  );
+}
+
+export function StoreDetailPanel({
+  store,
+  onClose,
+  mapPick,
+  onPickModeChange,
+  onDraftChange,
+  onEditingChange,
+}: StoreDetailPanelProps) {
+  const router = useRouter();
+  const t = useT();
+  const { canEdit, canDelete } = usePermissions("map");
+  const { deleteStore } = useStores();
+  const { contracts } = useDb();
+
+  // Başka mağazaya geçilince düzenleme kendiliğinden kapanır
+  const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const isEditing = editingStoreId === store.id;
+
+  useEffect(() => {
+    onEditingChange(isEditing);
+    return () => onEditingChange(false);
+  }, [isEditing, onEditingChange]);
+
+  const projectConfig = projectStatusConfig[store.projectStatus];
+  const openingBadge = storeOpeningBadgeLabel(store);
 
   const handleDelete = () => {
     if (!canDelete) return;
@@ -109,9 +186,7 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
               <Badge
                 className={cn(
                   "border border-current/20 bg-current/10",
-                  storeOpeningIsOverdue(store)
-                    ? "animate-none text-amber-400"
-                    : "animate-pulse text-red-400"
+                  storeOpeningIsOverdue(store) ? "text-amber-400" : "text-red-400"
                 )}
               >
                 {openingBadge}
@@ -140,55 +215,46 @@ export function StoreDetailPanel({ store, onClose }: StoreDetailPanelProps) {
           </div>
         </div>
 
-        <div className="scrollbar-themed min-h-0 flex-1 overflow-y-auto p-4 space-y-3">
-          <StoreOpeningAlert store={store} />
-          <ContractIhaleWarning store={store} contracts={contracts} compact />
-          {isEditing ? (
-            <StoreFormFields form={form} onChange={setForm} />
-          ) : (
-            <StoreViewFields store={store} />
-          )}
-        </div>
+        {isEditing ? (
+          <StoreEditor
+            key={store.id}
+            store={store}
+            mapPick={mapPick}
+            onPickModeChange={onPickModeChange}
+            onDraftChange={onDraftChange}
+            canDelete={canDelete}
+            onDelete={handleDelete}
+            onCancel={() => setEditingStoreId(null)}
+            onSaved={() => {
+              setEditingStoreId(null);
+              setSaved(true);
+              setTimeout(() => setSaved(false), 2000);
+            }}
+          />
+        ) : (
+          <>
+            <div className="scrollbar-themed min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+              <StoreOpeningAlert store={store} />
+              <ContractIhaleWarning store={store} contracts={contracts} compact />
+              <StoreViewFields store={store} />
+            </div>
 
-        <div className="flex shrink-0 gap-2 border-t border-zinc-800 p-4">
-          {saveError && (
-            <p className="w-full text-xs text-red-400">{saveError}</p>
-          )}
-          {!isEditing && canEdit && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1"
-              onClick={() => setIsEditing(true)}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Düzenle
-            </Button>
-          )}
-          {isEditing && (
-            <>
-              {canDelete && (
-                <Button variant="danger" size="sm" onClick={handleDelete}>
-                  <Trash2 className="h-3.5 w-3.5" />
+            <div className="flex shrink-0 items-center gap-2 border-t border-zinc-800 p-4">
+              {saved && <p className="text-xs text-emerald-400">Kaydedildi</p>}
+              {canEdit && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setEditingStoreId(store.id)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Düzenle
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setForm(storeToForm(store));
-                  setIsEditing(false);
-                }}
-              >
-                İptal
-              </Button>
-              <Button className="flex-1" size="sm" onClick={handleSave}>
-                <Save className="h-3.5 w-3.5" />
-                {saved ? "Kaydedildi!" : "Kaydet"}
-              </Button>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

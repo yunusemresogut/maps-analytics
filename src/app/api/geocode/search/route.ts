@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
+import { getRequestCaller } from "@/lib/server-auth";
+import { NOMINATIM_HEADERS, parseNominatimItem, type GeocodeResult } from "@/lib/geocode-server";
 
-export type GeocodeResult = {
-  id: string;
-  label: string;
-  address: string;
-  city: string;
-  latitude: number;
-  longitude: number;
-};
+export type { GeocodeResult };
 
+/** Adres → konum adayları (dünya geneli; sonuçlar Türkçe adlarla) */
 export async function GET(request: Request) {
+  // Açık bir proxy olmasın: yalnızca oturum açmış kullanıcılar
+  const auth = await getRequestCaller(request);
+  if (!auth.ok) return auth.response;
+
   const { searchParams } = new URL(request.url);
-  const q = (searchParams.get("q") || "").trim();
+  const q = (searchParams.get("q") || "").trim().slice(0, 300);
 
   if (q.length < 3) {
     return NextResponse.json({ results: [] as GeocodeResult[] });
@@ -22,56 +22,18 @@ export async function GET(request: Request) {
     url.searchParams.set("format", "json");
     url.searchParams.set("addressdetails", "1");
     url.searchParams.set("limit", "6");
-    url.searchParams.set("countrycodes", "tr");
     url.searchParams.set("q", q);
 
-    const res = await fetch(url.toString(), {
-      headers: {
-        "User-Agent": "MapsAnalytics/1.0 (local-dev)",
-        Accept: "application/json",
-      },
-      next: { revalidate: 0 },
-    });
-
+    const res = await fetch(url.toString(), { headers: NOMINATIM_HEADERS, cache: "no-store" });
     if (!res.ok) {
-      return NextResponse.json(
-        { error: "Geocoding failed", results: [] },
-        { status: 502 }
-      );
+      return NextResponse.json({ error: "Geocoding failed", results: [] }, { status: 502 });
     }
-
-    const data = (await res.json()) as Array<{
-      place_id: number;
-      display_name: string;
-      lat: string;
-      lon: string;
-      address?: Record<string, string>;
-    }>;
-
-    const results: GeocodeResult[] = data.map((item) => {
-      const addr = item.address || {};
-      const city =
-        addr.city ||
-        addr.town ||
-        addr.province ||
-        addr.state ||
-        addr.county ||
-        "";
-      return {
-        id: String(item.place_id),
-        label: item.display_name,
-        address: item.display_name,
-        city,
-        latitude: Number(item.lat),
-        longitude: Number(item.lon),
-      };
-    });
-
+    const data = (await res.json()) as Parameters<typeof parseNominatimItem>[0][];
+    // Şehri belirlenemeyen (okyanus, ülke geneli gibi) sonuçlar mağaza konumu olamaz
+    const results = data.map(parseNominatimItem).filter((item) => item.city);
     return NextResponse.json({ results });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || "Geocoding failed", results: [] },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    console.error("Adres araması başarısız", error);
+    return NextResponse.json({ error: "Geocoding failed", results: [] }, { status: 500 });
   }
 }

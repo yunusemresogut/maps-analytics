@@ -7,38 +7,38 @@ export const projectStatusConfig: Record<
 > = {
   proje: {
     labelKey: "status.proje",
-    color: "text-cyan-400",
-    marker: "#22d3ee",
+    color: "text-teal-400",
+    marker: "#3f9a9b",
   },
   ihale: {
     labelKey: "status.ihale",
     color: "text-violet-400",
-    marker: "#a78bfa",
+    marker: "#8a76cb",
   },
   santiye: {
     labelKey: "status.santiye",
     color: "text-amber-400",
-    marker: "#fbbf24",
+    marker: "#cc9a45",
   },
   acilis: {
     labelKey: "status.acilis",
     color: "text-emerald-400",
-    marker: "#34d399",
+    marker: "#43a882",
   },
   hakedis: {
     labelKey: "status.hakedis",
     color: "text-orange-400",
-    marker: "#fb923c",
+    marker: "#d27f4b",
   },
   fatura: {
     labelKey: "status.fatura",
     color: "text-pink-400",
-    marker: "#f472b6",
+    marker: "#c56a93",
   },
   yakinda_aciliyor: {
     labelKey: "status.yakinda_aciliyor",
     color: "text-red-400",
-    marker: "#f87171",
+    marker: "#cf6660",
   },
 };
 

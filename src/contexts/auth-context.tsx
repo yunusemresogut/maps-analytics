@@ -34,6 +34,7 @@ import type {
   UserPermissions,
   UserRole,
 } from "@/types";
+import { apiFetch } from "@/lib/api-client";
 
 type AuthContextValue = {
   user: User | null;
@@ -442,7 +443,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data.permissions ||
           resolveDefaultMatrixForRole(role, organization?.rolePermissionDefaults);
 
-        const response = await fetch("/api/admin/users", {
+        const response = await apiFetch("/api/admin/users", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -510,7 +511,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUserPermissions = useCallback(
     async (userId: string, permissions: UserPermissions) => {
       try {
-        const response = await fetch("/api/admin/users", {
+        const response = await apiFetch("/api/admin/users", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: userId, permissions }),
@@ -582,7 +583,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           );
         }
 
-        const response = await fetch("/api/admin/users", {
+        const response = await apiFetch("/api/admin/users", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -620,7 +621,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (data: { name?: string; phone?: string; avatarUrl?: string | null }) => {
       if (!user) return false;
       try {
-        const response = await fetch("/api/admin/users", {
+        const response = await apiFetch("/api/admin/users", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -673,6 +674,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.roleLabels !== undefined) {
           payload.role_labels = data.roleLabels;
         }
+        if (data.settings !== undefined) {
+          payload.settings = data.settings;
+        }
 
         const { data: updated, error } = await supabase
           .from("organizations")
@@ -685,7 +689,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOrganization(mapOrganizationFromDb(updated));
         const detail = data.rolePermissionDefaults
           ? "rol yetki şablonları"
-          : "firma bilgileri";
+          : data.settings
+            ? "firma ayarları"
+            : "firma bilgileri";
         logActivity({
           category: "organization",
           action: "update",
@@ -710,7 +716,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const target = users.find((u) => u.id === userId);
         if (!target || target.role === "admin") return false;
 
-        const response = await fetch(`/api/admin/users?id=${userId}`, {
+        const response = await apiFetch(`/api/admin/users?id=${userId}`, {
           method: "DELETE",
         });
 
@@ -748,7 +754,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const target = users.find((u) => u.id === userId);
         if (!target || target.role === "admin") return;
 
-        const response = await fetch("/api/admin/users", {
+        const response = await apiFetch("/api/admin/users", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

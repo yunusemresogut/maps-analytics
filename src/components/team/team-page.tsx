@@ -32,7 +32,6 @@ import { useI18n } from "@/contexts/i18n-context";
 import {
   requestTeamCleanup,
   TEAM_MAX_FILE_BYTES,
-  TEAM_RETENTION_DAYS,
   useTeamChat,
 } from "@/contexts/team-chat-context";
 import { Button } from "@/components/ui/button";
@@ -42,6 +41,7 @@ import { ALLOWED_FILE_ACCEPT, isAllowedFileType } from "@/lib/file-types";
 import { getRoleLabel } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import type { TeamMessage, User } from "@/types";
+import { useSettings } from "@/contexts/settings-context";
 
 function formatFileSize(bytes = 0) {
   if (bytes < 1024) return `${bytes} B`;
@@ -54,7 +54,7 @@ function UnreadBadge({ count, className }: { count: number; className?: string }
   return (
     <span
       className={cn(
-        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-cyan-500 px-1.5 text-[11px] font-semibold text-white tabular-nums",
+        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-semibold text-brand-on tabular-nums",
         className
       )}
       aria-label={`${count} okunmamış mesaj`}
@@ -224,6 +224,7 @@ function ChatPanel({
   onBack: () => void;
 }) {
   const { user, organization } = useAuth();
+  const { org } = useSettings();
   const { dateLocale } = useI18n();
   const { messages, unreadBySender, sendMessage, markRead, deleteMessage, clearConversation } =
     useTeamChat();
@@ -348,7 +349,7 @@ function ChatPanel({
       </header>
 
       <p className="border-b border-zinc-800/60 bg-zinc-900/30 px-4 py-1.5 text-center text-[11px] text-zinc-500">
-        Mesajlar ve dosyalar {TEAM_RETENTION_DAYS} gün sonra otomatik olarak silinir.
+        Mesajlar{org.team.fileSharing ? " ve dosyalar" : ""} {org.team.retentionDays} gün sonra otomatik olarak silinir.
       </p>
 
       <div ref={scrollRef} className="scrollbar-themed flex-1 overflow-y-auto px-3 py-4 sm:px-6" aria-live="polite">
@@ -448,6 +449,7 @@ function ChatPanel({
             </p>
           )}
           <div className="flex items-end gap-2 rounded-2xl border border-zinc-700/80 bg-zinc-900/60 p-1.5 focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/30">
+            {org.team.fileSharing && (
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -457,6 +459,7 @@ function ChatPanel({
             >
               <Paperclip className="h-4 w-4" />
             </button>
+            )}
             <input
               ref={fileInputRef}
               type="file"
@@ -486,7 +489,7 @@ function ChatPanel({
             <button
               type="submit"
               disabled={sending || (!text.trim() && !file)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-500 text-white transition-colors hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-on transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Gönder"
             >
               {sending ? (
@@ -531,7 +534,10 @@ export function TeamPage() {
   const { dateLocale } = useI18n();
   const { messages, unreadBySender, isReady } = useTeamChat();
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Bildirimden gelinirse (?peer=) o kişiyle sohbet açılır
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("peer")
+  );
   const [view, setView] = useState<"profile" | "chat">("chat");
 
   useEffect(() => {

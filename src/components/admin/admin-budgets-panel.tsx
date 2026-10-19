@@ -69,6 +69,7 @@ export function AdminBudgetsPanel() {
   }, []);
 
   const table = useTableState<BudgetRow, SortKey>({
+    memoryKey: "admin-budgets",
     items: storesData,
     initialSort: { key: "percentSpent", direction: "desc" },
     getSortValue,
@@ -324,7 +325,7 @@ export function AdminBudgetsPanel() {
                     </td>
                     <td className="px-4 py-3.5 text-center">
                       {isOver ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[9px] font-semibold text-red-400 animate-pulse">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[9px] font-semibold text-red-400">
                           Bütçe Aşımı!
                         </span>
                       ) : (
@@ -404,7 +405,7 @@ function MetricCard({
     violet: { icon: "text-violet-400", bg: "bg-violet-500/10" },
     emerald: { icon: "text-emerald-400", bg: "bg-emerald-500/10" },
     amber: { icon: "text-amber-400", bg: "bg-amber-500/10" },
-    red: { icon: "text-red-400", bg: "bg-red-500/10 animate-pulse" },
+    red: { icon: "text-red-400", bg: "bg-red-500/10" },
   } as const;
   const colors = colorMap[accent];
 

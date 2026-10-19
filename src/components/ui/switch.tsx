@@ -5,9 +5,11 @@ type SwitchProps = {
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   label?: string;
+  /** Görünür etiket yoksa ekran okuyucular için */
+  ariaLabel?: string;
 };
 
-export function Switch({ checked, onChange, disabled, label }: SwitchProps) {
+export function Switch({ checked, onChange, disabled, label, ariaLabel }: SwitchProps) {
   return (
     <div
       className={cn(
@@ -19,6 +21,7 @@ export function Switch({ checked, onChange, disabled, label }: SwitchProps) {
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={ariaLabel}
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={cn(

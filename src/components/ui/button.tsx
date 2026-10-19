@@ -3,15 +3,15 @@ import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40 focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
-          "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 hover:shadow-[0_0_20px_var(--glow-accent)]",
-        ghost: "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/20",
+          "bg-brand text-brand-on border border-transparent shadow-sm hover:bg-brand-hover",
+        ghost: "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60",
         outline:
-          "border border-zinc-700 bg-transparent text-zinc-300 hover:border-cyan-500/50 hover:text-cyan-300",
+          "border border-zinc-700 bg-transparent text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800/40 hover:text-zinc-100",
         danger:
           "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20",
       },

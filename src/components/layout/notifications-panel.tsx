@@ -4,14 +4,9 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { format, parseISO } from "date-fns";
-import {
-  AlertTriangle,
-  Bell,
-  Clock,
-  ShoppingCart,
-  X,
-} from "lucide-react";
+import { Bell, X } from "lucide-react";
 import { useI18n } from "@/contexts/i18n-context";
+import { NOTIFICATION_META } from "@/lib/notification-meta";
 import type { AppNotification } from "@/types";
 
 type NotificationsPanelProps = {
@@ -20,18 +15,6 @@ type NotificationsPanelProps = {
   onDismiss: (id: string) => void;
   onSelect: (notification: AppNotification) => void;
   anchorRect: DOMRect | null;
-};
-
-const TYPE_ICON = {
-  opening_soon: AlertTriangle,
-  opening_overdue: Clock,
-  ihale_contract_reminder: ShoppingCart,
-};
-
-const TYPE_COLOR = {
-  opening_soon: "text-red-400",
-  opening_overdue: "text-amber-400",
-  ihale_contract_reminder: "text-violet-400",
 };
 
 export function NotificationsPanel({
@@ -102,8 +85,7 @@ export function NotificationsPanel({
           </li>
         )}
         {notifications.map((notif) => {
-          const Icon = TYPE_ICON[notif.type];
-          const color = TYPE_COLOR[notif.type];
+          const { icon: Icon, color } = NOTIFICATION_META[notif.type];
           return (
             <li key={notif.id} className="mb-1 last:mb-0">
               <div className="group flex items-start gap-1 rounded-lg border border-zinc-800/60 bg-zinc-900/40 p-2">

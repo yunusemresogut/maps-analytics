@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { useSettings } from "@/contexts/settings-context";
 import { canAccessRoute } from "@/lib/permissions";
 import { homePathForRole } from "@/lib/roles";
 import { PageLoader } from "@/components/ui/spinner";
@@ -23,7 +24,10 @@ export function AuthGuard({
   routeKey,
 }: AuthGuardProps) {
   const { user, isLoading } = useAuth();
+  const { isModuleEnabled, homePath } = useSettings();
   const router = useRouter();
+  // Admin'in firma genelinde kapattığı modüllerin sayfaları da kapanır
+  const moduleOff = Boolean(routeKey && !isModuleEnabled(routeKey));
 
   useEffect(() => {
     if (isLoading) return;
@@ -35,10 +39,10 @@ export function AuthGuard({
       router.replace(homePathForRole(user.role));
       return;
     }
-    if (routeKey && !canAccessRoute(user, routeKey)) {
-      router.replace(homePathForRole(user.role));
+    if ((routeKey && !canAccessRoute(user, routeKey)) || moduleOff) {
+      router.replace(moduleOff ? homePath : homePathForRole(user.role));
     }
-  }, [user, isLoading, router, redirectTo, allowedRoles, routeKey]);
+  }, [user, isLoading, router, redirectTo, allowedRoles, routeKey, moduleOff, homePath]);
 
   if (isLoading) {
     return <PageLoader />;
@@ -47,6 +51,7 @@ export function AuthGuard({
   if (!user) return null;
   if (allowedRoles && !allowedRoles.includes(user.role)) return null;
   if (routeKey && !canAccessRoute(user, routeKey)) return null;
+  if (moduleOff) return null;
 
   return <>{children}</>;
 }

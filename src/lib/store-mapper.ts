@@ -22,10 +22,6 @@ export function mapApprovalsFromDb(row: Record<string, unknown>): ProjectApprova
       approvedByName: (row.electrical_approved_by_name as string) || undefined,
       approvedAt: (row.electrical_approved_at as string) || undefined,
     },
-    projectOpened: Boolean(row.project_opened),
-    projectOpenedBy: (row.project_opened_by as string) || undefined,
-    projectOpenedByName: (row.project_opened_by_name as string) || undefined,
-    projectOpenedAt: (row.project_opened_at as string) || undefined,
   };
 }
 
@@ -44,10 +40,6 @@ export function approvalsToDb(approvals: ProjectApprovals): Record<string, unkno
     electrical_approved_by: approvals.electrical.approvedBy ?? null,
     electrical_approved_by_name: approvals.electrical.approvedByName ?? null,
     electrical_approved_at: approvals.electrical.approvedAt ?? null,
-    project_opened: approvals.projectOpened,
-    project_opened_by: approvals.projectOpenedBy ?? null,
-    project_opened_by_name: approvals.projectOpenedByName ?? null,
-    project_opened_at: approvals.projectOpenedAt ?? null,
   };
 }
 
@@ -57,6 +49,8 @@ export function mapStoreFromDb(s: Record<string, any>): Store {
     organizationId: s.organization_id || undefined,
     name: s.name,
     city: s.city,
+    district: s.district || undefined,
+    country: s.country || undefined,
     address: s.address,
     latitude: s.latitude,
     longitude: s.longitude,

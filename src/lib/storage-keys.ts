@@ -10,6 +10,15 @@ export const STORAGE_KEYS = {
   locale: "maps-analytics-locale",
 } as const;
 
+/** Harita tercihleri cihaz başına tutulur (her harita hareketinde veritabanına yazılmaz) */
+export function getMapViewKey(userId: string) {
+  return `maps-analytics-map-view:${userId}`;
+}
+
+export function getHiddenRegionsKey(userId: string) {
+  return `maps-analytics-map-regions:${userId}`;
+}
+
 export function getStoreDataKey(userId: string) {
   return `${STORAGE_KEYS.storeData}:${userId}`;
 }

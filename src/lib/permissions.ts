@@ -330,6 +330,7 @@ export function routeToModule(route: AppRouteKey): AppModuleKey | null | "admin"
   switch (route) {
     case "dashboard":
     case "profile":
+    case "settings":
       return null;
     case "map":
     case "stores":
@@ -346,6 +347,7 @@ export function routeToModule(route: AppRouteKey): AppModuleKey | null | "admin"
     case "adminLogs":
     case "adminBudgets":
     case "adminDashboard":
+    case "adminSettings":
       return "admin";
     default:
       return null;

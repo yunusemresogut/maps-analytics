@@ -7,6 +7,7 @@ import {
   FileText,
   MessageSquare,
   StickyNote,
+  Lock,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -19,15 +20,110 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ALLOWED_FILE_ACCEPT, ALLOWED_FILE_LABELS } from "@/lib/file-types";
+import { getAttachmentUrl } from "@/lib/upload-module-attachment";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
 import { cn } from "@/lib/utils";
 import type { Store } from "@/types";
+import { usePrivateNote } from "@/hooks/use-private-note";
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Kullanıcının bu mağaza için kendi notu (başkaları göremez) */
+function PrivateNoteSection({ storeId }: { storeId: string }) {
+  const { note, loading, loadError, save } = usePrivateNote(storeId);
+  if (loading) return <p className="text-sm text-zinc-500">Yükleniyor…</p>;
+  if (loadError) return <p className="text-sm text-red-400">Not yüklenemedi. Sayfayı yenileyin.</p>;
+  return <SpecialNoteEditor saved={note} onSave={save} />;
+}
+
+/**
+ * Özel not: yazarken yalnızca yerel taslak değişir; "Kaydet" ile tek istekte
+ * kaydedilir. Başka biri notu değiştirirse ve burada kaydedilmemiş değişiklik
+ * yoksa taslak güncel değere çekilir.
+ */
+function SpecialNoteEditor({
+  saved,
+  onSave,
+}: {
+  saved: string;
+  onSave: (note: string) => Promise<boolean>;
+}) {
+  const [draft, setDraft] = useState(saved);
+  const [lastSaved, setLastSaved] = useState(saved);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const dirty = draft !== saved;
+
+  if (saved !== lastSaved) {
+    setLastSaved(saved);
+    if (draft === lastSaved) setDraft(saved);
+  }
+
+  const save = async () => {
+    if (!dirty || status === "saving") return;
+    setStatus("saving");
+    const ok = await onSave(draft);
+    setStatus(ok ? "saved" : "error");
+    if (ok) window.setTimeout(() => setStatus((s) => (s === "saved" ? "idle" : s)), 2000);
+  };
+
+  return (
+    <div className="space-y-2">
+      <Textarea
+        className="min-h-30 resize-y"
+        placeholder="Bu mağaza için kendinize not alın…"
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          if (status !== "saving") setStatus("idle");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            void save();
+          }
+        }}
+        aria-label="Özel not"
+      />
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <span
+          role="status"
+          className={cn(
+            "mr-auto text-xs",
+            status === "error" ? "text-red-400" : status === "saved" ? "text-emerald-400" : "text-zinc-500"
+          )}
+        >
+          {status === "error"
+            ? "Kaydedilemedi. Tekrar deneyin."
+            : status === "saved"
+              ? "Kaydedildi"
+              : dirty
+                ? "Kaydedilmemiş değişiklik var"
+                : ""}
+        </span>
+        {dirty && (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={status === "saving"}
+            onClick={() => {
+              setDraft(saved);
+              setStatus("idle");
+            }}
+          >
+            Vazgeç
+          </Button>
+        )}
+        <Button size="sm" disabled={!dirty} loading={status === "saving"} onClick={() => void save()}>
+          Kaydet
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 function SectionCard({
@@ -71,7 +167,6 @@ export function StoreDetailSections({ store }: { store: Store }) {
     getStoreData,
     addNote,
     deleteNote,
-    updateSpecialNote,
     addFile,
     deleteFile,
     importMaterials,
@@ -128,19 +223,17 @@ export function StoreDetailSections({ store }: { store: Store }) {
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
         <div className="space-y-4">
-          <SectionCard title="Özel Not" icon={StickyNote}>
-            {canEdit ? (
-              <Textarea
-                className="min-h-30 resize-y"
-                placeholder="Bu mağazaya özel kişisel notunuz…"
-                value={userData.specialNote}
-                onChange={(e) => updateSpecialNote(store.id, e.target.value)}
-              />
-            ) : (
-              <p className="text-sm leading-relaxed text-zinc-300">
-                {userData.specialNote || "—"}
-              </p>
-            )}
+          <SectionCard
+            title="Özel Not"
+            icon={StickyNote}
+            action={
+              <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">
+                <Lock className="h-3 w-3" aria-hidden />
+                Yalnızca siz görürsünüz
+              </span>
+            }
+          >
+            <PrivateNoteSection key={store.id} storeId={store.id} />
           </SectionCard>
 
           <SectionCard
@@ -201,9 +294,13 @@ export function StoreDetailSections({ store }: { store: Store }) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => {
+                      onClick={async () => {
+                        // Depo gizli: kısa ömürlü imzalı bağlantıyla indirilir
                         const link = document.createElement("a");
-                        link.href = file.dataUrl;
+                        link.href = await getAttachmentUrl(file.dataUrl, {
+                          bucket: "store-files",
+                          download: file.name,
+                        });
                         link.download = file.name;
                         link.click();
                       }}

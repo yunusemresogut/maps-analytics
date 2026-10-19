@@ -28,7 +28,6 @@ type StoreDataContextValue = {
   getStoreData: (storeId: string) => StoreUserData;
   addNote: (storeId: string, content: string) => void;
   deleteNote: (storeId: string, noteId: string) => void;
-  updateSpecialNote: (storeId: string, note: string) => void;
   addFile: (storeId: string, file: File) => Promise<{ success: boolean; error?: string }>;
   deleteFile: (storeId: string, fileId: string) => void;
   /** Malzeme/iş planı her değiştiğinde artar; listeler bunu izleyip yeniden çeker */
@@ -74,7 +73,6 @@ const StoreDataContext = createContext<StoreDataContextValue | null>(null);
 const emptyData = (): StoreUserData => ({
   notes: [],
   files: [],
-  specialNote: "",
 });
 
 function materialToDb(m: StoreMaterial) {
@@ -224,36 +222,6 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
           actorId: user.id,
           actorName: user.name,
           targetId: noteId,
-          targetLabel: storeId,
-        });
-      }
-    },
-    [data, setData, user]
-  );
-
-  const updateSpecialNote = useCallback(
-    (storeId: string, note: string) => {
-      const current = data[storeId] ?? emptyData();
-      setData({
-        ...data,
-        [storeId]: { ...current, specialNote: note },
-      });
-
-      supabase
-        .from("stores")
-        .update({ special_note: note })
-        .eq("id", storeId)
-        .then(({ error }) => {
-          if (error) console.error("Error updating special note:", error);
-        });
-      if (user) {
-        logActivity({
-          category: "note",
-          action: "update",
-          message: `Özel not güncellendi (${storeId})`,
-          actorId: user.id,
-          actorName: user.name,
-          targetId: storeId,
           targetLabel: storeId,
         });
       }
@@ -687,7 +655,6 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         getDetailVersion,
         addNote,
         deleteNote,
-        updateSpecialNote,
         addFile,
         deleteFile,
         importMaterials,

@@ -8,6 +8,9 @@ import {
   useState,
 } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/auth-context";
+import { useSettings } from "@/contexts/settings-context";
+import { getHiddenRegionsKey } from "@/lib/storage-keys";
 import { appendActivityLog } from "@/lib/activity-log";
 import type { Region } from "@/types";
 
@@ -38,6 +41,44 @@ export function RegionsProvider({ children }: { children: React.ReactNode }) {
   const [regions, setRegions] = useState<Region[]>([]);
   const [visibleRegions, setVisibleRegions] = useState<Record<string, boolean>>({});
   const [isPanelOpen, setPanelOpen] = useState(false);
+  const { user } = useAuth();
+  const { prefs, prefsLoaded } = useSettings();
+  const hiddenKey = user ? getHiddenRegionsKey(user.id) : null;
+  const rememberRegions = prefs.map.rememberRegions;
+  const [restoredKey, setRestoredKey] = useState<string | null>(null);
+
+  // Bölgeler yüklenince kullanıcının gizlediği bölgeler bir kez geri yüklenir
+  if (hiddenKey && prefsLoaded && regions.length > 0 && restoredKey !== hiddenKey) {
+    setRestoredKey(hiddenKey);
+    if (rememberRegions) {
+      try {
+        const hidden: unknown = JSON.parse(localStorage.getItem(hiddenKey) ?? "[]");
+        if (Array.isArray(hidden) && hidden.length > 0) {
+          setVisibleRegions((prev) => {
+            const next = { ...prev };
+            for (const id of hidden) if (typeof id === "string" && id in next) next[id] = false;
+            return next;
+          });
+        }
+      } catch {
+        // bozuk kayıt: tüm bölgeler görünür
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!hiddenKey || restoredKey !== hiddenKey) return;
+    try {
+      if (rememberRegions) {
+        const hidden = Object.entries(visibleRegions).filter(([, visible]) => !visible).map(([id]) => id);
+        localStorage.setItem(hiddenKey, JSON.stringify(hidden));
+      } else {
+        localStorage.removeItem(hiddenKey);
+      }
+    } catch {
+      // depolama yoksa hatırlamadan devam et
+    }
+  }, [visibleRegions, hiddenKey, restoredKey, rememberRegions]);
 
   useEffect(() => {
     let cancelled = false;

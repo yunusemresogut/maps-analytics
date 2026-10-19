@@ -1,39 +1,110 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --neon-cyan: #22d3ee;
-  --neon-green: #34d399;
-  --neon-red: #f87171;
-  --scrollbar-thumb: rgba(82, 82, 91, 0.85);
-  --scrollbar-thumb-hover: rgba(113, 113, 122, 0.95);
+  /*
+   * Marka: kobalt #3A66C4. Tailwind'in "cyan" skalası marka rengi olarak
+   * yeniden tanımlanır; bileşenlerdeki cyan-* sınıfları (vurgu yazıları,
+   * yarı saydam tonlar) bu paleti kullanır.
+   * Dolu marka yüzeyleri (birincil buton, logo, rozet) bg-brand /
+   * text-brand-on / hover:bg-brand-hover ile çizilir; palet değişirse
+   * yalnızca --brand-* değişkenleri güncellenir.
+   * Griler serin lacivert-gri tondadır; koyu tema saf siyah yerine
+   * lacivert-grafittir. Durum renkleri neon yerine pastel ama dolgundur.
+   */
+  --background: #0f141b;
+  --foreground: #eef1f5;
+  --brand: #3a66c4;
+  --brand-solid: #2f55a8;
+  --brand-solid-hover: #28478c;
+  --brand-on: #ffffff;
+  --scrollbar-thumb: rgba(118, 130, 154, 0.55);
+  --scrollbar-thumb-hover: rgba(144, 155, 176, 0.8);
   --scrollbar-track: transparent;
-  --glow-accent: rgba(34, 211, 238, 0.3);
-  --panel-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  --glow-accent: transparent;
+  --panel-shadow: 0 12px 32px rgba(3, 6, 12, 0.45), 0 1px 2px rgba(3, 6, 12, 0.4);
   color-scheme: dark;
 
-  /* Tailwind Zinc Color Overrides for Dark Mode (default) */
-  --color-zinc-50: #fafafa;
-  --color-zinc-100: #f4f4f5;
-  --color-zinc-200: #e4e4e7;
-  --color-zinc-300: #d4d4d8;
-  --color-zinc-400: #a1a1aa;
-  --color-zinc-500: #71717a;
-  --color-zinc-600: #52525b;
-  --color-zinc-700: #3f3f46;
-  --color-zinc-800: #27272a;
-  --color-zinc-900: #18181b;
-  --color-zinc-950: #09090b;
+  /* Nötr skala: serin lacivert-gri */
+  --color-zinc-50: #f5f7fa;
+  --color-zinc-100: #e8ecf1;
+  --color-zinc-200: #d4dae3;
+  --color-zinc-300: #b6bfcd;
+  --color-zinc-400: #909bb0;
+  --color-zinc-500: #76829a;
+  --color-zinc-600: #525e73;
+  --color-zinc-700: #384356;
+  --color-zinc-800: #283243;
+  --color-zinc-900: #1b2331;
+  --color-zinc-950: #141a24;
+
+  /* Marka skalası (kobalt #3A66C4 = 500) */
+  --color-cyan-50: #eff3fc;
+  --color-cyan-100: #dce5f8;
+  --color-cyan-200: #bccdf1;
+  --color-cyan-300: #9bb4e6;
+  --color-cyan-400: #6f93db;
+  --color-cyan-500: #3a66c4;
+  --color-cyan-600: #2f55a8;
+  --color-cyan-700: #28478c;
+  --color-cyan-800: #223b72;
+  --color-cyan-900: #1d315c;
+  --color-cyan-950: #121e38;
+
+  /* Teal yalnızca durum rengi (Hakediş) */
+  --color-teal-300: #9fd0cf;
+  --color-teal-400: #6cb8b8;
+  --color-teal-500: #3f9a9b;
+  --color-teal-600: #2f7f80;
+
+  /* Durum renkleri: pastel, düşük doygunluk (koyu zeminde AA kontrast) */
+  --color-red-300: #efb3ae;
+  --color-red-400: #e38b86;
+  --color-red-500: #cf6660;
+  --color-red-600: #b8524c;
+  --color-orange-300: #f1c4a3;
+  --color-orange-400: #e6a072;
+  --color-orange-500: #d27f4b;
+  --color-amber-300: #ecd3a2;
+  --color-amber-400: #dfb36a;
+  --color-amber-500: #cc9a45;
+  --color-amber-600: #b0822f;
+  --color-yellow-400: #dcc36e;
+  --color-emerald-300: #a3dbc3;
+  --color-emerald-400: #6cc4a1;
+  --color-emerald-500: #43a882;
+  --color-emerald-600: #33896a;
+  --color-green-400: #7cc596;
+  --color-lime-400: #b0c272;
+  --color-lime-500: #8a9d4a;
+  --color-green-500: #4fa872;
+  --color-sky-300: #acd0ea;
+  --color-sky-400: #7eb6dc;
+  --color-sky-500: #5294c4;
+  --color-blue-400: #86a8dd;
+  --color-blue-500: #5c83c6;
+  --color-indigo-400: #9aa2dd;
+  --color-violet-300: #cbc0ef;
+  --color-violet-400: #a998e0;
+  --color-violet-500: #8a76cb;
+  --color-purple-400: #b496d9;
+  --color-fuchsia-400: #cf93cf;
+  --color-pink-300: #ecbcd2;
+  --color-pink-400: #dc8fb2;
+  --color-pink-500: #c56a93;
+  --color-rose-400: #df8f9f;
+  --color-rose-500: #c96679;
 }
 
 .light {
   color-scheme: light;
-  --background: #f6f7f9;
-  --foreground: #151922;
+  --background: #f3f5f8;
+  --brand-solid: #2f55a8;
+  --brand-solid-hover: #28478c;
+  --brand-on: #ffffff;
+  --foreground: #141c2b;
   --scrollbar-thumb: rgba(107, 114, 128, 0.35);
   --scrollbar-thumb-hover: rgba(75, 82, 96, 0.6);
-  --glow-accent: rgba(13, 148, 136, 0.12);
+  --glow-accent: transparent;
   --panel-shadow: 0 8px 28px rgba(15, 23, 42, 0.1), 0 1px 3px rgba(15, 23, 42, 0.08);
 
   /*
@@ -41,16 +112,16 @@
    * (950 en açık yüzey, 50 en koyu yazı). Yazı tonları beyaz zeminde
    * WCAG AA kontrastını sağlar; hafif soğuk ton göz yorgunluğunu azaltır.
    */
-  --color-zinc-50: #0b0e14;
-  --color-zinc-100: #151922;
-  --color-zinc-200: #232833;
-  --color-zinc-300: #353b47;
-  --color-zinc-400: #4b5260;
-  --color-zinc-500: #5f6673;
-  --color-zinc-600: #6b7280;
-  --color-zinc-700: #d1d5db;
-  --color-zinc-800: #e5e7eb;
-  --color-zinc-900: #f3f4f6;
+  --color-zinc-50: #0b1220;
+  --color-zinc-100: #141c2b;
+  --color-zinc-200: #222b3a;
+  --color-zinc-300: #343e4e;
+  --color-zinc-400: #4a5464;
+  --color-zinc-500: #5e6878;
+  --color-zinc-600: #6c7686;
+  --color-zinc-700: #d3d9e1;
+  --color-zinc-800: #e4e8ee;
+  --color-zinc-900: #f2f4f7;
   --color-zinc-950: #ffffff;
 
   /*
@@ -111,16 +182,18 @@
   --color-teal-200: #134e4a;
   --color-teal-300: #115e59;
   --color-teal-400: #115e59;
-  --color-teal-500: #0d9488;
+  --color-teal-500: #3f9a9b;
   --color-teal-600: #0f766e;
   --color-teal-700: #115e59;
-  --color-cyan-100: #134e4a;
-  --color-cyan-200: #134e4a;
-  --color-cyan-300: #115e59;
-  --color-cyan-400: #115e59;
-  --color-cyan-500: #0d9488;
-  --color-cyan-600: #0f766e;
-  --color-cyan-700: #115e59;
+  /* Marka: açık zeminde yazı tonları koyulaşır (AA), dolgular aynı kalır */
+  --color-cyan-50: #121e38;
+  --color-cyan-100: #1d315c;
+  --color-cyan-200: #223b72;
+  --color-cyan-300: #28478c;
+  --color-cyan-400: #2f55a8;
+  --color-cyan-500: #3a66c4;
+  --color-cyan-600: #2f55a8;
+  --color-cyan-700: #28478c;
   --color-sky-100: #075985;
   --color-sky-200: #075985;
   --color-sky-300: #0369a1;
@@ -187,10 +260,13 @@
 }
 
 @theme inline {
+  --color-brand: var(--brand-solid);
+  --color-brand-hover: var(--brand-solid-hover);
+  --color-brand-on: var(--brand-on);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-app-sans);
+  --font-mono: var(--font-app-mono);
 }
 
 body {
@@ -307,6 +383,22 @@ html:not(.light) .maplibregl-ctrl-group button {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+@keyframes select-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Açılır liste menüsü (Select) */
+.select-menu {
+  animation: select-pop 0.12s ease-out;
 }
 
 .slide-up-fade {

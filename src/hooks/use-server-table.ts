@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSettings } from "@/contexts/settings-context";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { applyListFilters, type ListFilterValue } from "@/lib/supabase-query";
 import {
   nextSortState,
@@ -30,6 +32,8 @@ export function useServerTable<Row, K extends string>(options: {
   initialPageSize?: number;
   /** Değiştiğinde mevcut sayfa yeniden çekilir (örn. kayıt eklendi/silindi) */
   refreshKey?: unknown;
+  /** Verilirse sıralama ve sayfa, tablo hafızası açıkken hatırlanır */
+  memoryKey?: string;
 }) {
   const {
     source,
@@ -41,12 +45,14 @@ export function useServerTable<Row, K extends string>(options: {
     initialSort,
     initialPageSize,
     refreshKey,
+    memoryKey,
   } = options;
 
-  const [userSort, setUserSort] = useState<SortState<K> | null>(null);
+  const { prefs } = useSettings();
+  const [userSort, setUserSort] = usePersistentState<SortState<K> | null>(memoryKey, "sort", null);
   const sort = userSort ?? initialSort;
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(initialPageSize ?? 10);
+  const [page, setPage] = usePersistentState(memoryKey, "page", 1);
+  const [pageSize, setPageSizeState] = usePersistentState(memoryKey, "pageSize", initialPageSize ?? prefs.pageSize);
   const [rows, setRows] = useState<Row[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -146,13 +152,13 @@ export function useServerTable<Row, K extends string>(options: {
       );
       setPage(1);
     },
-    [initialKey, initialDirection]
+    [initialKey, initialDirection, setUserSort, setPage]
   );
 
   const setPageSize = useCallback((size: number) => {
     setPageSizeState(size);
     setPage(1);
-  }, []);
+  }, [setPageSizeState, setPage]);
 
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const currentPage = Math.min(page, totalPages);

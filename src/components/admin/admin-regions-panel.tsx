@@ -12,13 +12,13 @@ import { useTableState } from "@/hooks/use-table-state";
 import type { Region } from "@/types";
 
 const REGION_COLORS = [
-  "#22d3ee",
-  "#a78bfa",
-  "#34d399",
-  "#fbbf24",
-  "#60a5fa",
-  "#fb923c",
-  "#f472b6",
+  "#3a66c4",
+  "#8a76cb",
+  "#3f9a9b",
+  "#cc9a45",
+  "#43a882",
+  "#d27f4b",
+  "#c56a93",
 ];
 
 type SortKey = "name" | "cities";
@@ -41,6 +41,7 @@ export function AdminRegionsPanel() {
   }, []);
 
   const table = useTableState<Region, SortKey>({
+    memoryKey: "admin-regions",
     items: regions,
     initialSort: { key: "name", direction: "asc" },
     getSortValue,

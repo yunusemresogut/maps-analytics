@@ -9,19 +9,20 @@ import {
   useState,
 } from "react";
 import { useAuth } from "@/contexts/auth-context";
+import { useSettings } from "@/contexts/settings-context";
 import { isAllowedFileType } from "@/lib/file-types";
 import { supabase } from "@/lib/supabase";
 import type { TeamMessage } from "@/types";
+import { apiFetch } from "@/lib/api-client";
 
 export const TEAM_FILES_BUCKET = "team-files";
-export const TEAM_RETENTION_DAYS = 3;
 export const TEAM_MAX_FILE_BYTES = 10 * 1024 * 1024;
-const RETENTION_MS = TEAM_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
 type TeamChatContextValue = {
-  /** Kullanıcının taraf olduğu, son 3 gündeki tüm mesajlar (eskiden yeniye) */
+  /** Kullanıcının taraf olduğu, saklama süresindeki tüm mesajlar (eskiden yeniye) */
   messages: TeamMessage[];
   unreadBySender: Record<string, number>;
   totalUnread: number;
@@ -51,8 +52,8 @@ function mapMessage(row: Record<string, unknown>): TeamMessage {
   };
 }
 
-function isFresh(message: TeamMessage, now = Date.now()) {
-  return now - new Date(message.createdAt).getTime() < RETENTION_MS;
+function isFresh(message: TeamMessage, retentionDays: number, now = Date.now()) {
+  return now - new Date(message.createdAt).getTime() < retentionDays * DAY_MS;
 }
 
 function upsert(list: TeamMessage[], message: TeamMessage): TeamMessage[] {
@@ -65,24 +66,13 @@ function upsert(list: TeamMessage[], message: TeamMessage): TeamMessage[] {
   return next;
 }
 
-async function authorizedFetch(input: string, init: RequestInit) {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return fetch(input, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session?.access_token ?? ""}`,
-      ...init.headers,
-    },
-  });
-}
-
 export function TeamChatProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const userId = user?.id;
   const organizationId = user?.organizationId;
+  const { org } = useSettings();
+  const retentionDays = org.team.retentionDays;
+  const fileSharing = org.team.fileSharing;
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [isReady, setIsReady] = useState(false);
 
@@ -127,7 +117,7 @@ export function TeamChatProvider({ children }: { children: React.ReactNode }) {
     // Saklama süresi dolan mesajları açık ekranda da gizle
     const prune = window.setInterval(() => {
       setMessages((current) => {
-        const fresh = current.filter((message) => isFresh(message));
+        const fresh = current.filter((message) => isFresh(message, retentionDays));
         return fresh.length === current.length ? current : fresh;
       });
     }, 5 * 60 * 1000);
@@ -139,7 +129,7 @@ export function TeamChatProvider({ children }: { children: React.ReactNode }) {
       setMessages([]);
       setIsReady(false);
     };
-  }, [userId]);
+  }, [userId, retentionDays]);
 
   const unreadBySender = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -166,6 +156,7 @@ export function TeamChatProvider({ children }: { children: React.ReactNode }) {
       let attachment: Record<string, unknown> = {};
       let uploadedPath: string | null = null;
       if (file) {
+        if (!fileSharing) return { ok: false, error: "Dosya paylaşımı firma ayarlarından kapatılmış." };
         if (!isAllowedFileType(file.name)) return { ok: false, error: "Bu dosya türü desteklenmiyor." };
         if (file.size > TEAM_MAX_FILE_BYTES) return { ok: false, error: "Dosya en fazla 10 MB olabilir." };
         const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
@@ -198,7 +189,7 @@ export function TeamChatProvider({ children }: { children: React.ReactNode }) {
       setMessages((current) => upsert(current, mapMessage(data)));
       return { ok: true };
     },
-    [userId, organizationId]
+    [userId, organizationId, fileSharing]
   );
 
   const markRead = useCallback(
@@ -222,7 +213,7 @@ export function TeamChatProvider({ children }: { children: React.ReactNode }) {
     setMessages((current) => current.filter((message) => !predicate(message)));
 
   const deleteMessage = useCallback(async (messageId: string): Promise<ActionResult> => {
-    const response = await authorizedFetch("/api/team/messages", {
+    const response = await apiFetch("/api/team/messages", {
       method: "DELETE",
       body: JSON.stringify({ messageId }),
     });
@@ -233,7 +224,7 @@ export function TeamChatProvider({ children }: { children: React.ReactNode }) {
 
   const clearConversation = useCallback(
     async (peerId: string): Promise<ActionResult> => {
-      const response = await authorizedFetch("/api/team/messages", {
+      const response = await apiFetch("/api/team/messages", {
         method: "DELETE",
         body: JSON.stringify({ peerId }),
       });
@@ -286,5 +277,5 @@ export function useTeamChat() {
 
 /** Sayfa açıldığında firmanın süresi dolan mesajlarını kalıcı sil (arka planda) */
 export function requestTeamCleanup() {
-  void authorizedFetch("/api/team/cleanup", { method: "POST" }).catch(() => undefined);
+  void apiFetch("/api/team/cleanup", { method: "POST" }).catch(() => undefined);
 }

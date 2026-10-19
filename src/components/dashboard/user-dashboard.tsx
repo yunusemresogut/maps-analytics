@@ -139,7 +139,6 @@ export function UserDashboard() {
             value={openingSoon}
             icon={Clock}
             color="text-red-400"
-            animate={openingSoon > 0}
           />
           <MetricCard
             label="Geciken Açılış"
@@ -363,7 +362,6 @@ type MetricCardProps = {
   value: number | string;
   icon: React.ComponentType<{ className?: string }>;
   color: string;
-  animate?: boolean;
   isString?: boolean;
 };
 
@@ -372,7 +370,6 @@ function MetricCard({
   value,
   icon: Icon,
   color,
-  animate,
 }: MetricCardProps) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 flex items-center justify-between gap-4">
@@ -381,9 +378,7 @@ function MetricCard({
         <p className="mt-1 text-xl font-semibold text-zinc-100">{value}</p>
       </div>
       <div
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-950/60 border border-zinc-800 ${color} ${
-          animate ? "animate-pulse" : ""
-        }`}
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-950/60 border border-zinc-800 ${color}`}
       >
         <Icon className="h-5 w-5" />
       </div>

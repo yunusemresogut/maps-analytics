@@ -133,20 +133,10 @@ const trDict = {
     mechanical: "Mekanik",
     electrical: "Elektrik",
     approvedBy: "Onaylayan",
-    openProject: "Projeyi Aç",
-    projectOpened: "Proje Açıldı",
-    closeProject: "Projeyi Kapat",
-    closeHint:
-      "Kapatınca açılma iptal edilir ve durum yeniden \"proje\" olur. Disiplin onayları korunur.",
     pendingTitle: "Onay Bekleyenler",
     pendingDescription: "Eksik onaylı projeler",
     complete: "Tamam",
     incomplete: "Eksik",
-    openRequiresApprovals:
-      "Projeyi açmak için mimari, mekanik ve elektrik onayları tamamlanmalı",
-    openNoPermission: "Bu işlem için yetkiniz yok",
-    lockedHint:
-      "Proje açıldıktan sonra onayları yalnızca Admin / Yönetici / Bölge Müdürü değiştirebilir",
   },
   geocode: {
     mapPick: "Haritadan seç",

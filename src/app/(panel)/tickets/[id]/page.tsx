@@ -101,7 +101,6 @@ function TicketDetail({ id }: { id: string }) {
         <ModuleAttachments
           table="ticket_attachments"
           parentId={id}
-          parentField="ticket_id"
           canEdit={canEdit}
         />
       </div>

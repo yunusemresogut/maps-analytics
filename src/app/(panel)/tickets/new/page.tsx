@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Paperclip } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useAuth } from "@/contexts/auth-context";
@@ -11,11 +10,12 @@ import { useModules } from "@/contexts/modules-context";
 import { useStores } from "@/contexts/stores-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { nextTicketCode } from "@/lib/module-codes";
+import { useSettings } from "@/contexts/settings-context";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { uploadModuleAttachment } from "@/lib/upload-module-attachment";
-import { ALLOWED_FILE_ACCEPT, ALLOWED_FILE_LABELS } from "@/lib/file-types";
+import { uploadModuleAttachments } from "@/lib/upload-module-attachment";
+import { PendingAttachments } from "@/components/modules/pending-attachments";
 import type { TicketPriority } from "@/types";
 
 const PRIORITY_TR: Record<TicketPriority, string> = {
@@ -30,6 +30,7 @@ function NewTicketContent() {
   const { tickets, createTicket } = useModules();
   const { stores } = useStores();
   const { canAdd } = usePermissions("tickets");
+  const { org } = useSettings();
 
   const [code, setCode] = useState("");
   const [codeTouched, setCodeTouched] = useState(false);
@@ -38,11 +39,10 @@ function NewTicketContent() {
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [storeId, setStoreId] = useState("");
   const [saving, setSaving] = useState(false);
-  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
   const [saveError, setSaveError] = useState("");
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null);
-  const attachmentInputRef = useRef<HTMLInputElement>(null);
-  const ticketCode = codeTouched ? code : nextTicketCode(tickets);
+  const ticketCode = codeTouched ? code : nextTicketCode(tickets, org.defaults.ticketCodePrefix);
 
   if (!canAdd) {
     return (
@@ -71,17 +71,16 @@ function NewTicketContent() {
     }
 
     setCreatedTicketId(id);
-    if (attachment && user) {
-      const result = await uploadModuleAttachment({
+    if (attachments.length > 0 && user) {
+      const errors = await uploadModuleAttachments({
         table: "ticket_attachments",
         parentId: id,
-        parentField: "ticket_id",
-        file: attachment,
+        files: attachments,
         user,
       });
-      if (!result.ok) {
+      if (errors.length > 0) {
         setSaving(false);
-        setSaveError(`Talep kaydedildi ancak ek yüklenemedi: ${result.error}`);
+        setSaveError(`Talep kaydedildi ancak bazı ekler yüklenemedi: ${errors.join(" ")}`);
         return;
       }
     }
@@ -149,28 +148,7 @@ function NewTicketContent() {
             </Select>
           </div>
         </div>
-        <div>
-          <input
-            ref={attachmentInputRef}
-            type="file"
-            accept={ALLOWED_FILE_ACCEPT}
-            className="hidden"
-            onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
-          />
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-zinc-300 hover:border-cyan-500/50 hover:text-cyan-300"
-              onClick={() => attachmentInputRef.current?.click()}
-            >
-              <Paperclip className="h-4 w-4" />
-              Ek dosya seç
-            </button>
-            <span className="min-w-0 truncate text-xs text-zinc-500">
-              {attachment?.name ?? ALLOWED_FILE_LABELS}
-            </span>
-          </div>
-        </div>
+        <PendingAttachments files={attachments} onChange={setAttachments} />
       </div>
     </ModuleFormShell>
   );

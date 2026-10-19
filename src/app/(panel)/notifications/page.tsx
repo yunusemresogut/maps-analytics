@@ -5,40 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  Bell,
-  Clock,
-  RotateCcw,
-  ShoppingCart,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Bell, RotateCcw, Settings, X } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { TablePagination } from "@/components/modules/module-table";
 import { useNotifications } from "@/contexts/notifications-context";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { useTableState } from "@/hooks/use-table-state";
+import { NOTIFICATION_META } from "@/lib/notification-meta";
+import { notificationHref } from "@/lib/notifications";
 import type { AppNotification } from "@/types";
-
-const TYPE_ICON = {
-  opening_soon: AlertTriangle,
-  opening_overdue: Clock,
-  ihale_contract_reminder: ShoppingCart,
-};
-
-const TYPE_COLOR = {
-  opening_soon: "text-red-400",
-  opening_overdue: "text-amber-400",
-  ihale_contract_reminder: "text-violet-400",
-};
-
-const TYPE_LABEL = {
-  opening_soon: "Yakında Açılış",
-  opening_overdue: "Açılış Gecikmesi",
-  ihale_contract_reminder: "Sözleşme Gerekli",
-};
 
 type NotifItem = AppNotification & { dismissed: boolean };
 type SortKey = "createdAt" | "type" | "dismissed";
@@ -58,11 +34,12 @@ function NotificationsContent() {
 
   const getSortValue = useCallback((item: NotifItem, key: SortKey) => {
     if (key === "dismissed") return item.dismissed;
-    if (key === "type") return TYPE_LABEL[item.type] ?? item.type;
+    if (key === "type") return NOTIFICATION_META[item.type].label;
     return item.createdAt;
   }, []);
 
   const table = useTableState<NotifItem, SortKey>({
+    memoryKey: "notifications",
     items,
     initialSort: { key: "createdAt", direction: "desc" },
     getSortValue,
@@ -73,7 +50,7 @@ function NotificationsContent() {
 
   const handleOpen = (notif: AppNotification) => {
     dismiss(notif.id);
-    router.push(notif.actionHref ?? `/map?store=${notif.storeId}`);
+    router.push(notificationHref(notif));
   };
 
   const handleDismissAll = () => {
@@ -116,6 +93,13 @@ function NotificationsContent() {
               <option value="type">Tipe göre</option>
               <option value="dismissed">Okunma durumuna göre</option>
             </Select>
+            <Link
+              href="/settings/notifications"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Bildirim ayarları
+            </Link>
             {activeCount > 0 && (
               <Button size="sm" variant="outline" onClick={handleDismissAll}>
                 Tümünü okundu işaretle
@@ -131,8 +115,7 @@ function NotificationsContent() {
             </li>
           )}
           {table.pageItems.map((notif) => {
-            const Icon = TYPE_ICON[notif.type];
-            const color = TYPE_COLOR[notif.type];
+            const { icon: Icon, color, label } = NOTIFICATION_META[notif.type];
             return (
               <li
                 key={notif.id}
@@ -147,7 +130,7 @@ function NotificationsContent() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`text-xs font-medium ${color}`}>
-                        {TYPE_LABEL[notif.type]}
+                        {label}
                       </span>
                       {notif.dismissed && (
                         <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">
@@ -157,27 +140,15 @@ function NotificationsContent() {
                     </div>
                     <p className="mt-1 text-sm text-zinc-200">{notif.message}</p>
                     <p className="mt-1 text-xs text-zinc-600">
-                      {notif.storeName} ·{" "}
+                      {notif.storeName ? `${notif.storeName} · ` : ""}
                       {format(parseISO(notif.createdAt), "d MMM yyyy, HH:mm", {
                         locale: tr,
                       })}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {notif.actionHref ? (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            dismiss(notif.id);
-                            router.push(notif.actionHref!);
-                          }}
-                        >
-                          Sözleşme oluştur
-                        </Button>
-                      ) : (
-                        <Button size="sm" onClick={() => handleOpen(notif)}>
-                          Haritada aç
-                        </Button>
-                      )}
+                      <Button size="sm" onClick={() => handleOpen(notif)}>
+                        {notif.actionLabel ?? "Haritada aç"}
+                      </Button>
                       {notif.dismissed ? (
                         <Button
                           size="sm"

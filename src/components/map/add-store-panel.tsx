@@ -1,194 +1,71 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { MapPin, Search, Upload, X } from "lucide-react";
+import { useState } from "react";
+import { MapPin, X } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useStores } from "@/contexts/stores-context";
 import { useT } from "@/contexts/i18n-context";
-import {
-  StoreFormFields,
-  emptyStoreForm,
-  formToStoreData,
-  type StoreFormData,
-} from "@/components/map/store-form-fields";
+import { StoreFormFields } from "@/components/map/store-form-fields";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/field-error";
+import { StoreLocationFields } from "@/components/location/store-location-fields";
+import { useStoreForm } from "@/hooks/use-store-form";
+import { useMapPickBridge } from "@/hooks/use-map-pick-bridge";
+import type { Coords, MapPick } from "@/lib/geocode";
 import { cn } from "@/lib/utils";
 import {
   MAP_PANEL_HEIGHT_CLASS,
   MAP_PANEL_SHELL_CLASS,
   MAP_PANEL_BOTTOM_CLASS,
 } from "@/lib/map-panel-styles";
-import {
-  hasErrors,
-  validateStoreForm,
-  type FieldErrors,
-} from "@/lib/validation";
-import {
-  downloadStoreImportTemplate,
-  formatImportErrors,
-  geocodeStoreImportRows,
-  parseStoresExcel,
-} from "@/lib/excel-stores";
-
-type GeocodeResult = {
-  id: string;
-  label: string;
-  address: string;
-  city: string;
-  latitude: number;
-  longitude: number;
-};
-
-type AddMode = "map" | "search" | "excel";
 
 type AddStorePanelProps = {
-  coords: { latitude: number; longitude: number } | null;
-  onCoordsChange: (coords: { latitude: number; longitude: number }) => void;
+  /** Ana haritadan gelen son seçim (tıklama ya da taslak pini sürükleme) */
+  mapPick: MapPick | null;
+  onPickModeChange: (active: boolean) => void;
+  onDraftChange: (coords: Coords | null) => void;
   onClose: () => void;
   onSaved: (storeId: string) => void;
 };
 
 export function AddStorePanel({
-  coords,
-  onCoordsChange,
+  mapPick,
+  onPickModeChange,
+  onDraftChange,
   onClose,
   onSaved,
 }: AddStorePanelProps) {
   const { user } = useAuth();
   const { addStore } = useStores();
   const t = useT();
-  const [mode, setMode] = useState<AddMode>(coords ? "map" : "search");
-  const [form, setForm] = useState<StoreFormData>(emptyStoreForm);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<GeocodeResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const { form, setForm, errors, setErrors, location, prepare } = useStoreForm();
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const excelInputRef = useRef<HTMLInputElement>(null);
-  const [excelLoading, setExcelLoading] = useState(false);
-  const [excelErrors, setExcelErrors] = useState<string>("");
-  const [excelSuccess, setExcelSuccess] = useState("");
-  const queryTerm = query.trim();
-  const canSearch = mode === "search" && queryTerm.length >= 3;
-  const visibleResults = canSearch ? results : [];
-  const isSearching = canSearch && searching;
-
-  useEffect(() => {
-    if (!canSearch) return;
-
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setSearching(true);
-      try {
-        const response = await fetch(
-          `/api/geocode/search?q=${encodeURIComponent(queryTerm)}`,
-          { signal: controller.signal }
-        );
-        const data: unknown = await response.json().catch(() => null);
-        if (
-          !response.ok ||
-          !data ||
-          typeof data !== "object" ||
-          !Array.isArray((data as { results?: unknown }).results)
-        ) {
-          throw new Error("Geocoding request failed");
-        }
-        setResults((data as { results: GeocodeResult[] }).results);
-        setSearchError("");
-      } catch {
-        if (controller.signal.aborted) return;
-        setResults([]);
-        setSearchError(t("geocode.searchFailed"));
-      } finally {
-        if (!controller.signal.aborted) setSearching(false);
-      }
-    }, 400);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [canSearch, queryTerm, t]);
-
-  const applyResult = (item: GeocodeResult) => {
-    onCoordsChange({ latitude: item.latitude, longitude: item.longitude });
-    setForm((prev) => ({
-      ...prev,
-      address: item.address,
-      city: item.city || prev.city,
-    }));
-    setResults([]);
-    setSearchError("");
-    setQuery(item.label);
-  };
-
-  const handleExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !user) return;
-    setExcelErrors("");
-    setExcelSuccess("");
-    setExcelLoading(true);
-    try {
-      const buffer = await file.arrayBuffer();
-      const parsed = parseStoresExcel(buffer);
-      if (!parsed.ok) {
-        setExcelErrors(formatImportErrors(parsed.errors));
-        return;
-      }
-      const geocoded = await geocodeStoreImportRows(parsed.rows);
-      if (!geocoded.ok) {
-        setExcelErrors(formatImportErrors(geocoded.errors));
-        return;
-      }
-      let count = 0;
-      for (const row of geocoded.rows) {
-        const store = addStore(
-          formToStoreData(
-            {
-              ...emptyStoreForm(),
-              name: row.name,
-              city: row.city,
-              address: row.address,
-              projectStatus: row.projectStatus ?? emptyStoreForm().projectStatus,
-              openingDate: row.openingDate ?? emptyStoreForm().openingDate,
-            },
-            { latitude: row.latitude, longitude: row.longitude }
-          ),
-          { userId: user.id, userName: user.name }
-        );
-        count++;
-        if (count === 1) onSaved(store.id);
-      }
-      setExcelSuccess(`${count} mağaza eklendi`);
-    } catch {
-      setExcelErrors("Dosya işlenemedi");
-    } finally {
-      setExcelLoading(false);
-    }
-  };
+  // Mağaza eklerken haritaya tıklamak her zaman pini taşır
+  useMapPickBridge({
+    mapPick,
+    controller: location,
+    pickActive: true,
+    showDraft: true,
+    onPickModeChange,
+    onDraftChange,
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
     if (!user) return;
 
-    if (!coords) {
-      setFormError("Önce haritadan konum seçin veya adres arayın");
+    const prepared = prepare();
+    if (!prepared.ok) {
+      setFormError(prepared.message);
       return;
     }
 
-    const errors = validateStoreForm(form);
-    setFieldErrors(errors);
-    if (hasErrors(errors)) return;
-
     setSaving(true);
     try {
-      const store = addStore(formToStoreData(form, coords), {
+      const store = addStore(prepared.data, {
         userId: user.id,
         userName: user.name,
       });
@@ -198,6 +75,8 @@ export function AddStorePanel({
     }
   };
 
+  const { city, district, country } = location.location;
+
   return (
     <div className={cn(MAP_PANEL_BOTTOM_CLASS, "absolute right-4 z-20 w-full max-w-md animate-in slide-in-from-right")}>
       <form
@@ -206,180 +85,66 @@ export function AddStorePanel({
           "flex flex-col",
           MAP_PANEL_HEIGHT_CLASS,
           MAP_PANEL_SHELL_CLASS,
-          "border-cyan-500/30 shadow-[0_0_40px_var(--glow-accent)]"
+          "border-cyan-500/30"
         )}
       >
         <div className="flex items-center justify-between border-b border-zinc-800 p-4">
           <div>
             <h3 className="font-semibold text-zinc-100">Yeni Konum Ekle</h3>
-            {mode !== "excel" && (
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-zinc-500">
-                <MapPin className="h-3 w-3" />
-                {coords
-                  ? `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`
-                  : "Konum seçilmedi"}
-              </p>
-            )}
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-zinc-500">
+              <MapPin className="h-3 w-3" />
+              {city
+                ? [[district, city].filter(Boolean).join(" / "), country && country !== "Türkiye" ? country : ""]
+                    .filter(Boolean)
+                    .join(", ")
+                : "Konum seçilmedi"}
+            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
+            aria-label="Kapat"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="border-b border-zinc-800 p-3">
-          <div className="grid grid-cols-3 gap-1 rounded-lg bg-zinc-900 p-1">
-            {(
-              [
-                ["map", t("geocode.mapPick")],
-                ["search", t("geocode.addressSearch")],
-                ["excel", "Excel"],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setMode(key)}
-                className={cn(
-                  "rounded-md px-2 py-1.5 text-xs",
-                  mode === key
-                    ? "bg-cyan-500/20 text-cyan-300"
-                    : "text-zinc-500"
-                )}
-              >
-                {label}
-              </button>
-            ))}
+        <div className="scrollbar-themed flex-1 overflow-y-auto p-4">
+          <div className="space-y-4">
+            <StoreLocationFields
+              controller={location}
+              mapPick={{
+                active: true,
+                hint: "Haritaya tıklayın; pini sürükleyerek ince ayar yapın",
+              }}
+              errors={{ city: errors.city, address: errors.address }}
+            />
+            <StoreFormFields
+              form={form}
+              onChange={setForm}
+              errors={errors}
+              onErrorsChange={setErrors}
+            />
           </div>
-
-          {mode === "search" && (
-            <div className="relative mt-3">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
-              <Input
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setSearchError("");
-                  if (e.target.value.trim().length < 3) setSearching(false);
-                }}
-                placeholder={t("geocode.searchPlaceholder")}
-                className="pl-9"
-              />
-              {(isSearching || visibleResults.length > 0 || searchError) && (
-                <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-950 shadow-xl">
-                  {isSearching && (
-                    <li className="px-3 py-2 text-xs text-zinc-500">
-                      {t("geocode.searching")}
-                    </li>
-                  )}
-                  {!isSearching && searchError && (
-                    <li className="px-3 py-2 text-xs text-red-400" role="alert">
-                      {searchError}
-                    </li>
-                  )}
-                  {!isSearching && !searchError && visibleResults.length === 0 && canSearch && (
-                    <li className="px-3 py-2 text-xs text-zinc-500">
-                      {t("geocode.noResults")}
-                    </li>
-                  )}
-                  {visibleResults.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => applyResult(item)}
-                        className="w-full px-3 py-2 text-left text-xs text-zinc-300 hover:bg-zinc-900"
-                      >
-                        {item.label}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
-          {mode === "map" && !coords && (
-            <p className="mt-3 text-xs text-cyan-300/90">
-              Haritada bir noktaya tıklayın
-            </p>
-          )}
-
-          {mode === "excel" && (
-            <div className="mt-3 space-y-2">
-              <p className="text-xs text-zinc-500">
-                Zorunlu sütunlar: Ad, Şehir, Adres. Adresler otomatik konuma
-                çevrilir; hatalı satırlar listelenir.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={downloadStoreImportTemplate}
-                >
-                  Şablon indir
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  loading={excelLoading}
-                  onClick={() => excelInputRef.current?.click()}
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  Excel yükle
-                </Button>
-                <input
-                  ref={excelInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  onChange={handleExcelFile}
-                />
-              </div>
-              {excelErrors && (
-                <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
-                  {excelErrors}
-                </pre>
-              )}
-              {excelSuccess && (
-                <p className="text-xs text-emerald-400">{excelSuccess}</p>
-              )}
-            </div>
-          )}
         </div>
 
-        {mode !== "excel" && (
-          <>
-            <div className="scrollbar-themed flex-1 overflow-y-auto p-4">
-              <StoreFormFields
-                form={form}
-                onChange={setForm}
-                errors={fieldErrors}
-                onErrorsChange={setFieldErrors}
-              />
-            </div>
-
-            <div className="space-y-2 border-t border-zinc-800 p-4">
-              <FormError message={formError} />
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="flex-1"
-                  onClick={onClose}
-                >
-                  {t("common.cancel")}
-                </Button>
-                <Button type="submit" className="flex-1" loading={saving}>
-                  {t("common.save")}
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
+        <div className="space-y-2 border-t border-zinc-800 p-4">
+          <FormError message={formError} />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="flex-1"
+              onClick={onClose}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" className="flex-1" loading={saving}>
+              {t("common.save")}
+            </Button>
+          </div>
+        </div>
       </form>
     </div>
   );

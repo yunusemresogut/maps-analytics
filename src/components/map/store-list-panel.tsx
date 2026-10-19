@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { Search, Store, X } from "lucide-react";
 import { useMapUi } from "@/contexts/map-ui-context";
 import { useT } from "@/contexts/i18n-context";
@@ -19,6 +19,7 @@ import {
 } from "@/lib/map-panel-styles";
 import { cn } from "@/lib/utils";
 import type { ProjectStatus, Store as StoreType } from "@/types";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 type StoreListPanelProps = {
   stores: StoreType[];
@@ -30,7 +31,7 @@ type StatusFilter = "all" | "opening_soon" | ProjectStatus;
 type SortKey = "priority";
 
 function getStoreMarkerColor(store: StoreType): string {
-  if (shouldHighlightRed(store.openingDate)) return "#f87171";
+  if (shouldHighlightRed(store.openingDate)) return "#cf6660";
   return projectStatusConfig[store.projectStatus].marker;
 }
 
@@ -41,8 +42,8 @@ export function StoreListPanel({
 }: StoreListPanelProps) {
   const { isStoreListOpen, setStoreListOpen } = useMapUi();
   const t = useT();
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [query, setQuery] = usePersistentState("map-store-list", "query", "");
+  const [statusFilter, setStatusFilter] = usePersistentState<StatusFilter>("map-store-list", "statusFilter", "all");
 
   const statusFilters = useMemo(
     () =>
@@ -91,6 +92,7 @@ export function StoreListPanel({
   }, []);
 
   const table = useTableState<StoreType, SortKey>({
+    memoryKey: "map-store-list",
     items: filtered,
     initialSort: { key: "priority", direction: "asc" },
     getSortValue,

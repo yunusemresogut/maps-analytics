@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -23,6 +23,7 @@ import { useServerTable } from "@/hooks/use-server-table";
 import { formatTry } from "@/lib/currency";
 import { formatPaymentPeriod } from "@/lib/module-finance";
 import type { ProgressPayment } from "@/types";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 const STATUS_TR: Record<string, string> = {
   draft: "Taslak",
@@ -76,8 +77,8 @@ function ProgressPaymentsContent() {
   const { progressPayments, deletePayment } = useModules();
   const { contracts, invoices } = useDb();
   const { canAdd, canEdit, canDelete } = usePermissions("progressPayments");
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
+  const [query, setQuery] = usePersistentState("progress-payments", "query", "");
+  const [status, setStatus] = usePersistentState("progress-payments", "status", "all");
 
   // Ödenen/ilerleme fatura ve sözleşmelerden hesaplanır; bunlar değişince tazele
   const refreshKey = useMemo(
@@ -86,6 +87,7 @@ function ProgressPaymentsContent() {
   );
 
   const table = useServerTable<PaymentRow, SortKey>({
+    memoryKey: "progress-payments",
     source: "progress_payments_list",
     mapRow: mapPaymentRow,
     searchColumns: SEARCH_COLUMNS,

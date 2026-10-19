@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Map, { NavigationControl } from "react-map-gl/maplibre";
+import Map, { Marker, NavigationControl } from "react-map-gl/maplibre";
 import type { MapMouseEvent, MapRef } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Plus, X } from "lucide-react";
 import { useTheme } from "@/contexts/theme-context";
+import { useAuth } from "@/contexts/auth-context";
+import { useSettings } from "@/contexts/settings-context";
+import { getMapViewKey } from "@/lib/storage-keys";
 import { findRegionForCity } from "@/data/regions";
 import { useRegions } from "@/contexts/regions-context";
 import { useStores } from "@/contexts/stores-context";
@@ -16,6 +19,8 @@ import { StoreDetailPanel } from "@/components/map/store-detail-panel";
 import { AddStorePanel } from "@/components/map/add-store-panel";
 import { RegionFilterPanel } from "@/components/map/region-filter-panel";
 import { StoreListPanel } from "@/components/map/store-list-panel";
+import { DraftPin } from "@/components/location/location-picker-map";
+import type { Coords, MapPick } from "@/lib/geocode";
 import { useT } from "@/contexts/i18n-context";
 import { getOpeningAlert } from "@/lib/opening-dates";
 import {
@@ -33,9 +38,29 @@ const DARK_MAP_STYLE =
 
 const TURKEY_CENTER = { longitude: 35.2433, latitude: 38.9637, zoom: 5.5 };
 
+type MapView = typeof TURKEY_CENTER;
+
+function readSavedView(key: string): MapView | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) ?? "null") as Partial<MapView> | null;
+    if (!saved || ![saved.longitude, saved.latitude, saved.zoom].every((n) => typeof n === "number")) return null;
+    return saved as MapView;
+  } catch {
+    return null;
+  }
+}
+
 export function StoreMap() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const { prefs } = useSettings();
+  const viewKey = user ? getMapViewKey(user.id) : null;
+  const rememberView = prefs.map.rememberView;
+  // Harita yeniden açıldığında son konumdan başlar
+  const [initialView] = useState<MapView>(
+    () => (rememberView && viewKey ? readSavedView(viewKey) : null) ?? TURKEY_CENTER
+  );
   const t = useT();
   const searchParams = useSearchParams();
   const mapRef = useRef<MapRef>(null);
@@ -45,10 +70,18 @@ export function StoreMap() {
 
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [addMode, setAddMode] = useState(false);
-  const [pendingCoords, setPendingCoords] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
+  // Açık panel (ekleme/düzenleme) konum seçimi istiyor mu, taslak pin nerede,
+  // haritadan gelen son seçim ne: konumun sahibi paneldir, harita yalnızca iletir
+  const [pickActive, setPickActive] = useState(false);
+  // Panelde kaydedilmemiş düzenleme varken haritaya tıklamak onu kapatmasın
+  const [panelEditing, setPanelEditing] = useState(false);
+  const [draftCoords, setDraftCoords] = useState<Coords | null>(null);
+  const [mapPick, setMapPick] = useState<MapPick | null>(null);
+  const pickNonce = useRef(0);
+  const emitPick = useCallback((coords: Coords, source: MapPick["source"]) => {
+    pickNonce.current += 1;
+    setMapPick({ coords, nonce: pickNonce.current, source });
+  }, []);
 
   const visibleStores = useMemo(() => {
     return stores.filter((store) => {
@@ -78,7 +111,6 @@ export function StoreMap() {
       if (!store) return;
 
       setAddMode(false);
-      setPendingCoords(null);
       setSelectedStoreId(storeId);
 
       mapRef.current?.flyTo({
@@ -99,34 +131,55 @@ export function StoreMap() {
 
   const handleMapClick = useCallback(
     (e: MapMouseEvent) => {
-      if (addMode && canAdd) {
-        setPendingCoords({
-          latitude: e.lngLat.lat,
-          longitude: e.lngLat.lng,
-        });
-        setSelectedStoreId(null);
+      // Konum seçilirken tıklama pini taşır; seçili mağaza kapanmaz
+      if (pickActive) {
+        emitPick({ latitude: e.lngLat.lat, longitude: e.lngLat.lng }, "click");
         return;
       }
+      if (addMode || panelEditing) return;
       setSelectedStoreId(null);
-      setPendingCoords(null);
     },
-    [addMode, canAdd]
+    [addMode, panelEditing, pickActive, emitPick]
   );
+
+  // Taslak pin ekranın dışına düşerse (ör. adres aramasıyla) harita oraya gider
+  const draftKey = draftCoords ? `${draftCoords.latitude},${draftCoords.longitude}` : "";
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!draftCoords || !map) return;
+    if (!map.getBounds().contains([draftCoords.longitude, draftCoords.latitude])) {
+      map.flyTo({
+        center: [draftCoords.longitude, draftCoords.latitude],
+        zoom: Math.max(map.getZoom(), 14),
+        duration: 900,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
 
   const exitAddMode = () => {
     setAddMode(false);
-    setPendingCoords(null);
   };
 
   return (
     <div
-      className={`relative h-full w-full ${addMode ? "cursor-crosshair" : ""}`}
+      className="relative h-full w-full"
     >
       <Map
         ref={mapRef}
-        initialViewState={TURKEY_CENTER}
+        initialViewState={initialView}
+        onMoveEnd={(event) => {
+          if (!rememberView || !viewKey) return;
+          const { longitude, latitude, zoom } = event.viewState;
+          try {
+            localStorage.setItem(viewKey, JSON.stringify({ longitude, latitude, zoom }));
+          } catch {
+            // depolama yoksa hatırlamadan devam et
+          }
+        }}
         mapStyle={theme === "light" ? LIGHT_MAP_STYLE : DARK_MAP_STYLE}
         onClick={handleMapClick}
+        cursor={pickActive ? "crosshair" : undefined}
         style={{ width: "100%", height: "100%" }}
         attributionControl={false}
       >
@@ -138,19 +191,30 @@ export function StoreMap() {
             store={store}
             isSelected={selectedStoreId === store.id}
             onClick={() => {
-              if (addMode) return;
-              setPendingCoords(null);
+              if (addMode || pickActive || panelEditing) return;
               setSelectedStoreId(store.id);
             }}
             onDoubleClick={() => {
-              if (addMode) return;
+              if (addMode || pickActive || panelEditing) return;
               router.push(`/stores/${store.id}`);
             }}
           />
         ))}
+
+        {draftCoords && (
+          <Marker
+            longitude={draftCoords.longitude}
+            latitude={draftCoords.latitude}
+            anchor="bottom"
+            draggable
+            onDragEnd={(e) => emitPick({ latitude: e.lngLat.lat, longitude: e.lngLat.lng }, "drag")}
+          >
+            <DraftPin />
+          </Marker>
+        )}
       </Map>
 
-      {addMode && (
+      {pickActive && (
         <div className="pointer-events-none absolute inset-0 z-[5] border-2 border-dashed border-cyan-500/40 bg-cyan-500/5" />
       )}
 
@@ -219,17 +283,21 @@ export function StoreMap() {
         <StoreDetailPanel
           store={selectedStore}
           onClose={() => setSelectedStoreId(null)}
+          mapPick={mapPick}
+          onPickModeChange={setPickActive}
+          onDraftChange={setDraftCoords}
+          onEditingChange={setPanelEditing}
         />
       )}
 
       {addMode && (
         <AddStorePanel
-          coords={pendingCoords}
-          onCoordsChange={setPendingCoords}
+          mapPick={mapPick}
+          onPickModeChange={setPickActive}
+          onDraftChange={setDraftCoords}
           onClose={exitAddMode}
           onSaved={(id) => {
             setAddMode(false);
-            setPendingCoords(null);
             setSelectedStoreId(id);
           }}
         />
@@ -240,7 +308,11 @@ export function StoreMap() {
       <StoreListPanel
         stores={visibleStores}
         selectedStoreId={selectedStoreId}
-        onSelect={focusStore}
+        onSelect={(id) => {
+          // Kaydedilmemiş düzenleme varken başka mağazaya geçilmez
+          if (panelEditing) return;
+          focusStore(id);
+        }}
       />
     </div>
   );

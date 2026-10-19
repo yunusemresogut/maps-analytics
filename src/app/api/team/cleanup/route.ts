@@ -1,6 +1,6 @@
 import { cleanupExpiredTeamMessages, getTeamRequestUser } from "@/lib/team-server";
 
-/** Vercel Cron: tüm firmalarda 3 günü dolan mesajları ve dosyaları siler */
+/** Vercel Cron: tüm firmalarda saklama süresi dolan mesajları ve dosyaları siler */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {

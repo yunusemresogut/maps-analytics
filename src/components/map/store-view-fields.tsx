@@ -25,7 +25,15 @@ export function StoreViewFields({ store }: StoreViewFieldsProps) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Şehir" value={store.city} />
+        <Field
+          label={store.country && store.country !== "Türkiye" ? "Şehir / semt" : "İl / ilçe"}
+          value={[
+            [store.city, store.district].filter(Boolean).join(" / "),
+            store.country && store.country !== "Türkiye" ? store.country : "",
+          ]
+            .filter(Boolean)
+            .join(", ")}
+        />
         <Field
           label="Durum"
           value={getProjectStatusLabel(store.projectStatus, t)}

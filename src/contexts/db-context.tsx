@@ -271,16 +271,10 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
       if (filesRes.error) throw filesRes.error;
 
       const tempStoreData: Record<string, StoreUserData> = {};
-      const specialNotesMap: Record<string, string> = {};
-      (storesDataRes || []).forEach((s: any) => {
-        specialNotesMap[s.id] = s.special_note || "";
-      });
-
       mappedStores.forEach((st) => {
         tempStoreData[st.id] = {
           notes: [],
           files: [],
-          specialNote: specialNotesMap[st.id] || "",
         };
       });
 

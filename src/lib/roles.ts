@@ -88,50 +88,12 @@ export function canApproveDiscipline(
   return DISCIPLINE_ROLE[discipline] === role;
 }
 
-/** After project is opened, only admin/managers may change discipline approvals. */
-export function canToggleDisciplineApproval(
-  role: UserRole,
-  discipline: ApprovalDiscipline,
-  projectOpened: boolean
-): boolean {
-  if (projectOpened) {
-    return role === "admin" || FULL_MANAGER_ROLES.includes(role);
-  }
-  return canApproveDiscipline(role, discipline);
-}
-
 export function allDisciplinesApproved(approvals: ProjectApprovals): boolean {
   return (
     approvals.architectural.approved &&
     approvals.mechanical.approved &&
     approvals.electrical.approved
   );
-}
-
-export function canOpenProject(role: UserRole): boolean {
-  if (role === "admin") return true;
-  if (isEngineer(role)) return true;
-  if (FULL_MANAGER_ROLES.includes(role)) return true;
-  return false;
-}
-
-/** Role may open AND all three disciplines are approved AND not already opened. */
-export function canOpenStoreProject(
-  role: UserRole,
-  approvals: ProjectApprovals
-): boolean {
-  if (approvals.projectOpened) return false;
-  if (!canOpenProject(role)) return false;
-  return allDisciplinesApproved(approvals);
-}
-
-/** Only admin / manager / regional manager may reverse "project opened". */
-export function canCloseStoreProject(
-  role: UserRole,
-  approvals: ProjectApprovals
-): boolean {
-  if (!approvals.projectOpened) return false;
-  return role === "admin" || FULL_MANAGER_ROLES.includes(role);
 }
 
 export function canAccessApprovalsQueue(role: UserRole): boolean {

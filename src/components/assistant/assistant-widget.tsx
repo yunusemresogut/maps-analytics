@@ -1,10 +1,26 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { ArrowUp, ChevronDown, RotateCcw, Sparkles, Square } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useDb } from "@/contexts/db-context";
+import { useSettings } from "@/contexts/settings-context";
+import { nextTicketCode } from "@/lib/module-codes";
+import { useModules } from "@/contexts/modules-context";
+import { useStoreData } from "@/contexts/store-data-context";
+import { useStores } from "@/contexts/stores-context";
+import {
+  ActionPreviewCard,
+  type ActionProposal,
+  type ActionResult,
+} from "@/components/assistant/action-preview-card";
+import {
+  buildActionPreviews,
+  extractActions,
+  stripActionBlock,
+  type ResolvedAction,
+} from "@/lib/assistant-actions";
 import {
   MAX_ITEMS_PER_STORE,
   buildAssistantContext,
@@ -12,11 +28,19 @@ import {
   type StoreDetails,
 } from "@/lib/assistant-context";
 import { fetchStoreMaterialsPreview, fetchStoreWorkPlanPreview } from "@/lib/store-details";
-import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import type { Store } from "@/types";
+import { apiFetch } from "@/lib/api-client";
+import { searchAddresses } from "@/lib/geocode";
+import { useHorizontalDrag } from "@/hooks/use-horizontal-drag";
 
-type ChatMessage = { role: "user" | "assistant"; content: string; error?: boolean };
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  error?: boolean;
+  /** Cevapta kayıt ekleme önerisi varsa önizleme ve onay durumu */
+  proposal?: ActionProposal;
+};
 
 const SUGGESTIONS = [
   "Genel durumu özetle",
@@ -24,7 +48,31 @@ const SUGGESTIONS = [
   "Açılış tarihi geçmiş mağazalar var mı?",
   "Hakediş ve fatura durumunu yorumla",
   "Riskli projeleri ve önerilerini listele",
+  "Yeni bir ticket aç",
+  "Bir mağazanın keşfine malzeme ekle",
 ];
+
+/** Modelin önceki önerilerin akıbetini bilmesi için geçmişe eklenen not */
+function historyContent(message: ChatMessage): string {
+  const proposal = message.proposal;
+  if (!proposal) return message.content;
+  let note = "Bu öneri onaylanmadı; hiçbir kayıt eklenmedi.";
+  if (proposal.status === "done") {
+    note = `Kullanıcı onayladı. Sonuç: ${(proposal.results ?? []).map((result) => result.label).join("; ")}`;
+  } else if (proposal.previews.some((preview) => preview.errors.length > 0)) {
+    note = `Öneri uygulanamadı: ${proposal.previews.flatMap((preview) => preview.errors).join(" ")}`;
+  }
+  return `${message.content}\n\n[Sistem: ${note}]`;
+}
+
+async function geocode(query: string) {
+  try {
+    const [first] = await searchAddresses(query);
+    return first ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** **kalın** vurgularını işler */
 function renderInline(text: string): ReactNode[] {
@@ -111,6 +159,12 @@ export function AssistantWidget() {
   const pathname = usePathname();
   const { user } = useAuth();
   const { stores, storeSummaries, contracts, progressPayments, invoices, tickets, organization } = useDb();
+  const { addStore } = useStores();
+  const { createTicket } = useModules();
+  const { importMaterials, importWorkPlan } = useStoreData();
+  const { org, prefs, prefsLoaded, isModuleEnabled } = useSettings();
+  const historyKey = user ? `maps-analytics-assistant:${user.id}` : null;
+  const keepHistory = prefs.assistant.keepHistory;
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -118,6 +172,46 @@ export function AssistantWidget() {
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  // Panel başlığından tutularak yalnızca yatay sürüklenir; ekran dışına çıkamaz
+  const { offset, dragging, reset: resetPosition, handleProps } = useHorizontalDrag({
+    containerRef: wrapperRef,
+    targetRef: panelRef,
+  });
+
+  /** Paneli küçültür; bir sonraki açılışta ortadan başlar */
+  const collapse = useCallback(() => {
+    setOpen(false);
+    resetPosition();
+  }, [resetPosition]);
+
+  // Panel dışında boş bir yere tıklanınca küçülür
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (panelRef.current?.contains(event.target as Node)) return;
+      collapse();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open, collapse]);
+
+  // Tarayıcı sekmesi değişince konum ortaya döner
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") resetPosition();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [resetPosition]);
+
+  // Başka sayfaya geçilince de ortaya döner (render sırasında, efekt zinciri olmadan)
+  const [positionPath, setPositionPath] = useState(pathname);
+  if (positionPath !== pathname) {
+    setPositionPath(pathname);
+    if (offset !== 0) resetPosition();
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -129,17 +223,57 @@ export function AssistantWidget() {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  // Ekip sayfasında mesaj kutusunun üstüne binmesin
-  if (!user || pathname.startsWith("/team")) return null;
+  // Sohbet geçmişi: tercih açıksa tarayıcıda saklanır, kapatılınca silinir.
+  // Tercihler yüklenince bir kez geri yüklenir (render sırasında, efekt zinciri olmadan).
+  const [historyLoadedFor, setHistoryLoadedFor] = useState<string | null>(null);
+  if (historyKey && prefsLoaded && historyLoadedFor !== historyKey) {
+    setHistoryLoadedFor(historyKey);
+    if (keepHistory) {
+      try {
+        const saved: unknown = JSON.parse(localStorage.getItem(historyKey) ?? "[]");
+        if (Array.isArray(saved) && saved.length > 0) {
+          // Yarım kalan önizlemeler geri yüklenince onaylanamaz
+          setMessages(
+            (saved as ChatMessage[]).map((message) =>
+              message.proposal && message.proposal.status !== "done"
+                ? { ...message, proposal: { ...message.proposal, status: "cancelled" } }
+                : message
+            )
+          );
+        }
+      } catch {
+        // Bozuk kayıt: boş sohbetle devam
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!historyKey || historyLoadedFor !== historyKey || streaming) return;
+    try {
+      if (keepHistory) localStorage.setItem(historyKey, JSON.stringify(messages.slice(-40)));
+      else localStorage.removeItem(historyKey);
+    } catch {
+      // Kota dolduysa geçmiş saklanmaz
+    }
+  }, [messages, historyKey, historyLoadedFor, keepHistory, streaming]);
+
+  // Ekip sayfasında mesaj kutusunun üstüne binmesin; firma ya da kullanıcı kapattıysa gösterme
+  if (!user || pathname.startsWith("/team") || !org.assistant.enabled || !prefs.assistant.visible) return null;
 
   const send = async (text: string) => {
     const content = text.trim();
     if (!content || streaming) return;
+    // Yanıtlanmamış önizlemeler yeni mesajla geçersiz olur: aynı kayıt iki kez eklenmesin
+    const settled = messages.map((message) =>
+      message.proposal && (message.proposal.status === "ready" || message.proposal.status === "preparing")
+        ? { ...message, proposal: { ...message.proposal, status: "cancelled" as const } }
+        : message
+    );
     const history: ChatMessage[] = [
-      ...messages.filter((message) => !message.error),
+      ...settled.filter((message) => !message.error),
       { role: "user", content },
     ];
-    setMessages([...history, { role: "assistant", content: "" }]);
+    setMessages([...settled, { role: "user", content }, { role: "assistant", content: "" }]);
     setInput("");
     setStreaming(true);
 
@@ -149,20 +283,14 @@ export function AssistantWidget() {
       setMessages((current) => [...current.slice(0, -1), update(current[current.length - 1])]);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
       const storeDetails = await loadStoreDetails(
         pickDetailStores(stores, storeSummaries, content)
       );
-      const response = await fetch("/api/assistant", {
+      const response = await apiFetch("/api/assistant", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token ?? ""}`,
-        },
         body: JSON.stringify({
-          messages: history.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
+          messages: history.map((message) => ({ role: message.role, content: historyContent(message) })),
+          allowActions: org.assistant.allowActions,
           context: buildAssistantContext({
             question: content,
             organizationName: organization?.name,
@@ -191,17 +319,33 @@ export function AssistantWidget() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let fullText = "";
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
+        fullText += chunk;
         updateLast((message) => ({ ...message, content: message.content + chunk }));
       }
-      updateLast((message) =>
-        message.content.trim()
-          ? message
-          : { role: "assistant", content: "Bir cevap üretilemedi. Soruyu farklı sormayı deneyin.", error: true }
-      );
+      if (!fullText.trim()) {
+        updateLast(() => ({
+          role: "assistant",
+          content: "Bir cevap üretilemedi. Soruyu farklı sormayı deneyin.",
+          error: true,
+        }));
+        return;
+      }
+
+      const rawActions = org.assistant.allowActions ? extractActions(fullText) : null;
+      if (rawActions) {
+        updateLast((message) => ({ ...message, proposal: { status: "preparing", previews: [] } }));
+        const previews = await buildActionPreviews(rawActions, { user, stores, geocode, isModuleEnabled });
+        updateLast((message) =>
+          message.proposal?.status === "preparing"
+            ? { ...message, proposal: { status: "ready", previews } }
+            : message
+        );
+      }
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         updateLast((message) =>
@@ -220,6 +364,63 @@ export function AssistantWidget() {
     }
   };
 
+  const setProposal = (index: number, update: (proposal: ActionProposal) => ActionProposal) =>
+    setMessages((current) =>
+      current.map((message, i) =>
+        i === index && message.proposal ? { ...message, proposal: update(message.proposal) } : message
+      )
+    );
+
+  const runAction = async (action: ResolvedAction): Promise<ActionResult> => {
+    const storeName = (id: string) => stores.find((store) => store.id === id)?.name ?? "mağaza";
+    switch (action.type) {
+      case "create_store": {
+        const store = addStore(action.store, { userId: user.id, userName: user.name });
+        return { ok: true, label: `"${store.name}" mağazası oluşturuldu`, href: `/stores/${store.id}` };
+      }
+      case "create_ticket": {
+        const id = await createTicket({
+          ...action.ticket,
+          code: nextTicketCode(tickets, org.defaults.ticketCodePrefix),
+        });
+        return id
+          ? { ok: true, label: `"${action.ticket.title}" ticket'ı açıldı`, href: `/tickets/${id}` }
+          : { ok: false, label: "Ticket oluşturulamadı" };
+      }
+      case "add_work_plan": {
+        const count = await importWorkPlan(action.storeId, action.rows, "append");
+        return count > 0
+          ? { ok: true, label: `${storeName(action.storeId)} iş planına ${count} kalem eklendi`, href: `/stores/${action.storeId}` }
+          : { ok: false, label: "İş planı kalemleri eklenemedi" };
+      }
+      case "add_materials": {
+        const count = await importMaterials(action.storeId, action.rows, "append");
+        return count > 0
+          ? { ok: true, label: `${storeName(action.storeId)} keşfine ${count} kalem eklendi`, href: `/stores/${action.storeId}` }
+          : { ok: false, label: "Keşif kalemleri eklenemedi" };
+      }
+    }
+  };
+
+  const confirmProposal = async (index: number) => {
+    const proposal = messages[index]?.proposal;
+    if (!proposal || proposal.status !== "ready") return;
+    const actions = proposal.previews.flatMap((preview) => (preview.resolved ? [preview.resolved] : []));
+    if (actions.length !== proposal.previews.length) return;
+    setProposal(index, (current) => ({ ...current, status: "running" }));
+    const results: ActionResult[] = [];
+    // Sırayla: biri hata verirse diğerleri yine denenir, sonuçlar ayrı ayrı gösterilir
+    for (const action of actions) {
+      try {
+        results.push(await runAction(action));
+      } catch (error) {
+        console.error("Asistan eylemi uygulanamadı:", error);
+        results.push({ ok: false, label: "İşlem sırasında beklenmeyen bir hata oluştu" });
+      }
+    }
+    setProposal(index, (current) => ({ ...current, status: "done", results }));
+  };
+
   const reset = () => {
     abortRef.current?.abort();
     setMessages([]);
@@ -227,24 +428,40 @@ export function AssistantWidget() {
   };
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-3 sm:px-4 sm:pb-4">
+    <div
+      ref={wrapperRef}
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-3 sm:px-4 sm:pb-4"
+    >
       {open ? (
         <section
+          ref={panelRef}
           role="dialog"
           aria-label="Maps'e Sor"
           onKeyDown={(event) => {
-            if (event.key === "Escape") setOpen(false);
+            if (event.key === "Escape") collapse();
           }}
-          className="slide-up-fade pointer-events-auto flex h-[min(640px,calc(100dvh-5rem))] w-full max-w-[720px] flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-(--panel-shadow)"
+          // translate (transform değil): açılış animasyonuyla çakışmaz
+          style={{ translate: `${offset}px 0` }}
+          className={cn(
+            "slide-up-fade pointer-events-auto flex h-[min(640px,calc(100dvh-5rem))] w-full max-w-[720px] flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-(--panel-shadow)",
+            dragging && "select-none"
+          )}
         >
-          <header className="flex items-center justify-between gap-2 border-b border-zinc-800 px-4 py-3">
+          <header
+            {...handleProps}
+            title="Sağa sola taşımak için sürükleyin"
+            className={cn(
+              "flex touch-none items-center justify-between gap-2 border-b border-zinc-800 px-4 py-3",
+              dragging ? "cursor-grabbing" : "cursor-grab"
+            )}
+          >
             <div className="flex items-center gap-2.5">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/15">
                 <Sparkles className="h-4 w-4 text-cyan-400" />
               </span>
               <div>
                 <p className="text-sm font-semibold text-zinc-100">Maps&apos;e Sor</p>
-                <p className="text-[11px] text-zinc-500">Firma verilerinize göre cevaplar</p>
+                <p className="text-[11px] text-zinc-500">Firma verilerinize göre cevaplar, onayınızla kayıt ekler</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -261,7 +478,7 @@ export function AssistantWidget() {
               )}
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={collapse}
                 className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800/50 hover:text-zinc-300"
                 aria-label="Küçült"
                 title="Küçült"
@@ -279,7 +496,8 @@ export function AssistantWidget() {
                     Merhaba {user.name.split(" ")[0]}, ne öğrenmek istersiniz?
                   </p>
                   <p className="mt-1 text-sm text-zinc-500">
-                    Mağazalar, açılış takvimi, iş planları ve finans kayıtlarınız hakkında sorun ya da yorum isteyin.
+                    Mağazalar, açılış takvimi, iş planları ve finans kayıtlarınız hakkında sorun. Mağaza, ticket, iş planı
+                    ya da keşif kalemi eklemesini de isteyebilirsiniz; önce önizleme gösterilir, onaylarsanız eklenir.
                   </p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -308,14 +526,37 @@ export function AssistantWidget() {
                     <div
                       key={index}
                       className={cn(
-                        "text-sm leading-relaxed",
+                        "space-y-3 text-sm leading-relaxed",
                         message.error
                           ? "rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-red-400"
                           : "text-zinc-300"
                       )}
                     >
                       {message.content ? (
-                        message.error ? message.content : <MessageContent text={message.content} />
+                        message.error ? (
+                          message.content
+                        ) : (
+                          <>
+                            {stripActionBlock(message.content) && (
+                              <MessageContent text={stripActionBlock(message.content)} />
+                            )}
+                            {message.proposal ? (
+                              <ActionPreviewCard
+                                proposal={message.proposal}
+                                onConfirm={() => void confirmProposal(index)}
+                                onCancel={() =>
+                                  setProposal(index, (proposal) => ({ ...proposal, status: "cancelled" }))
+                                }
+                              />
+                            ) : (
+                              streaming &&
+                              index === messages.length - 1 &&
+                              message.content.includes("```action") && (
+                                <p className="text-xs text-zinc-500">Öneri hazırlanıyor…</p>
+                              )
+                            )}
+                          </>
+                        )
                       ) : (
                         <span className="inline-flex gap-1 py-1" aria-label="Yazıyor">
                           {[0, 150, 300].map((delay) => (
@@ -372,7 +613,7 @@ export function AssistantWidget() {
                 <button
                   type="submit"
                   disabled={!input.trim()}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-500 text-white transition-colors hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-on transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="Gönder"
                 >
                   <ArrowUp className="h-4 w-4" />
@@ -398,7 +639,7 @@ export function AssistantWidget() {
           <span className="min-w-0 flex-1 truncate text-sm text-zinc-500">
             {messages.length > 0 ? "Sohbete devam et" : "Mağazalar, açılışlar, finans…"}
           </span>
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-500 text-white transition-colors group-hover:bg-cyan-600">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-brand-on transition-colors group-hover:bg-brand-hover">
             <ArrowUp className="h-4 w-4" />
           </span>
         </button>

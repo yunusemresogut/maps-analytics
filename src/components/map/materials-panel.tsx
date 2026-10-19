@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { MaterialsImportMenu } from "@/components/map/materials-import-menu";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { MaterialStatus, StoreMaterial } from "@/types";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 type MaterialsPanelProps = {
   storeId: string;
@@ -200,13 +201,14 @@ export function MaterialsPanel({
   const summary = storeSummaries[storeId] ?? EMPTY_SUMMARY;
   const [modal, setModal] = useState<{ key: number; material: StoreMaterial | null } | null>(null);
   const [expanded, setExpanded] = useState(true);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = usePersistentState(`materials:${storeId}`, "query", "");
   const [deleting, setDeleting] = useState(false);
   const bodyId = useId();
 
   // Sunucuda aranır ve sayfalanır; sıra her zaman eklenme sırasıdır (seq)
   const filters = useMemo(() => ({ store_id: storeId }), [storeId]);
   const table = useServerTable<StoreMaterial, "seq">({
+    memoryKey: `materials:${storeId}`,
     source: MATERIALS_SOURCE,
     mapRow: mapMaterialFromDb,
     searchColumns: MATERIAL_SEARCH_COLUMNS,

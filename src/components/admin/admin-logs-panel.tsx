@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { format, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Filter, Trash2 } from "lucide-react";
@@ -13,6 +13,8 @@ import {
   TablePagination,
 } from "@/components/modules/module-table";
 import type { ActivityCategory, ActivityLogEntry } from "@/types";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { Select } from "@/components/ui/select";
 
 const CATEGORY_LABELS: Record<ActivityCategory, string> = {
   auth: "Oturum",
@@ -65,7 +67,7 @@ type SortKey =
 
 export function AdminLogsPanel() {
   const logs = useActivityLogs();
-  const [category, setCategory] = useState<ActivityCategory | "all">("all");
+  const [category, setCategory] = usePersistentState<ActivityCategory | "all">("admin-logs", "category", "all");
 
   const filtered = useMemo(() => {
     if (category === "all") return logs;
@@ -77,6 +79,7 @@ export function AdminLogsPanel() {
   }, []);
 
   const table = useTableState<ActivityLogEntry, SortKey>({
+    memoryKey: "admin-logs",
     items: filtered,
     initialSort: { key: "createdAt", direction: "desc" },
     getSortValue,
@@ -94,12 +97,13 @@ export function AdminLogsPanel() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="h-4 w-4 text-zinc-500" />
-          <select
+          <Select
             value={category}
             onChange={(e) =>
               setCategory(e.target.value as ActivityCategory | "all")
             }
-            className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-300"
+            aria-label="Kategori"
+            className="h-9 w-auto min-w-[180px]"
           >
             <option value="all">Tüm kategoriler</option>
             {(Object.keys(CATEGORY_LABELS) as ActivityCategory[]).map((c) => (
@@ -107,7 +111,7 @@ export function AdminLogsPanel() {
                 {CATEGORY_LABELS[c]}
               </option>
             ))}
-          </select>
+          </Select>
           <span className="text-xs text-zinc-600">{filtered.length} kayıt</span>
         </div>
         {logs.length > 0 && (

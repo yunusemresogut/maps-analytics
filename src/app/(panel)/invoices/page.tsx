@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -22,6 +22,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useServerTable } from "@/hooks/use-server-table";
 import { formatTry } from "@/lib/currency";
 import type { Invoice } from "@/types";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 const STATUS_TR: Record<string, string> = {
   draft: "Taslak",
@@ -70,8 +71,8 @@ function InvoicesContent() {
   const { invoices, deleteInvoice } = useModules();
   const { progressPayments } = useDb();
   const { canAdd, canEdit, canDelete } = usePermissions("invoices");
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
+  const [query, setQuery] = usePersistentState("invoices", "query", "");
+  const [status, setStatus] = usePersistentState("invoices", "status", "all");
 
   const refreshKey = useMemo(
     () => [invoices, progressPayments],
@@ -79,6 +80,7 @@ function InvoicesContent() {
   );
 
   const table = useServerTable<InvoiceRow, SortKey>({
+    memoryKey: "invoices",
     source: "invoices_list",
     mapRow: mapInvoiceRow,
     searchColumns: SEARCH_COLUMNS,

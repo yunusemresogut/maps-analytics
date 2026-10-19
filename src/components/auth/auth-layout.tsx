@@ -19,8 +19,8 @@ export function AuthLayout({ title, description, children }: AuthLayoutProps) {
 
   return (
     <main className="grid min-h-screen lg:grid-cols-[minmax(0,1.05fr)_minmax(26rem,0.95fr)]">
-      <aside className="relative isolate flex min-h-112 flex-col justify-between overflow-hidden bg-[#0b1014] px-6 py-7 text-white sm:px-10 sm:py-9 lg:min-h-screen lg:px-14 lg:py-12">
-        <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(135deg,#102126_0%,#0b1014_52%,#111827_100%)]" />
+      <aside className="relative isolate flex min-h-112 flex-col justify-between overflow-hidden bg-[#0f141b] px-6 py-7 text-white sm:px-10 sm:py-9 lg:min-h-screen lg:px-14 lg:py-12">
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(135deg,#17254a_0%,#0f141b_55%,#141a24_100%)]" />
         <div
           className="pointer-events-none absolute inset-0 -z-10 opacity-25"
           style={{
@@ -32,14 +32,14 @@ export function AuthLayout({ title, description, children }: AuthLayoutProps) {
         />
 
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0f766e] text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2f55a8] text-white">
             <MapPinned className="h-5 w-5" aria-hidden />
           </div>
           <span className="text-base font-semibold tracking-wide">Maps Analytics</span>
         </div>
 
         <div className="my-10 max-w-xl lg:my-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5eead4]">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9bb4e6]">
             {t("auth.brandEyebrow")}
           </p>
           <h1 className="mt-4 text-4xl font-semibold leading-tight text-white sm:text-5xl">
@@ -52,7 +52,7 @@ export function AuthLayout({ title, description, children }: AuthLayoutProps) {
           <div className="mt-8 max-w-lg divide-y divide-white/10 border-y border-white/10">
             {features.map(({ icon: Icon, title: featureTitle, description: featureDescription }) => (
               <div key={featureTitle} className="flex items-start gap-3 py-4">
-                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-[#5eead4]">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-[#9bb4e6]">
                   <Icon className="h-4 w-4" aria-hidden />
                 </div>
                 <div>

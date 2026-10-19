@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { ModuleFormShell } from "@/components/modules/module-form-shell";
+import { PendingAttachments } from "@/components/modules/pending-attachments";
+import { useAuth } from "@/contexts/auth-context";
+import { uploadModuleAttachments } from "@/lib/upload-module-attachment";
 import { useModules } from "@/contexts/modules-context";
 import { useDb } from "@/contexts/db-context";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -25,6 +29,7 @@ function NewPaymentContent() {
   const { createPayment } = useModules();
   const { contracts } = useDb();
   const { canAdd } = usePermissions("progressPayments");
+  const { user } = useAuth();
 
   const [title, setTitle] = useState("");
   const [periodStart, setPeriodStart] = useState("");
@@ -35,6 +40,8 @@ function NewPaymentContent() {
   const [status, setStatus] = useState<ProgressPaymentStatus>("draft");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [createdId, setCreatedId] = useState<string | null>(null);
 
   if (!canAdd) {
     return <div className="flex h-full items-center justify-center text-sm text-zinc-500">Ekleme yetkiniz yok</div>;
@@ -47,6 +54,7 @@ function NewPaymentContent() {
   };
 
   const save = async () => {
+    if (createdId) return;
     if (!title.trim() || !contractId || !periodStart || !periodEnd) {
       setSaveError("Başlık, sözleşme ve dönem tarihleri zorunludur.");
       return;
@@ -65,14 +73,40 @@ function NewPaymentContent() {
       storeId: storeId || undefined,
       status,
     });
-    setSaving(false);
-    if (id) router.push("/progress-payments");
-    else setSaveError("Hakediş oluşturulamadı. Bağlantınızı kontrol edip tekrar deneyin.");
+    if (!id) {
+      setSaving(false);
+      setSaveError("Hakediş oluşturulamadı. Bağlantınızı kontrol edip tekrar deneyin.");
+      return;
+    }
+    setCreatedId(id);
+    if (attachments.length > 0 && user) {
+      const errors = await uploadModuleAttachments({
+        table: "progress_payment_attachments",
+        parentId: id,
+        files: attachments,
+        user,
+      });
+      if (errors.length > 0) {
+        setSaving(false);
+        setSaveError(`Hakediş kaydedildi ancak bazı ekler yüklenemedi: ${errors.join(" ")}`);
+        return;
+      }
+    }
+    router.push("/progress-payments");
   };
 
   return (
-    <ModuleFormShell backHref="/progress-payments" backLabel="Hakedişler" title="Yeni hakediş" onSave={save} saving={saving} saveLabel="Oluştur" canSave={!!title.trim() && !!contractId && !!periodStart && !!periodEnd}>
-      {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
+    <ModuleFormShell backHref="/progress-payments" backLabel="Hakedişler" title="Yeni hakediş" onSave={save} saving={saving} saveLabel="Oluştur" canSave={!!title.trim() && !!contractId && !!periodStart && !!periodEnd && !createdId}>
+      {saveError && (
+        <p role="alert" className="text-sm text-red-400">
+          {saveError}
+          {createdId && (
+            <Link href={`/progress-payments/${createdId}/edit`} className="ml-2 underline underline-offset-2">
+              Hakedişi aç
+            </Link>
+          )}
+        </p>
+      )}
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div>
           <label className="text-xs text-zinc-500">Sözleşme *</label>
@@ -109,6 +143,7 @@ function NewPaymentContent() {
             </Select>
           </div>
         </div>
+        <PendingAttachments files={attachments} onChange={setAttachments} />
       </div>
     </ModuleFormShell>
   );

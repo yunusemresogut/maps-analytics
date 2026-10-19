@@ -11,12 +11,12 @@ import {
   MapPin,
   Pin,
   PinOff,
+  Settings,
   Receipt,
   ScrollText,
   Shield,
   Store,
   Ticket,
-  UserCircle,
   Users,
   UsersRound,
   X,
@@ -25,6 +25,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useSidebar } from "@/contexts/sidebar-context";
 import { useT } from "@/contexts/i18n-context";
 import { useTeamChat } from "@/contexts/team-chat-context";
+import { useSettings } from "@/contexts/settings-context";
 import { canAccessRoute } from "@/lib/permissions";
 import { getRoleLabel } from "@/lib/roles";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -115,12 +116,13 @@ export function AppSidebar() {
   const { isOpen, isPinned, close, togglePin } = useSidebar();
   const t = useT();
   const { totalUnread } = useTeamChat();
+  const { isModuleEnabled } = useSettings();
 
   if (!user) return null;
 
   const visible = isPinned || isOpen;
   const filterNav = (items: NavItem[]) =>
-    items.filter((item) => canAccessRoute(user, item.routeKey));
+    items.filter((item) => canAccessRoute(user, item.routeKey) && isModuleEnabled(item.routeKey));
 
   const mainItems = filterNav(MAIN_NAV);
   const adminItems =
@@ -158,7 +160,7 @@ export function AppSidebar() {
         <span className="flex-1">{t(item.labelKey)}</span>
         {item.routeKey === "team" && totalUnread > 0 && (
           <span
-            className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-cyan-500 px-1.5 text-[11px] font-semibold text-white tabular-nums"
+            className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-semibold text-brand-on tabular-nums"
             aria-label={`${totalUnread} okunmamış mesaj`}
           >
             {totalUnread > 99 ? "99+" : totalUnread}
@@ -254,13 +256,14 @@ export function AppSidebar() {
         </nav>
 
         <div className="border-t border-zinc-800 p-3">
-          {canAccessRoute(user, "profile") ? (
+          {canAccessRoute(user, "settings") ? (
             <Link
               href="/settings/profile"
               onClick={handleNavClick}
+              title="Profil ve ayarlar"
               className={cn(
                 "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-zinc-900",
-                pathname.startsWith("/settings/profile")
+                pathname.startsWith("/settings")
                   ? "bg-cyan-500/10 ring-1 ring-cyan-500/25"
                   : ""
               )}
@@ -278,7 +281,7 @@ export function AppSidebar() {
                   {getRoleLabel(user.role as UserRole, organization)}
                 </p>
               </div>
-              <UserCircle className="h-4 w-4 shrink-0 text-zinc-500" />
+              <Settings className="h-4 w-4 shrink-0 text-zinc-500" aria-label="Ayarlar" />
             </Link>
           ) : (
             <div className="flex items-center gap-3 px-2 py-2">

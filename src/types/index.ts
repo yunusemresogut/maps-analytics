@@ -64,6 +64,8 @@ export type AppRouteKey =
   | "invoices"
   | "team"
   | "profile"
+  | "settings"
+  | "adminSettings"
   | "adminUsers"
   | "adminRegions"
   | "adminPermissions"
@@ -91,10 +93,6 @@ export type ProjectApprovals = {
   architectural: DisciplineApproval;
   mechanical: DisciplineApproval;
   electrical: DisciplineApproval;
-  projectOpened: boolean;
-  projectOpenedBy?: string;
-  projectOpenedByName?: string;
-  projectOpenedAt?: string;
 };
 
 export type Organization = {
@@ -110,6 +108,8 @@ export type Organization = {
   rolePermissionDefaults?: Partial<Record<UserRole, PermissionMatrix>>;
   /** Admin tarafından düzenlenebilir rol görünen adları */
   roleLabels?: Partial<Record<UserRole, string>>;
+  /** Ham firma ayarları; normalizeOrgSettings ile okunur */
+  settings?: Record<string, unknown>;
 };
 
 export type ModuleAttachment = {
@@ -131,7 +131,12 @@ export type Store = {
   id: string;
   organizationId?: string;
   name: string;
+  /** Türkiye'de 81 ilden biri; yurt dışında şehir. Konumdan türetilir. */
   city: string;
+  /** İlçe (yurt dışında semt). Konumdan türetilir. */
+  district?: string;
+  /** Ülke adı, ör. "Türkiye". Konumdan türetilir. */
+  country?: string;
   address: string;
   latitude: number;
   longitude: number;
@@ -241,7 +246,6 @@ export type StoreWorkPlanItem = {
 export type StoreUserData = {
   notes: StoreNote[];
   files: StoreFile[];
-  specialNote: string;
 };
 
 /** Mağazanın malzeme ve iş planı özeti (store_detail_summary view'ı) */
@@ -334,18 +338,26 @@ export type Invoice = {
 export type NotificationType =
   | "opening_soon"
   | "opening_overdue"
-  | "ihale_contract_reminder";
+  | "ihale_contract_reminder"
+  | "contract_expiring"
+  | "ticket_assigned"
+  | "ticket_high_priority"
+  | "payment_pending_approval"
+  | "invoice_unpaid"
+  | "team_unread";
 
 export type AppNotification = {
   id: string;
   type: NotificationType;
-  storeId: string;
-  storeName: string;
+  storeId?: string;
+  storeName?: string;
   message: string;
   createdAt: string;
   read: boolean;
   /** Bildirime tıklanınca gidilecek rota (yoksa haritada mağaza açılır) */
   actionHref?: string;
+  /** Bildirimdeki eylem düğmesinin metni */
+  actionLabel?: string;
 };
 
 export type ActivityCategory =
@@ -404,7 +416,6 @@ export function emptyApprovals(): ProjectApprovals {
     architectural: { approved: false },
     mechanical: { approved: false },
     electrical: { approved: false },
-    projectOpened: false,
   };
 }
 

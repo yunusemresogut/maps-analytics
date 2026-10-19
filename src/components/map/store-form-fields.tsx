@@ -7,7 +7,6 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import type { LocationType, ProjectStatus, Store, StoreInput } from "@/types";
 
 export type StoreFormData = {
@@ -122,15 +121,6 @@ export function StoreFormFields({
       </FormField>
 
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Şehir" required error={errors.city}>
-          <Input
-            value={form.city}
-            onChange={(e) => set("city", e.target.value)}
-            placeholder="İstanbul"
-            readOnly={readOnly}
-            aria-invalid={!!errors.city}
-          />
-        </FormField>
         <FormField label="Durum" required>
           <Select
             value={form.projectStatus}
@@ -146,18 +136,19 @@ export function StoreFormFields({
             ))}
           </Select>
         </FormField>
+        <FormField label="Konum Tipi" required>
+          <Select
+            value={form.locationType}
+            onChange={(e) =>
+              set("locationType", e.target.value as LocationType)
+            }
+            disabled={readOnly}
+          >
+            <option value="avm">AVM</option>
+            <option value="cadde">Cadde</option>
+          </Select>
+        </FormField>
       </div>
-
-      <FormField label="Adres" required error={errors.address}>
-        <Textarea
-          value={form.address}
-          onChange={(e) => set("address", e.target.value)}
-          placeholder="Tam adres"
-          className="min-h-[60px]"
-          readOnly={readOnly}
-          aria-invalid={!!errors.address}
-        />
-      </FormField>
 
       <div className="grid grid-cols-2 gap-3">
         <FormField label="Açılış Tarihi" required error={errors.openingDate}>
@@ -198,18 +189,6 @@ export function StoreFormFields({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Konum Tipi" required>
-          <Select
-            value={form.locationType}
-            onChange={(e) =>
-              set("locationType", e.target.value as LocationType)
-            }
-            disabled={readOnly}
-          >
-            <option value="avm">AVM</option>
-            <option value="cadde">Cadde</option>
-          </Select>
-        </FormField>
         <FormField label="Brüt m²" required error={errors.grossM2}>
           <Input
             type="number"
@@ -221,9 +200,6 @@ export function StoreFormFields({
             aria-invalid={!!errors.grossM2}
           />
         </FormField>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
         <FormField label="Kat Sayısı" required error={errors.floorCount}>
           <Input
             type="number"
@@ -234,6 +210,9 @@ export function StoreFormFields({
             aria-invalid={!!errors.floorCount}
           />
         </FormField>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
         <FormField label="Telefon" error={errors.phone}>
           <Input
             value={form.phone}

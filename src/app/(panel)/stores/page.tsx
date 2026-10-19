@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Pencil } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { ApprovalSwitches } from "@/components/projects/approval-switches";
@@ -19,6 +19,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { getProjectStatusLabel } from "@/lib/project-status";
 import { cn } from "@/lib/utils";
 import { emptyApprovals, type Store } from "@/types";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 type Tab = "all" | "pending";
 type SortKey = "name" | "city" | "status" | "approvals" | "actions";
@@ -45,8 +46,7 @@ function isPendingApproval(store: Store) {
   return (
     !a.architectural.approved ||
     !a.mechanical.approved ||
-    !a.electrical.approved ||
-    !a.projectOpened
+    !a.electrical.approved
   );
 }
 
@@ -61,12 +61,18 @@ function StoresList() {
   const searchParams = useSearchParams();
   const initialTab =
     searchParams.get("tab") === "pending" ? "pending" : "all";
-  const [tab, setTab] = useState<Tab>(initialTab);
+  // URL'de sekme varsa o geçerli; yoksa hatırlanan sekme
+  const [tab, setTab] = usePersistentState<Tab>(
+    searchParams.get("tab") ? undefined : "stores",
+    "tab",
+    initialTab
+  );
   const { stores } = useStores();
   const { canEdit } = usePermissions("stores");
   const t = useT();
 
   const table = useServerTable<Store, SortKey>({
+    memoryKey: "stores",
     source: "stores_list",
     mapRow: mapStoreFromDb,
     searchColumns: [],

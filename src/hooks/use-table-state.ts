@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useSettings } from "@/contexts/settings-context";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 export type SortDirection = "asc" | "desc";
 
@@ -72,13 +74,20 @@ export function useTableState<T, K extends string>(options: {
   initialPageSize?: number;
   /** When this string changes, page resets to 1 (e.g. filter signature) */
   resetKey?: string;
+  /** Verilirse sıralama ve sayfa, tablo hafızası açıkken hatırlanır */
+  memoryKey?: string;
 }) {
+  const { prefs } = useSettings();
   // null = varsayılan sıralama (initialSort)
-  const [userSort, setUserSort] = useState<SortState<K> | null>(null);
+  const [userSort, setUserSort] = usePersistentState<SortState<K> | null>(options.memoryKey, "sort", null);
   const initialSort = options.initialSort;
   const sort = userSort ?? initialSort;
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(options.initialPageSize ?? 10);
+  const [page, setPage] = usePersistentState(options.memoryKey, "page", 1);
+  const [pageSize, setPageSizeState] = usePersistentState(
+    options.memoryKey,
+    "pageSize",
+    options.initialPageSize ?? prefs.pageSize
+  );
   const [prevResetKey, setPrevResetKey] = useState(options.resetKey ?? "");
 
   if ((options.resetKey ?? "") !== prevResetKey) {
@@ -117,7 +126,7 @@ export function useTableState<T, K extends string>(options: {
       );
       setPage(1);
     },
-    [initialKey, initialDirection]
+    [initialKey, initialDirection, setUserSort, setPage]
   );
 
   /** Açılır menü gibi tek seçimli kontroller için: kolonu varsayılan yönüyle seçer */
@@ -126,13 +135,13 @@ export function useTableState<T, K extends string>(options: {
       setUserSort(key === initialSort.key ? null : { key, direction: "asc" });
       setPage(1);
     },
-    [initialSort.key]
+    [initialSort.key, setUserSort, setPage]
   );
 
   const setPageSize = useCallback((size: number) => {
     setPageSizeState(size);
     setPage(1);
-  }, []);
+  }, [setPageSizeState, setPage]);
 
   const rangeStart = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const rangeEnd = Math.min(currentPage * pageSize, totalItems);

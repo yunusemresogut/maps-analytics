@@ -1,16 +1,11 @@
 "use client";
 
+import { CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useStores } from "@/contexts/stores-context";
 import { useT } from "@/contexts/i18n-context";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import {
-  allDisciplinesApproved,
-  canCloseStoreProject,
-  canOpenStoreProject,
-  canToggleDisciplineApproval,
-} from "@/lib/roles";
+import { allDisciplinesApproved, canApproveDiscipline } from "@/lib/roles";
 import { canModule } from "@/lib/permissions";
 import type {
   ApprovalDiscipline,
@@ -30,6 +25,10 @@ const DISCIPLINES: ApprovalDiscipline[] = [
   "electrical",
 ];
 
+/**
+ * Disiplin onayları (mimari, mekanik, elektrik). Her disiplini ilgili mühendis
+ * ya da yönetici onaylar; onaylayan kişi ve zaman veritabanında damgalanır.
+ */
 export function ApprovalSwitches({ store, compact }: Props) {
   const { user } = useAuth();
   const { updateStore } = useStores();
@@ -38,20 +37,11 @@ export function ApprovalSwitches({ store, compact }: Props) {
   if (!user) return null;
 
   const approvals: ProjectApprovals = store.approvals ?? emptyApprovals();
-  const disciplinesReady = allDisciplinesApproved(approvals);
+  const allApproved = allDisciplinesApproved(approvals);
   const hasApprovalEdit = canModule(user, "approvals", "edit");
-  const canOpen =
-    hasApprovalEdit && canOpenStoreProject(user.role, approvals);
-  const canClose =
-    hasApprovalEdit && canCloseStoreProject(user.role, approvals);
 
   const canToggle = (discipline: ApprovalDiscipline) =>
-    hasApprovalEdit &&
-    canToggleDisciplineApproval(
-      user.role,
-      discipline,
-      approvals.projectOpened
-    );
+    hasApprovalEdit && canApproveDiscipline(user.role, discipline);
 
   const toggle = (discipline: ApprovalDiscipline, checked: boolean) => {
     if (!canToggle(discipline)) return;
@@ -69,38 +59,6 @@ export function ApprovalSwitches({ store, compact }: Props) {
     updateStore(
       store.id,
       { approvals: next },
-      { userId: user.id, userName: user.name }
-    );
-  };
-
-  const openProject = () => {
-    if (!canOpen) return;
-    const next: ProjectApprovals = {
-      ...approvals,
-      projectOpened: true,
-      projectOpenedBy: user.id,
-      projectOpenedByName: user.name,
-      projectOpenedAt: new Date().toISOString(),
-    };
-    updateStore(
-      store.id,
-      { approvals: next, projectStatus: "santiye" },
-      { userId: user.id, userName: user.name }
-    );
-  };
-
-  const closeProject = () => {
-    if (!canClose) return;
-    const next: ProjectApprovals = {
-      ...approvals,
-      projectOpened: false,
-      projectOpenedBy: undefined,
-      projectOpenedByName: undefined,
-      projectOpenedAt: undefined,
-    };
-    updateStore(
-      store.id,
-      { approvals: next, projectStatus: "proje" },
       { userId: user.id, userName: user.name }
     );
   };
@@ -145,46 +103,18 @@ export function ApprovalSwitches({ store, compact }: Props) {
               checked={entry.approved}
               onChange={(v) => toggle(d, v)}
               disabled={!can}
+              ariaLabel={labelFor(d)}
             />
           </div>
         );
       })}
 
-      <div className="pt-1">
-        {approvals.projectOpened ? (
-          <div className="space-y-1.5">
-            <p className="text-xs text-emerald-400">
-              {t("approvals.projectOpened")}
-              {approvals.projectOpenedByName
-                ? ` — ${approvals.projectOpenedByName}`
-                : ""}
-            </p>
-            {canClose && (
-              <Button size="sm" variant="outline" onClick={closeProject}>
-                {t("approvals.closeProject")}
-              </Button>
-            )}
-            <p className="text-[11px] text-zinc-600">
-              {canClose
-                ? t("approvals.closeHint")
-                : t("approvals.lockedHint")}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            <Button size="sm" onClick={openProject} disabled={!canOpen}>
-              {t("approvals.openProject")}
-            </Button>
-            {!canOpen && (
-              <p className="text-[11px] text-zinc-600">
-                {!disciplinesReady
-                  ? t("approvals.openRequiresApprovals")
-                  : t("approvals.openNoPermission")}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
+      {allApproved && (
+        <p className="flex items-center gap-1.5 pt-1 text-xs text-emerald-400">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Tüm disiplin onayları tamamlandı
+        </p>
+      )}
     </div>
   );
 }

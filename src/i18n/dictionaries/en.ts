@@ -135,20 +135,10 @@ export const en: Dictionary = {
     mechanical: "Mechanical",
     electrical: "Electrical",
     approvedBy: "Approved by",
-    openProject: "Open Project",
-    projectOpened: "Project Opened",
-    closeProject: "Close Project",
-    closeHint:
-      "Closing clears the opened flag and sets status back to \"project\". Discipline approvals are kept.",
     pendingTitle: "Pending Approvals",
     pendingDescription: "Projects with missing approvals",
     complete: "Complete",
     incomplete: "Incomplete",
-    openRequiresApprovals:
-      "Architectural, mechanical, and electrical approvals are required before opening",
-    openNoPermission: "You don’t have permission for this action",
-    lockedHint:
-      "After opening, only Admin / Manager / Regional Manager can change approvals",
   },
   geocode: {
     mapPick: "Pick on map",

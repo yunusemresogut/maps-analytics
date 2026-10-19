@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { ModuleFormShell } from "@/components/modules/module-form-shell";
+import { ModuleAttachments } from "@/components/modules/module-attachments";
 import { useModules } from "@/contexts/modules-context";
 import { useDb } from "@/contexts/db-context";
 import { useT } from "@/contexts/i18n-context";
@@ -133,6 +134,8 @@ function EditPaymentContent({ id }: { id: string }) {
           </div>
         </div>
       </div>
+
+      <ModuleAttachments table="progress_payment_attachments" parentId={id} canEdit={canEdit} />
     </ModuleFormShell>
   );
 }

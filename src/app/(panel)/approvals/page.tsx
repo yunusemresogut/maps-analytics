@@ -33,8 +33,7 @@ function ApprovalsContent() {
         return (
           !a.architectural.approved ||
           !a.mechanical.approved ||
-          !a.electrical.approved ||
-          !a.projectOpened
+          !a.electrical.approved
         );
       }),
     [stores]
@@ -46,6 +45,7 @@ function ApprovalsContent() {
   }, []);
 
   const table = useTableState<Store, SortKey>({
+    memoryKey: "approvals",
     items: pending,
     initialSort: { key: "name", direction: "asc" },
     getSortValue,

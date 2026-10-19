@@ -6,12 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
+  useRef,
 } from "react";
-import { useStores } from "@/contexts/stores-context";
+import { useAuth } from "@/contexts/auth-context";
 import { useDb } from "@/contexts/db-context";
-import { computeStoreNotifications } from "@/lib/notifications";
-import { STORAGE_KEYS } from "@/lib/storage-keys";
+import { useSettings } from "@/contexts/settings-context";
+import { useTeamChat } from "@/contexts/team-chat-context";
+import { computeNotifications, notificationHref } from "@/lib/notifications";
+import { NOTIFICATION_META } from "@/lib/notification-meta";
 import type { AppNotification } from "@/types";
 
 type NotificationsContextValue = {
@@ -27,68 +29,82 @@ const NotificationsContext = createContext<NotificationsContextValue | null>(
   null
 );
 
-function loadDismissed(): string[] {
-  if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(STORAGE_KEYS.dismissedNotifications);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw) as string[];
-  } catch {
-    return [];
-  }
-}
-
-function saveDismissed(ids: string[]) {
-  localStorage.setItem(STORAGE_KEYS.dismissedNotifications, JSON.stringify(ids));
-}
-
 export function NotificationsProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { stores } = useStores();
-  const { contracts } = useDb();
-  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const { user } = useAuth();
+  const { stores, contracts, tickets, progressPayments, invoices, users } = useDb();
+  const { messages } = useTeamChat();
+  const { org, prefs, prefsLoaded, dismissedIds, updateDismissed } = useSettings();
 
-  useEffect(() => {
-    setDismissedIds(loadDismissed());
-  }, []);
+  const dismiss = useCallback(
+    (id: string) => updateDismissed((prev) => (prev.includes(id) ? prev : [...prev, id])),
+    [updateDismissed]
+  );
 
-  const dismiss = useCallback((id: string) => {
-    setDismissedIds((prev) => {
-      if (prev.includes(id)) return prev;
-      const next = [...prev, id];
-      saveDismissed(next);
-      return next;
-    });
-  }, []);
+  const dismissAll = useCallback(
+    (ids: string[]) => updateDismissed((prev) => [...new Set([...prev, ...ids])]),
+    [updateDismissed]
+  );
 
-  const dismissAll = useCallback((ids: string[]) => {
-    setDismissedIds((prev) => {
-      const next = [...new Set([...prev, ...ids])];
-      saveDismissed(next);
-      return next;
-    });
-  }, []);
-
-  const undismiss = useCallback((id: string) => {
-    setDismissedIds((prev) => {
-      const next = prev.filter((d) => d !== id);
-      saveDismissed(next);
-      return next;
-    });
-  }, []);
+  const undismiss = useCallback(
+    (id: string) => updateDismissed((prev) => prev.filter((d) => d !== id)),
+    [updateDismissed]
+  );
 
   const allNotifications = useMemo(
-    () => computeStoreNotifications(stores, contracts),
-    [stores, contracts]
+    () =>
+      user && prefsLoaded
+        ? computeNotifications({
+            user,
+            org,
+            prefs,
+            stores,
+            contracts,
+            tickets,
+            progressPayments,
+            invoices,
+            teamMessages: messages,
+            users,
+          })
+        : [],
+    [user, prefsLoaded, org, prefs, stores, contracts, tickets, progressPayments, invoices, messages, users]
   );
 
   const notifications = useMemo(() => {
     const dismissed = new Set(dismissedIds);
     return allNotifications.filter((n) => !dismissed.has(n.id));
   }, [allNotifications, dismissedIds]);
+
+  // Masaüstü bildirimi: yalnızca oturum sırasında yeni ortaya çıkanlar için
+  const seenIds = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!prefsLoaded) return;
+    const ids = new Set(notifications.map((n) => n.id));
+    const seen = seenIds.current;
+    seenIds.current = ids;
+    // İlk hesaplamada mevcutları gösterme, yalnızca sonrasında gelenleri
+    if (!seen || !prefs.notifications.desktop) return;
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission !== "granted" || document.visibilityState === "visible") return;
+    for (const notification of notifications) {
+      if (seen.has(notification.id)) continue;
+      const desktop = new Notification(NOTIFICATION_META[notification.type].label, {
+        body: notification.message,
+        tag: notification.id,
+      });
+      desktop.onclick = () => {
+        window.focus();
+        window.location.assign(notificationHref(notification));
+      };
+    }
+  }, [notifications, prefsLoaded, prefs.notifications.desktop]);
+
+  useEffect(() => {
+    if (!user) seenIds.current = null;
+  }, [user]);
 
   return (
     <NotificationsContext.Provider

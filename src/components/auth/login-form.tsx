@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { useT } from "@/contexts/i18n-context";
-import { homePathForRole } from "@/lib/roles";
+import { useSettings } from "@/contexts/settings-context";
 import { clearSessionReplaced, wasSessionReplaced } from "@/lib/single-session";
 import { clearFieldError, hasErrors, validateLogin, type FieldErrors } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
@@ -35,10 +35,12 @@ export function LoginForm() {
     clearSessionReplaced();
   }, []);
 
+  // Tercih edilen açılış sayfası için tercihlerin yüklenmesi beklenir
+  const { homePath, prefsLoaded } = useSettings();
   useEffect(() => {
-    if (isLoading || !user) return;
-    router.replace(homePathForRole(user.role));
-  }, [user, isLoading, router]);
+    if (isLoading || !user || !prefsLoaded) return;
+    router.replace(homePath);
+  }, [user, isLoading, prefsLoaded, homePath, router]);
 
   if (isLoading || user) {
     return <PageLoader label={t("common.loading")} />;

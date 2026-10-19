@@ -36,6 +36,7 @@ import { WorkPlanImportMenu } from "@/components/map/work-plan-import-menu";
 import { WorkPlanFormModal, type WorkPlanFormValues } from "@/components/map/work-plan-form-modal";
 import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
 import type { StoreWorkPlanItem, WorkPlanStatus } from "@/types";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 type WorkPlanPanelProps = {
   storeId: string;
@@ -249,16 +250,17 @@ export function WorkPlanPanel({
   const { storeSummaries } = useDb();
   const summary = storeSummaries[storeId] ?? EMPTY_SUMMARY;
   const version = getDetailVersion(storeId);
-  const [viewMode, setViewMode] = useState<"table" | "gantt">("table");
+  const [viewMode, setViewMode] = usePersistentState<"table" | "gantt">(`work-plan:${storeId}`, "viewMode", "table");
   const [modal, setModal] = useState<{ key: number; item: StoreWorkPlanItem | null } | null>(null);
   const [expanded, setExpanded] = useState(true);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = usePersistentState(`work-plan:${storeId}`, "query", "");
   const [deleting, setDeleting] = useState(false);
   const bodyId = useId();
 
   // Tablo: sunucuda aranır ve sayfalanır; sıra her zaman eklenme sırasıdır (seq)
   const filters = useMemo(() => ({ store_id: storeId }), [storeId]);
   const table = useServerTable<StoreWorkPlanItem, "seq">({
+    memoryKey: `work-plan:${storeId}`,
     source: WORK_PLAN_SOURCE,
     mapRow: mapWorkPlanFromDb,
     searchColumns: WORK_PLAN_SEARCH_COLUMNS,

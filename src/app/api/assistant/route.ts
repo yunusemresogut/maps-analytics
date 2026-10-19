@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { getRequestCaller } from "@/lib/server-auth";
 
 // Ücretsiz katmanda modeller zaman zaman "yoğun talep" (503) ya da kota (429)
 // döndürür; sırayla yedek modeller denenir. Kotalar model başına ayrıdır.
@@ -28,6 +28,29 @@ Kurallar:
 - Riskleri ve öncelikleri yorumlarken gerekçesini veriyle göster.
 - Uygulamanın nasıl kullanılacağı sorulursa genel yönlendirme yap.`;
 
+const ACTIONS_DISABLED_PROMPT = `# Kayıt ekleme
+Bu firmada asistanla kayıt ekleme kapalı. Kullanıcı kayıt eklemek isterse bunu uygulamadaki ilgili sayfadan yapması gerektiğini söyle; asla \`\`\`action bloğu üretme.`;
+
+const ACTIONS_PROMPT = `# Kayıt ekleme
+Kullanıcı mağaza oluşturmak, ticket (tadilat talebi) açmak, bir mağazanın iş planına ya da keşfine (malzeme listesine) kalem eklemek isterse kaydı sen eklemezsin: bir öneri hazırlarsın, uygulama kullanıcıya önizleme gösterir ve kullanıcı onaylarsa ekler.
+- Önce 1-2 cümleyle ne hazırladığını ve varsaydığın değerleri söyle, ardından mesajın EN SONUNA tek bir \`\`\`action kod bloğu koy. Bloğun içi yalnızca geçerli JSON olsun: {"actions":[...]}.
+- Zorunlu bilgi eksikse blok koyma; eksik bilgileri kısa bir soruyla iste. Zorunlu olmayan alanlara makul varsayılanlar verebilirsin.
+- Kaydın eklendiğini asla söyleme; "onaylarsanız eklenecek" de. Onaydan sonraki durum sohbette [Sistem: ...] notuyla bildirilir.
+- Tarihler YYYY-MM-DD biçiminde. "Yarın", "gelecek ay" gibi göreli tarihleri "Bugün" bilgisine göre hesapla.
+- storeName için Firma verisindeki mağaza adını aynen yaz. Yalnızca mevcut mağazalara kalem eklenebilir; aynı blokta yeni oluşturulacak mağazaya kalem ekleme, önce mağazanın oluşturulmasını öner.
+- Silme ve güncelleme desteklenmez; istenirse bunun uygulamadan yapılması gerektiğini söyle.
+- Kullanıcı birden fazla şey isterse aynı blokta en fazla 5 eylem olabilir.
+
+Eylem şemaları (? işaretli alanlar isteğe bağlı):
+- {"type":"create_store","name":"…","city":"…","address":"… (haritada bulunabilecek açık adres)","openingDate":"YYYY-MM-DD","projectStatus?":"proje|ihale|santiye|acilis|hakedis|fatura","locationType?":"avm|cadde|outdoor","grossM2?":0,"floorCount?":1,"totalBudget?":0,"contractorCompany?":"…","siteManager?":"…","phone?":"…"}
+  Zorunlu: name, city, address, openingDate.
+- {"type":"create_ticket","title":"…","description?":"…","priority?":"low|medium|high","storeName?":"…"}
+  Zorunlu: title.
+- {"type":"add_work_plan","storeName":"…","items":[{"description":"…","startDate":"YYYY-MM-DD","endDate?":"YYYY-MM-DD","responsible?":"…","status?":"yapilacak|devam_ediyor|tamamlandi","percentComplete?":0}]}
+  Zorunlu: storeName, her kalemde description ve startDate.
+- {"type":"add_materials","storeName":"…","items":[{"name":"…","quantity":1,"unit?":"adet","unitPrice?":0}]}
+  Zorunlu: storeName, her kalemde name ve quantity (> 0). Birim fiyat bilinmiyorsa sor ya da 0 bırakıp belirt.`;
+
 function errorResponse(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
@@ -43,16 +66,9 @@ function isChatMessage(value: unknown): value is ChatMessage {
 }
 
 export async function POST(request: Request) {
-  // Yalnızca giriş yapmış kullanıcılar: API anahtarının kötüye kullanımını önler
-  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!token) return errorResponse("Oturum bulunamadı.", 401);
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  );
-  const { data: userData, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !userData.user) return errorResponse("Oturum geçersiz.", 401);
+  // Yalnızca giriş yapmış, aktif oturumu olan kullanıcılar: API anahtarının kötüye kullanımını önler
+  const auth = await getRequestCaller(request);
+  if (!auth.ok) return auth.response;
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -65,7 +81,11 @@ export async function POST(request: Request) {
   } catch {
     return errorResponse("Geçersiz istek.", 400);
   }
-  const { messages, context } = (body ?? {}) as { messages?: unknown; context?: unknown };
+  const { messages, context, allowActions } = (body ?? {}) as {
+    messages?: unknown;
+    context?: unknown;
+    allowActions?: unknown;
+  };
   if (!Array.isArray(messages) || messages.length === 0 || !messages.every(isChatMessage)) {
     return errorResponse("Mesaj bulunamadı.", 400);
   }
@@ -79,13 +99,18 @@ export async function POST(request: Request) {
 
   const requestBody = JSON.stringify({
     systemInstruction: {
-      parts: [{ text: `${SYSTEM_PROMPT}\n\n# Firma verisi\n${contextText || "Veri yok."}` }],
+      parts: [
+        {
+          text: `${SYSTEM_PROMPT}\n\n${allowActions === false ? ACTIONS_DISABLED_PROMPT : ACTIONS_PROMPT}\n\n# Firma verisi\n${contextText || "Veri yok."}`,
+        },
+      ],
     },
     contents: history.map((message) => ({
       role: message.role === "assistant" ? "model" : "user",
       parts: [{ text: message.content }],
     })),
-    generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
+    // Uzun keşif/iş planı listeleri action bloğuna sığsın diye
+    generationConfig: { temperature: 0.4, maxOutputTokens: 4096 },
   });
 
   let geminiResponse: Response | null = null;

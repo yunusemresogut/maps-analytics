@@ -12,6 +12,7 @@ import { SidebarProvider } from "@/contexts/sidebar-context";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { ModulesProvider } from "@/contexts/modules-context";
 import { TeamChatProvider } from "@/contexts/team-chat-context";
+import { SettingsProvider } from "@/contexts/settings-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -19,21 +20,24 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <I18nProvider>
         <DbProvider>
           <AuthProvider>
-            <SidebarProvider>
-              <RegionsProvider>
-                <StoresProvider>
-                  <ModulesProvider>
-                    <NotificationsProvider>
-                      <MapUiProvider>
-                        <StoreDataProvider>
-                          <TeamChatProvider>{children}</TeamChatProvider>
-                        </StoreDataProvider>
-                      </MapUiProvider>
-                    </NotificationsProvider>
-                  </ModulesProvider>
-                </StoresProvider>
-              </RegionsProvider>
-            </SidebarProvider>
+            <SettingsProvider>
+              <SidebarProvider>
+                <RegionsProvider>
+                  <StoresProvider>
+                    <ModulesProvider>
+                      {/* Bildirimler ekip mesajlarını da kullanır */}
+                      <TeamChatProvider>
+                        <NotificationsProvider>
+                          <MapUiProvider>
+                            <StoreDataProvider>{children}</StoreDataProvider>
+                          </MapUiProvider>
+                        </NotificationsProvider>
+                      </TeamChatProvider>
+                    </ModulesProvider>
+                  </StoresProvider>
+                </RegionsProvider>
+              </SidebarProvider>
+            </SettingsProvider>
           </AuthProvider>
         </DbProvider>
       </I18nProvider>

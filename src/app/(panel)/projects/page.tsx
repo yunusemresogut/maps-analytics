@@ -34,6 +34,7 @@ function ProjectsContent() {
   }, []);
 
   const table = useTableState<Store, SortKey>({
+    memoryKey: "projects",
     items: stores,
     initialSort: { key: "name", direction: "asc" },
     getSortValue,

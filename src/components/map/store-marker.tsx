@@ -22,7 +22,7 @@ export function StoreMarker({
   const openingAlert = getOpeningAlert(store.openingDate);
   const isRed = shouldHighlightRed(store.openingDate);
 
-  const markerColor = isRed ? "#f87171" : projectConfig.marker;
+  const markerColor = isRed ? "#cf6660" : projectConfig.marker;
 
   return (
     <Marker
@@ -47,21 +47,24 @@ export function StoreMarker({
       >
         {isRed && (
           <span
-            className="absolute h-10 w-10 rounded-full opacity-50 animate-pulse"
-            style={{ backgroundColor: "#f87171" }}
+            className="absolute h-9 w-9 rounded-full opacity-25 animate-pulse"
+            style={{ backgroundColor: markerColor }}
           />
         )}
         <span
-          className="absolute h-8 w-8 rounded-full opacity-30"
+          className="absolute h-7 w-7 rounded-full opacity-20"
           style={{ backgroundColor: markerColor }}
         />
         <span
-          className={`relative h-4 w-4 rounded-full border-2 border-white/80 transition-transform group-hover:scale-125 ${
-            isSelected ? "scale-150 ring-2 ring-white/50" : ""
+          className={`relative h-4 w-4 rounded-full border-2 border-white transition-transform group-hover:scale-125 ${
+            isSelected ? "scale-150 ring-2 ring-zinc-950/40" : ""
           } ${store.isCustom ? "border-dashed" : ""}`}
           style={{
             backgroundColor: markerColor,
-            boxShadow: `0 0 ${isSelected ? 16 : 10}px ${markerColor}`,
+            // Işıma yerine sade gölge: zemin üzerinde okunur, göz yormaz
+            boxShadow: isSelected
+              ? "0 2px 8px rgba(0, 0, 0, 0.35)"
+              : "0 1px 3px rgba(0, 0, 0, 0.3)",
           }}
         />
       </button>

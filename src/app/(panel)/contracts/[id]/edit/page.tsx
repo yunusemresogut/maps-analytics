@@ -151,7 +151,7 @@ function EditContractContent({ id }: { id: string }) {
         )}
       </div>
 
-      <ModuleAttachments table="contract_attachments" parentId={id} parentField="contract_id" canEdit={canEdit} />
+      <ModuleAttachments table="contract_attachments" parentId={id} canEdit={canEdit} />
     </ModuleFormShell>
   );
 }

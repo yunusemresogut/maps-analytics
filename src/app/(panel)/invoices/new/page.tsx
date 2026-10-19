@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatTry } from "@/lib/currency";
 import { calculateVat, VAT_RATE_OPTIONS } from "@/lib/module-finance";
+import { useSettings } from "@/contexts/settings-context";
 import type { InvoiceStatus } from "@/types";
 
 const STATUS_TR: Record<InvoiceStatus, string> = {
@@ -28,7 +29,8 @@ function NewInvoiceContent() {
 
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [amount, setAmount] = useState("");
-  const [vatRate, setVatRate] = useState(20);
+  const { org } = useSettings();
+  const [vatRate, setVatRate] = useState(org.defaults.vatRate);
   const [progressPaymentId, setProgressPaymentId] = useState("");
   const [storeId, setStoreId] = useState("");
   const [status, setStatus] = useState<InvoiceStatus>("draft");

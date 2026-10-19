@@ -68,6 +68,7 @@ export function AdminUsersPanel() {
   }, [organization]);
 
   const table = useTableState<User, UserSortKey>({
+    memoryKey: "admin-users",
     items: orgUsers,
     initialSort: { key: "name", direction: "asc" },
     getSortValue,

@@ -14,9 +14,8 @@ import { useAuth } from "@/contexts/auth-context";
 import { useI18n, useT } from "@/contexts/i18n-context";
 import { useRegions } from "@/contexts/regions-context";
 import { useStores } from "@/contexts/stores-context";
-import { useDb } from "@/contexts/db-context";
 import { useActivityLogs } from "@/hooks/use-activity-logs";
-import { computeStoreNotifications } from "@/lib/notifications";
+import { useNotifications } from "@/contexts/notifications-context";
 import {
   getProjectStatusLabel,
   projectStatusConfig,
@@ -26,14 +25,13 @@ import type { ProjectStatus } from "@/types";
 export function AdminDashboard() {
   const { users } = useAuth();
   const { stores } = useStores();
-  const { contracts } = useDb();
   const { regions } = useRegions();
   const logs = useActivityLogs();
   const t = useT();
   const { dateLocale } = useI18n();
 
   const regularUsers = users.filter((u) => u.role !== "admin");
-  const notifications = computeStoreNotifications(stores, contracts);
+  const { notifications } = useNotifications();
   const recentLogs = logs.slice(0, 6);
 
   const statusCounts = stores.reduce(
@@ -72,7 +70,7 @@ export function AdminDashboard() {
           icon={Shield}
           label="Aktif Bildirim"
           value={notifications.length}
-          href="/admin/logs"
+          href="/notifications"
           accent="amber"
         />
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save } from "lucide-react";
@@ -10,12 +10,10 @@ import { useStores } from "@/contexts/stores-context";
 import { useDb } from "@/contexts/db-context";
 import { useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
-import {
-  StoreFormFields,
-  formToStoreData,
-  storeToForm,
-  type StoreFormData,
-} from "@/components/map/store-form-fields";
+import { StoreFormFields } from "@/components/map/store-form-fields";
+import { StoreLocationFields } from "@/components/location/store-location-fields";
+import { LocationPickerMap } from "@/components/location/location-picker-map";
+import { useStoreForm } from "@/hooks/use-store-form";
 import { ApprovalSwitches } from "@/components/projects/approval-switches";
 import { StoreDetailSections } from "@/components/stores/store-detail-sections";
 import { StoreContractsList } from "@/components/contracts/store-contracts-list";
@@ -29,27 +27,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FormError } from "@/components/ui/field-error";
 import { getProjectStatusLabel, projectStatusConfig } from "@/lib/project-status";
-import { hasErrors, validateStoreForm, type FieldErrors } from "@/lib/validation";
+import { hasErrors } from "@/lib/validation";
+import type { Store } from "@/types";
 import { cn } from "@/lib/utils";
 
 function StoreEditContent({ id }: { id: string }) {
-  const router = useRouter();
-  const { user } = useAuth();
-  const { getStore, updateStore } = useStores();
-  const { contracts } = useDb();
+  const { getStore } = useStores();
   const { canEdit } = usePermissions("stores");
   const t = useT();
-
   const store = getStore(id);
-  const [form, setForm] = useState<StoreFormData | null>(null);
-  const [errors, setErrors] = useState<FieldErrors>({});
-  const [saveError, setSaveError] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    if (store) setForm(storeToForm(store));
-  }, [store?.id]);
 
   if (!store) {
     return (
@@ -70,33 +56,38 @@ function StoreEditContent({ id }: { id: string }) {
     );
   }
 
-  if (!form) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-zinc-500">
-        Yükleniyor…
-      </div>
-    );
-  }
+  // Form, mağaza yüklendiği anki değerlerle bir kez kurulur
+  return <StoreEditForm key={store.id} store={store} />;
+}
+
+function StoreEditForm({ store }: { store: Store }) {
+  const router = useRouter();
+  const { user } = useAuth();
+  const { updateStore } = useStores();
+  const { contracts } = useDb();
+  const t = useT();
+  const { form, setForm, errors, setErrors, location, prepare } = useStoreForm(store);
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const config = projectStatusConfig[store.projectStatus];
   const openingBadge = storeOpeningBadgeLabel(store);
 
   const handleSave = async () => {
     if (!user) return;
-    const nextErrors = validateStoreForm(form);
-    setErrors(nextErrors);
-    if (hasErrors(nextErrors)) return;
-
     setSaveError("");
+    const prepared = prepare();
+    if (!prepared.ok) {
+      setSaveError(prepared.message);
+      return;
+    }
+
     setSaving(true);
-    const ok = await updateStore(
-      store.id,
-      formToStoreData(form, {
-        latitude: store.latitude,
-        longitude: store.longitude,
-      }),
-      { userId: user.id, userName: user.name }
-    );
+    const ok = await updateStore(store.id, prepared.data, {
+      userId: user.id,
+      userName: user.name,
+    });
     setSaving(false);
 
     if (!ok) {
@@ -171,10 +162,7 @@ function StoreEditContent({ id }: { id: string }) {
 
         {(saveError || hasErrors(errors)) && (
           <div className="space-y-1">
-            {saveError && <FormError message={saveError} />}
-            {hasErrors(errors) && (
-              <FormError message="Lütfen zorunlu alanları kontrol edin." />
-            )}
+            <FormError message={saveError || "Lütfen zorunlu alanları kontrol edin."} />
           </div>
         )}
 
@@ -188,12 +176,24 @@ function StoreEditContent({ id }: { id: string }) {
             <h2 className="mb-4 text-sm font-medium uppercase tracking-wider text-zinc-500">
               Mağaza bilgileri
             </h2>
-            <StoreFormFields
-              form={form}
-              onChange={setForm}
-              errors={errors}
-              onErrorsChange={setErrors}
-            />
+            <div className="space-y-5">
+              <StoreLocationFields
+                controller={location}
+                mapSlot={
+                  <LocationPickerMap
+                    coords={location.location.coords}
+                    onPick={(coords) => void location.setFromMap(coords)}
+                  />
+                }
+                errors={{ city: errors.city, address: errors.address }}
+              />
+              <StoreFormFields
+                form={form}
+                onChange={setForm}
+                errors={errors}
+                onErrorsChange={setErrors}
+              />
+            </div>
           </div>
 
           <div className="lg:sticky lg:top-6">
