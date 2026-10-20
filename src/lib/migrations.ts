@@ -6,7 +6,7 @@ import {
   normalizePermissions,
   normalizeRolePermissionDefaults,
 } from "@/lib/permissions";
-import { normalizeRole } from "@/lib/roles";
+import { normalizeCustomRoles, normalizeRole } from "@/lib/roles";
 import { ensureApprovals } from "@/lib/store-mapper";
 import { normalizeCurrency } from "@/lib/currency";
 
@@ -79,6 +79,7 @@ export function mapOrganizationFromDb(row: Record<string, any>): Organization {
       row.role_permission_defaults
     ),
     roleLabels: (row.role_labels as Organization["roleLabels"]) || undefined,
+    customRoles: normalizeCustomRoles(row.custom_roles),
     settings: row.settings && typeof row.settings === "object" ? row.settings : {},
   };
 }

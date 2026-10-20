@@ -35,6 +35,7 @@ const CATEGORY_LABELS: Record<ActivityCategory, string> = {
   file: "Dosya",
   material: "Keşif",
   workplan: "İş programı",
+  inventory: "Envanter",
 };
 
 const CATEGORY_COLORS: Record<ActivityCategory, string> = {
@@ -56,6 +57,7 @@ const CATEGORY_COLORS: Record<ActivityCategory, string> = {
   file: "text-rose-400 bg-rose-500/10",
   material: "text-cyan-300 bg-cyan-500/10",
   workplan: "text-emerald-300 bg-emerald-500/10",
+  inventory: "text-sky-300 bg-sky-500/10",
 };
 
 type SortKey =

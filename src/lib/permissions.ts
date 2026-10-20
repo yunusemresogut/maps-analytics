@@ -15,7 +15,8 @@ import {
   normalizeRole,
 } from "@/lib/roles";
 
-export const MODULE_KEYS: AppModuleKey[] = [
+/** Kayıtlı matrisin geçerli sayılması için bulunması gereken modüller */
+const CORE_MODULE_KEYS: AppModuleKey[] = [
   "map",
   "stores",
   "projects",
@@ -26,6 +27,12 @@ export const MODULE_KEYS: AppModuleKey[] = [
   "invoices",
 ];
 
+/**
+ * Tüm modüller. Sonradan eklenenler (envanter) eski matrislerde bulunmaz;
+ * eksik modül "yetki yok" sayılır (veritabanındaki app_module_permission ile aynı).
+ */
+export const MODULE_KEYS: AppModuleKey[] = [...CORE_MODULE_KEYS, "inventory"];
+
 export const MODULE_LABELS: Record<AppModuleKey, string> = {
   map: "Harita",
   stores: "Mağazalar",
@@ -35,6 +42,7 @@ export const MODULE_LABELS: Record<AppModuleKey, string> = {
   contracts: "Sözleşmeler",
   progressPayments: "Hakediş",
   invoices: "Faturalar",
+  inventory: "Envanter",
 };
 
 export const CRUD_ACTIONS: PermissionAction[] = [
@@ -106,6 +114,7 @@ function emptyMatrix(): PermissionMatrix {
     contracts: cloneCrud(NONE_CRUD),
     progressPayments: cloneCrud(NONE_CRUD),
     invoices: cloneCrud(NONE_CRUD),
+    inventory: cloneCrud(NONE_CRUD),
   };
 }
 
@@ -230,7 +239,7 @@ function isFlatPermissions(raw: unknown): raw is LegacyFlatPermissions {
 function isMatrix(raw: unknown): raw is PermissionMatrix {
   if (!raw || typeof raw !== "object") return false;
   const o = raw as Record<string, unknown>;
-  return MODULE_KEYS.every((k) => {
+  return CORE_MODULE_KEYS.every((k) => {
     const m = o[k];
     if (!m || typeof m !== "object") return false;
     const c = m as Record<string, unknown>;
@@ -253,7 +262,8 @@ export function normalizePermissions(
   if (isMatrix(raw)) {
     const base = emptyMatrix();
     for (const key of MODULE_KEYS) {
-      const m = raw[key];
+      const m = raw[key] as ModuleCrud | undefined;
+      if (!m || typeof m !== "object") continue;
       base[key] = {
         view: !!m.view,
         add: !!m.add,
@@ -341,6 +351,9 @@ export function routeToModule(route: AppRouteKey): AppModuleKey | null | "admin"
     case "progressPayments":
     case "invoices":
       return route;
+    // Yetkisi olmayan da sayfayı açar; yalnızca kendi zimmetini görür
+    case "inventory":
+      return null;
     // Raporlar mağaza verisinden hazırlanır
     case "reports":
       return "stores";

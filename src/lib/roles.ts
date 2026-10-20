@@ -1,11 +1,15 @@
 import type {
   ApprovalDiscipline,
+  BuiltInRole,
+  CustomRole,
+  CustomRoleKey,
   Organization,
   ProjectApprovals,
   UserRole,
 } from "@/types";
 
-export const ALL_ROLES: UserRole[] = [
+/** Yerleşik roller (özel roller firmaya göre değişir, bkz. organizationRoles) */
+export const ALL_ROLES: BuiltInRole[] = [
   "admin",
   "mechanical_engineer",
   "electrical_engineer",
@@ -17,7 +21,7 @@ export const ALL_ROLES: UserRole[] = [
   "accounting",
 ];
 
-export const ROLE_LABELS: Record<UserRole, string> = {
+export const ROLE_LABELS: Record<BuiltInRole, string> = {
   admin: "Admin",
   mechanical_engineer: "Makine Mühendisi",
   electrical_engineer: "Elektrik Mühendisi",
@@ -29,14 +33,55 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   accounting: "Muhasebe",
 };
 
+/** Veritabanındaki app_normalize_role ve profiles_role_check ile aynı biçim */
+export const CUSTOM_ROLE_PATTERN = /^custom_[a-z0-9]{4,32}$/;
+
+export function isCustomRole(role: string | null | undefined): role is CustomRoleKey {
+  return !!role && CUSTOM_ROLE_PATTERN.test(role);
+}
+
+export function isBuiltInRole(role: string | null | undefined): role is BuiltInRole {
+  return !!role && (ALL_ROLES as string[]).includes(role);
+}
+
+export function newCustomRoleKey(): CustomRoleKey {
+  const random = Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => (byte % 36).toString(36)).join("");
+  return `custom_${random}`;
+}
+
+export function normalizeCustomRoles(raw: unknown): CustomRole[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item): CustomRole[] => {
+    if (!item || typeof item !== "object") return [];
+    const role = item as Record<string, unknown>;
+    const label = typeof role.label === "string" ? role.label.trim() : "";
+    if (!isCustomRole(role.key as string) || !label) return [];
+    const description = typeof role.description === "string" ? role.description.trim() : "";
+    return [{ key: role.key as CustomRoleKey, label, ...(description ? { description } : {}) }];
+  });
+}
+
+/** Firmadaki tüm roller: yerleşikler, ardından özel roller */
+export function organizationRoles(org?: Pick<Organization, "customRoles"> | null): UserRole[] {
+  return [...ALL_ROLES, ...(org?.customRoles ?? []).map((role) => role.key)];
+}
+
+/** Kullanıcıya atanabilen roller (admin yalnızca firma kaydıyla oluşur) */
+export function assignableRoles(org?: Pick<Organization, "customRoles"> | null): UserRole[] {
+  return organizationRoles(org).filter((role) => role !== "admin");
+}
+
 /** Org özelleştirmesi varsa onu, yoksa varsayılan etiketi döner */
 export function getRoleLabel(
   role: UserRole,
-  org?: Pick<Organization, "roleLabels"> | null
+  org?: Pick<Organization, "roleLabels" | "customRoles"> | null
 ): string {
+  if (isCustomRole(role)) {
+    return org?.customRoles?.find((item) => item.key === role)?.label ?? "Özel rol";
+  }
   const custom = org?.roleLabels?.[role];
   if (custom?.trim()) return custom.trim();
-  return ROLE_LABELS[role];
+  return ROLE_LABELS[role] ?? role;
 }
 
 export const ENGINEER_ROLES: UserRole[] = [
@@ -55,15 +100,16 @@ export const MANAGER_ROLES: UserRole[] = [
 /** Managers who can approve all disciplines and open/close projects */
 export const FULL_MANAGER_ROLES: UserRole[] = ["manager", "regional_manager"];
 
-const DISCIPLINE_ROLE: Record<ApprovalDiscipline, UserRole> = {
+const DISCIPLINE_ROLE: Record<ApprovalDiscipline, BuiltInRole> = {
   architectural: "architect",
   mechanical: "mechanical_engineer",
   electrical: "electrical_engineer",
 };
 
+/** Tanınmayan eski değerler "manager" olur; özel rol anahtarı olduğu gibi kalır */
 export function normalizeRole(role: string | null | undefined): UserRole {
   if (!role || role === "user") return "manager";
-  if ((ALL_ROLES as string[]).includes(role)) return role as UserRole;
+  if (isBuiltInRole(role) || isCustomRole(role)) return role;
   return "manager";
 }
 

@@ -674,6 +674,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.roleLabels !== undefined) {
           payload.role_labels = data.roleLabels;
         }
+        if (data.customRoles !== undefined) {
+          payload.custom_roles = data.customRoles;
+        }
         if (data.settings !== undefined) {
           payload.settings = data.settings;
         }
@@ -687,7 +690,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error) throw error;
         setOrganization(mapOrganizationFromDb(updated));
-        const detail = data.rolePermissionDefaults
+        const detail = data.customRoles
+          ? "roller"
+          : data.rolePermissionDefaults
           ? "rol yetki şablonları"
           : data.settings
             ? "firma ayarları"

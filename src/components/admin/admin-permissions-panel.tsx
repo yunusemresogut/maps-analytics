@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Shield, Users } from "lucide-react";
+import { Plus, Shield, Trash2, Users } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import {
   CRUD_ACTION_LABELS,
@@ -14,9 +14,12 @@ import {
   normalizePermissions,
   setMatrixCell,
 } from "@/lib/permissions";
-import { ALL_ROLES, getRoleLabel, ROLE_LABELS } from "@/lib/roles";
+import { ALL_ROLES, assignableRoles, getRoleLabel, newCustomRoleKey } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type {
   AppModuleKey,
@@ -78,6 +81,125 @@ function PermissionMatrixTable({
   );
 }
 
+type RoleForm = { label: string; description: string; base: UserRole };
+
+/** Yeni özel rol: ad, açıklama ve yetkilerin kopyalanacağı başlangıç rolü */
+function NewRoleModal({
+  open,
+  roles,
+  roleLabel,
+  saving,
+  onClose,
+  onCreate,
+}: {
+  open: boolean;
+  roles: UserRole[];
+  roleLabel: (role: UserRole) => string;
+  saving: boolean;
+  onClose: () => void;
+  onCreate: (form: RoleForm) => void;
+}) {
+  const formId = useId();
+  const [form, setForm] = useState<RoleForm>({ label: "", description: "", base: "store_manager" });
+  const [error, setError] = useState("");
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Yeni rol"
+      description="Rol, seçtiğiniz başlangıç rolünün yetkileriyle oluşturulur; sonra düzenleyebilirsiniz."
+      footer={
+        <>
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Vazgeç
+          </Button>
+          <Button type="submit" form={formId} loading={saving}>
+            Rolü oluştur
+          </Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        noValidate
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!form.label.trim()) {
+            setError("Rol adı zorunludur");
+            return;
+          }
+          onCreate({ ...form, label: form.label.trim(), description: form.description.trim() });
+        }}
+      >
+        <FormField label="Rol adı" required error={error}>
+          <Input
+            value={form.label}
+            maxLength={40}
+            placeholder="ör. Usta, Tedarik"
+            aria-invalid={!!error}
+            onChange={(e) => {
+              setForm((prev) => ({ ...prev, label: e.target.value }));
+              if (error) setError("");
+            }}
+          />
+        </FormField>
+        <FormField label="Açıklama" hint="İsteğe bağlı; rol listesinde görünür.">
+          <Input
+            value={form.description}
+            maxLength={120}
+            placeholder="ör. Sahada uygulama yapan ekip başı"
+            onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+          />
+        </FormField>
+        <FormField label="Başlangıç yetkileri">
+          <Select value={form.base} onChange={(e) => setForm((prev) => ({ ...prev, base: e.target.value as UserRole }))}>
+            {roles.map((role) => (
+              <option key={role} value={role}>
+                {roleLabel(role)} gibi
+              </option>
+            ))}
+          </Select>
+        </FormField>
+      </form>
+    </Modal>
+  );
+}
+
+function RoleListButton({
+  label,
+  hint,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  hint?: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-start justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+        active ? "bg-violet-500/15 text-violet-200" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+      )}
+    >
+      <span className="min-w-0">
+        <span className="block truncate">{label}</span>
+        {hint && <span className="mt-0.5 block truncate text-[10px] text-zinc-500">{hint}</span>}
+      </span>
+      <span className="shrink-0 rounded-full bg-zinc-800/80 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400" title="Kullanıcı sayısı">
+        {count}
+      </span>
+    </button>
+  );
+}
+
 export function AdminPermissionsPanel() {
   const searchParams = useSearchParams();
   const {
@@ -97,12 +219,20 @@ export function AdminPermissionsPanel() {
   const [userDraft, setUserDraft] = useState<PermissionMatrix>(
     builtInMatrixForRole("manager")
   );
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [roleLabelDraft, setRoleLabelDraft] = useState("");
+  const [roleDescriptionDraft, setRoleDescriptionDraft] = useState("");
+  const [applyToUsers, setApplyToUsers] = useState(false);
+  const [newRoleOpen, setNewRoleOpen] = useState(false);
 
+  const customRoles = useMemo(() => organization?.customRoles ?? [], [organization?.customRoles]);
+  const selectedCustom = customRoles.find((role) => role.key === selectedRole);
+  const roleLabel = useCallback((role: UserRole) => getRoleLabel(role, organization), [organization]);
   const regularUsers = users.filter((u) => u.role !== "admin");
   const selectedUser = regularUsers.find((u) => u.id === selectedUserId);
+  const usersOfRole = (role: UserRole) => users.filter((u) => u.role === role);
+  const selectedRoleUsers = usersOfRole(selectedRole);
   const hasOrgOverride = Boolean(
     organization?.rolePermissionDefaults?.[selectedRole]
   );
@@ -119,10 +249,13 @@ export function AdminPermissionsPanel() {
 
   useEffect(() => {
     setRoleDraft(getRoleDefaultMatrix(selectedRole));
+    const custom = customRoles.find((role) => role.key === selectedRole);
     setRoleLabelDraft(
-      organization?.roleLabels?.[selectedRole] ?? ROLE_LABELS[selectedRole]
+      custom ? custom.label : organization?.roleLabels?.[selectedRole] ?? getRoleLabel(selectedRole)
     );
-  }, [selectedRole, getRoleDefaultMatrix, organization?.rolePermissionDefaults, organization?.roleLabels]);
+    setRoleDescriptionDraft(custom?.description ?? "");
+    setApplyToUsers(false);
+  }, [selectedRole, getRoleDefaultMatrix, organization?.rolePermissionDefaults, organization?.roleLabels, customRoles]);
 
   useEffect(() => {
     if (selectedUser) {
@@ -132,29 +265,100 @@ export function AdminPermissionsPanel() {
     }
   }, [selectedUser]);
 
-  const flash = (text: string) => {
-    setMessage(text);
-    setTimeout(() => setMessage(""), 2500);
+  const flash = (text: string, tone: "success" | "error" = "success") => {
+    setMessage({ tone, text });
+    setTimeout(() => setMessage(null), 3000);
   };
 
   const saveRoleDefaults = async () => {
     if (!organization) {
-      flash("Organizasyon bulunamadı");
+      flash("Organizasyon bulunamadı", "error");
+      return;
+    }
+    const label = roleLabelDraft.trim();
+    if (selectedCustom && !label) {
+      flash("Rol adı boş olamaz", "error");
       return;
     }
     setSaving(true);
-    const next = {
+    const rolePermissionDefaults = {
       ...(organization.rolePermissionDefaults ?? {}),
       [selectedRole]: roleDraft,
     };
-    const nextLabels = {
-      ...(organization.roleLabels ?? {}),
-      [selectedRole]: roleLabelDraft.trim() || ROLE_LABELS[selectedRole],
-    };
-    const okPerms = await updateOrganization({ rolePermissionDefaults: next });
-    const okLabels = await updateOrganization({ roleLabels: nextLabels });
+    const ok = selectedCustom
+      ? await updateOrganization({
+          rolePermissionDefaults,
+          customRoles: customRoles.map((role) =>
+            role.key === selectedRole
+              ? { key: role.key, label, ...(roleDescriptionDraft.trim() ? { description: roleDescriptionDraft.trim() } : {}) }
+              : role
+          ),
+        })
+      : await updateOrganization({
+          rolePermissionDefaults,
+          roleLabels: {
+            ...(organization.roleLabels ?? {}),
+            [selectedRole]: label || getRoleLabel(selectedRole),
+          },
+        });
+    // İstenirse bu roldeki kullanıcıların yetkileri de rol şablonuna eşitlenir
+    if (ok && applyToUsers) {
+      for (const member of selectedRoleUsers) {
+        await updateUserPermissions(member.id, roleDraft);
+      }
+    }
     setSaving(false);
-    flash(okPerms && okLabels ? "Rol kaydedildi" : "Kayıt başarısız");
+    setApplyToUsers(false);
+    if (!ok) flash("Kayıt başarısız", "error");
+    else flash(applyToUsers && selectedRoleUsers.length > 0 ? `Rol kaydedildi, ${selectedRoleUsers.length} kullanıcıya uygulandı` : "Rol kaydedildi");
+  };
+
+  const createRole = async (form: RoleForm) => {
+    if (!organization) return;
+    setSaving(true);
+    const key = newCustomRoleKey();
+    const ok = await updateOrganization({
+      customRoles: [
+        ...customRoles,
+        { key, label: form.label, ...(form.description ? { description: form.description } : {}) },
+      ],
+      rolePermissionDefaults: {
+        ...(organization.rolePermissionDefaults ?? {}),
+        [key]: getRoleDefaultMatrix(form.base),
+      },
+    });
+    setSaving(false);
+    if (!ok) {
+      flash("Rol oluşturulamadı", "error");
+      return;
+    }
+    setNewRoleOpen(false);
+    setSelectedRole(key);
+    flash(`"${form.label}" rolü oluşturuldu`);
+  };
+
+  const deleteRole = async () => {
+    if (!organization || !selectedCustom) return;
+    if (selectedRoleUsers.length > 0) {
+      flash("Bu rolde kullanıcılar var; önce rollerini değiştirin", "error");
+      return;
+    }
+    if (!confirm(`"${selectedCustom.label}" rolü silinsin mi?`)) return;
+    setSaving(true);
+    // Rol şablonu da birlikte kaldırılır
+    const { [selectedCustom.key]: _removed, ...rolePermissionDefaults } = organization.rolePermissionDefaults ?? {};
+    void _removed;
+    const ok = await updateOrganization({
+      customRoles: customRoles.filter((role) => role.key !== selectedCustom.key),
+      rolePermissionDefaults,
+    });
+    setSaving(false);
+    if (!ok) {
+      flash("Rol silinemedi", "error");
+      return;
+    }
+    setSelectedRole("manager");
+    flash("Rol silindi");
   };
 
   const resetRoleToBuiltIn = () => {
@@ -188,7 +392,7 @@ export function AdminPermissionsPanel() {
           )}
         >
           <Shield className="h-4 w-4" />
-          Rol varsayılanları
+          Roller
         </button>
         <button
           type="button"
@@ -205,69 +409,121 @@ export function AdminPermissionsPanel() {
         </button>
       </div>
 
-      {message && <p className="text-sm text-emerald-400">{message}</p>}
+      {message && (
+        <p role={message.tone === "error" ? "alert" : "status"} className={cn("text-sm", message.tone === "error" ? "text-red-400" : "text-emerald-400")}>
+          {message.text}
+        </p>
+      )}
 
       {tab === "roles" ? (
-        <div className="grid gap-6 xl:grid-cols-[260px_1fr]">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
-            <h2 className="mb-3 text-sm font-medium text-zinc-300">Roller</h2>
-            <ul className="space-y-1">
-              {EDITABLE_ROLES.map((role) => (
-                <li key={role}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole(role)}
-                    className={cn(
-                      "w-full rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
-                      selectedRole === role
-                        ? "bg-violet-500/15 text-violet-200"
-                        : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
-                    )}
-                  >
-                    {getRoleLabel(role, organization)}
-                    {organization?.rolePermissionDefaults?.[role] && (
-                      <span className="mt-0.5 block text-[10px] text-cyan-500/80">
-                        Özel şablon
-                      </span>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
+        <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
+          <div className="space-y-5 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-medium text-zinc-300">Özel roller</h2>
+                <Button size="sm" variant="outline" onClick={() => setNewRoleOpen(true)}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Yeni rol
+                </Button>
+              </div>
+              {customRoles.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-zinc-800 px-3 py-3 text-xs text-zinc-500">
+                  Henüz özel rol yok. Usta, Tedarik gibi firmanıza özel roller ekleyebilirsiniz.
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {customRoles.map((role) => (
+                    <li key={role.key}>
+                      <RoleListButton
+                        label={role.label}
+                        hint={role.description}
+                        count={usersOfRole(role.key).length}
+                        active={selectedRole === role.key}
+                        onClick={() => setSelectedRole(role.key)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h2 className="mb-2 text-sm font-medium text-zinc-300">Yerleşik roller</h2>
+              <ul className="space-y-1">
+                {EDITABLE_ROLES.map((role) => (
+                  <li key={role}>
+                    <RoleListButton
+                      label={roleLabel(role)}
+                      hint={organization?.rolePermissionDefaults?.[role] ? "Özel şablon" : undefined}
+                      count={usersOfRole(role).length}
+                      active={selectedRole === role}
+                      onClick={() => setSelectedRole(role)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="font-medium text-zinc-200">
-                  {getRoleLabel(selectedRole, organization)}
+                <h2 className="flex items-center gap-2 font-medium text-zinc-200">
+                  {roleLabel(selectedRole)}
+                  <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-normal text-zinc-400">
+                    {selectedCustom ? "Özel rol" : "Yerleşik rol"}
+                  </span>
                 </h2>
-                <p className="mt-1 max-w-xl text-xs text-zinc-600">
-                  Bu matris, bu role sahip yeni kullanıcılar ve “rol varsayılanını
-                  uygula” için kullanılır.{" "}
-                  {hasOrgOverride
-                    ? "Organizasyona özel şablon aktif."
-                    : "Şu an uygulama varsayılanı gösteriliyor; kaydedince organizasyona yazılır."}
+                <p className="mt-1 max-w-xl text-xs text-zinc-500">
+                  Bu matris, bu role atanan yeni kullanıcılar ve “rol varsayılanını uygula” için kullanılır.{" "}
+                  {selectedCustom
+                    ? "Özel rollerin yalnızca bu yetkileri vardır; disiplin onayı veremezler."
+                    : hasOrgOverride
+                      ? "Organizasyona özel şablon aktif."
+                      : "Şu an uygulama varsayılanı gösteriliyor; kaydedince organizasyona yazılır."}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={resetRoleToBuiltIn}>
-                  Uygulama varsayılanına dön
-                </Button>
-                <Button size="sm" onClick={saveRoleDefaults} loading={saving}>
+                {selectedCustom ? (
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => void deleteRole()}
+                    disabled={saving || selectedRoleUsers.length > 0}
+                    title={selectedRoleUsers.length > 0 ? "Bu rolde kullanıcılar var; önce rollerini değiştirin" : undefined}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Rolü sil
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={resetRoleToBuiltIn}>
+                    Uygulama varsayılanına dön
+                  </Button>
+                )}
+                <Button size="sm" onClick={() => void saveRoleDefaults()} loading={saving}>
                   Rolü kaydet
                 </Button>
               </div>
             </div>
 
-            <div className="mb-4 max-w-md">
-              <label className="text-xs text-zinc-500">Görünen ad</label>
-              <Input
-                className="mt-1"
-                value={roleLabelDraft}
-                onChange={(e) => setRoleLabelDraft(e.target.value)}
-                placeholder={ROLE_LABELS[selectedRole]}
-              />
+            <div className="mb-4 grid max-w-2xl gap-3 sm:grid-cols-2">
+              <FormField label={selectedCustom ? "Rol adı" : "Görünen ad"} required={!!selectedCustom}>
+                <Input
+                  value={roleLabelDraft}
+                  maxLength={40}
+                  onChange={(e) => setRoleLabelDraft(e.target.value)}
+                  placeholder={selectedCustom ? "ör. Usta" : getRoleLabel(selectedRole)}
+                />
+              </FormField>
+              {selectedCustom && (
+                <FormField label="Açıklama">
+                  <Input
+                    value={roleDescriptionDraft}
+                    maxLength={120}
+                    onChange={(e) => setRoleDescriptionDraft(e.target.value)}
+                    placeholder="İsteğe bağlı"
+                  />
+                </FormField>
+              )}
             </div>
 
             <PermissionMatrixTable
@@ -278,7 +534,34 @@ export function AdminPermissionsPanel() {
                 )
               }
             />
+
+            <label className="mt-4 flex items-start gap-2 text-sm text-zinc-400">
+              <input
+                type="checkbox"
+                checked={applyToUsers}
+                disabled={selectedRoleUsers.length === 0}
+                onChange={(e) => setApplyToUsers(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-zinc-600 bg-zinc-900 accent-cyan-500"
+              />
+              <span>
+                Kaydederken bu roldeki {selectedRoleUsers.length} kullanıcının yetkilerini de bu matrise eşitle
+                <span className="block text-xs text-zinc-600">
+                  İşaretlenmezse mevcut kullanıcıların kendi yetkileri değişmez.
+                </span>
+              </span>
+            </label>
           </div>
+
+          {newRoleOpen && (
+            <NewRoleModal
+              open
+              roles={assignableRoles(organization)}
+              roleLabel={roleLabel}
+              saving={saving}
+              onClose={() => setNewRoleOpen(false)}
+              onCreate={(form) => void createRole(form)}
+            />
+          )}
         </div>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[280px_1fr]">

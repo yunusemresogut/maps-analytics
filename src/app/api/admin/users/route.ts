@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { defaultMatrixForRole, normalizePermissions } from "@/lib/permissions";
-import { normalizeRole } from "@/lib/roles";
+import { isCustomRole, normalizeCustomRoles, normalizeRole } from "@/lib/roles";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { getRequestCaller, type RequestCaller } from "@/lib/server-auth";
 import { isValidEmail, isValidPassword, isValidUrl } from "@/lib/validation";
@@ -25,6 +25,17 @@ function errorMessage(err: unknown): string {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value.trim() : undefined;
+}
+
+/** Özel rol yalnızca çağıranın firmasında tanımlıysa atanabilir (veritabanı da denetler) */
+async function isRoleAvailable(caller: RequestCaller, role: string): Promise<boolean> {
+  if (!isCustomRole(role)) return true;
+  const { data } = await getSupabaseAdmin()
+    .from("organizations")
+    .select("custom_roles")
+    .eq("id", caller.organizationId)
+    .maybeSingle();
+  return normalizeCustomRoles(data?.custom_roles).some((item) => item.key === role);
 }
 
 type TargetProfile = { id: string; role: string; organization_id: string | null; email: string | null };
@@ -59,6 +70,7 @@ export async function POST(request: Request) {
 
     const role = normalizeRole(typeof body?.role === "string" ? body.role : "manager");
     if (role === "admin") return error("Admin rolü yalnızca kayıt ile oluşturulabilir", 400);
+    if (!(await isRoleAvailable(caller, role))) return error("Seçilen rol bu firmada tanımlı değil", 400);
     const permissions =
       body?.permissions !== undefined ? normalizePermissions(role, body.permissions) : defaultMatrixForRole(role);
 
@@ -138,6 +150,7 @@ export async function PUT(request: Request) {
     if (email && !isValidEmail(email)) return error("Geçerli bir e-posta adresi girin", 400);
     if (password && !isValidPassword(password)) return error("Şifre en az 6 karakter olmalıdır", 400);
     if (role === "admin") return error("Admin rolü bu ekrandan verilemez", 400);
+    if (role && !(await isRoleAvailable(caller, role))) return error("Seçilen rol bu firmada tanımlı değil", 400);
     if (avatarUrl && !isValidUrl(avatarUrl)) return error("Geçersiz profil fotoğrafı adresi", 400);
     if (body.restricted !== undefined && typeof body.restricted !== "boolean") {
       return error("Geçersiz kısıt değeri", 400);

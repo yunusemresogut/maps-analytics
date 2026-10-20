@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useTableState } from "@/hooks/use-table-state";
-import { ALL_ROLES, getRoleLabel } from "@/lib/roles";
+import { assignableRoles, getRoleLabel } from "@/lib/roles";
 import { MODULE_KEYS, MODULE_LABELS } from "@/lib/permissions";
 import {
   clearFieldError,
@@ -29,8 +29,6 @@ import { PasswordInput } from "@/components/ui/password-input";
 import type { User, UserRole } from "@/types";
 
 type UserSortKey = "name" | "email" | "role";
-
-const CREATABLE_ROLES = ALL_ROLES.filter((r) => r !== "admin");
 
 export function AdminUsersPanel() {
   const {
@@ -55,6 +53,8 @@ export function AdminUsersPanel() {
   const [applyRoleDefaults, setApplyRoleDefaults] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
+  // Yerleşik roller ve firmanın özel rolleri
+  const creatableRoles = assignableRoles(organization);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const orgUsers = useMemo(
@@ -218,7 +218,7 @@ export function AdminUsersPanel() {
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
             >
-              {CREATABLE_ROLES.map((r) => (
+              {creatableRoles.map((r) => (
                 <option key={r} value={r}>
                   {getRoleLabel(r, organization)}
                 </option>
@@ -269,7 +269,7 @@ export function AdminUsersPanel() {
                 onChange={(e) => setEditRole(e.target.value as UserRole)}
                 className="sm:col-span-2"
               >
-                {CREATABLE_ROLES.map((r) => (
+                {creatableRoles.map((r) => (
                   <option key={r} value={r}>
                     {getRoleLabel(r, organization)}
                   </option>

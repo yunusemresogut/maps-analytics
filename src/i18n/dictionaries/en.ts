@@ -21,6 +21,7 @@ export const en: Dictionary = {
     invoices: "Invoices",
     team: "Team",
     reports: "Reports",
+    inventory: "Inventory",
     profile: "Profile",
     budgets: "Budget Tracking",
     users: "Users",

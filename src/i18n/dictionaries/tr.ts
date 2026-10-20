@@ -19,6 +19,7 @@ const trDict = {
     invoices: "Faturalar",
     team: "Ekip",
     reports: "Raporlar",
+    inventory: "Envanter",
     profile: "Profil",
     budgets: "Bütçe Takibi",
     users: "Kullanıcılar",

@@ -12,7 +12,8 @@ export type ProjectStatus =
 
 export type LocationType = "cadde" | "avm" | "outdoor";
 
-export type UserRole =
+/** Uygulamayla gelen roller; onay disiplini gibi kurallar bunlara bağlıdır */
+export type BuiltInRole =
   | "admin"
   | "mechanical_engineer"
   | "electrical_engineer"
@@ -22,6 +23,18 @@ export type UserRole =
   | "regional_manager"
   | "store_manager"
   | "accounting";
+
+/** Firmaya özel rol anahtarı (organizations.custom_roles) */
+export type CustomRoleKey = `custom_${string}`;
+
+export type UserRole = BuiltInRole | CustomRoleKey;
+
+/** Admin'in eklediği rol: yalnızca yetki matrisi taşır */
+export type CustomRole = {
+  key: CustomRoleKey;
+  label: string;
+  description?: string;
+};
 
 /** @deprecated Legacy — migrated to manager */
 export type LegacyUserRole = "user";
@@ -39,7 +52,8 @@ export type AppModuleKey =
   | "tickets"
   | "contracts"
   | "progressPayments"
-  | "invoices";
+  | "invoices"
+  | "inventory";
 
 export type ModuleCrud = Record<PermissionAction, boolean>;
 
@@ -66,6 +80,7 @@ export type AppRouteKey =
   | "invoices"
   | "team"
   | "reports"
+  | "inventory"
   | "profile"
   | "settings"
   | "adminSettings"
@@ -111,6 +126,8 @@ export type Organization = {
   rolePermissionDefaults?: Partial<Record<UserRole, PermissionMatrix>>;
   /** Admin tarafından düzenlenebilir rol görünen adları */
   roleLabels?: Partial<Record<UserRole, string>>;
+  /** Firmaya özel roller */
+  customRoles?: CustomRole[];
   /** Ham firma ayarları; normalizeOrgSettings ile okunur */
   settings?: Record<string, unknown>;
 };
@@ -391,7 +408,8 @@ export type ActivityCategory =
   | "note"
   | "file"
   | "material"
-  | "workplan";
+  | "workplan"
+  | "inventory";
 
 export type ActivityLogEntry = {
   id: string;
