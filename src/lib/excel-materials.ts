@@ -1,11 +1,15 @@
 import * as XLSX from "xlsx";
-import { formatTry } from "@/lib/currency";
+import { parseCurrency, parseDecimal, roundMoney, type CurrencyCode } from "@/lib/currency";
 
 export type ParsedMaterialRow = {
+  /** Dosyada poz sütunu yoksa boş */
+  pozNo?: string;
   name: string;
   quantity: number;
   unit: string;
   unitPrice: number;
+  /** Dosyada para birimi sütunu yoksa boş; içe aktarırken firmanın varsayılanı kullanılır */
+  currency?: CurrencyCode;
   status?: string;
 };
 
@@ -13,10 +17,12 @@ export type ExcelParseResult = {
   materials: ParsedMaterialRow[];
   errors: string[];
   matchedColumns: {
+    pozNo?: string;
     description?: string;
     quantity?: string;
     unit?: string;
     unitPrice?: string;
+    currency?: string;
     status?: string;
   };
 };
@@ -38,14 +44,10 @@ function findColumn(
   return headers.find((h) => matcher(normalizeHeader(h)));
 }
 
+/** Sayı hücresi olduğu gibi; metin hücresi "1.250,75" ya da "1,250.75" yazımıyla okunur */
 function parseNumber(value: unknown): number {
-  if (typeof value === "number") return value;
-  const str = String(value ?? "")
-    .replace(/\s/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
-  const num = parseFloat(str);
-  return Number.isFinite(num) ? num : 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  return parseDecimal(String(value ?? "")) ?? 0;
 }
 
 export async function parseMaterialsFromExcel(
@@ -63,7 +65,8 @@ export async function parseMaterialsFromExcel(
   const sheet = workbook.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: "",
-    raw: false,
+    // Sayı hücreleri biçimlenmeden gelsin; biçimli metin ondalığı kaybettirebilir
+    raw: true,
   });
 
   if (rows.length === 0) {
@@ -72,11 +75,19 @@ export async function parseMaterialsFromExcel(
 
   const headers = Object.keys(rows[0]);
 
-  const descriptionCol = findColumn(headers, (h) => h.includes("aciklama") || h.includes("ad") || h.includes("isim") || h.includes("tanim"));
+  const pozCol = findColumn(headers, (h) => h.includes("poz"));
+  const descriptionCol = findColumn(
+    headers,
+    (h) => !h.includes("poz") && (h.includes("aciklama") || h.includes("ad") || h.includes("isim") || h.includes("tanim"))
+  );
   const quantityCol = findColumn(headers, (h) => h.includes("miktar"));
+  const currencyCol = findColumn(
+    headers,
+    (h) => h.includes("para birimi") || h.includes("doviz") || h.includes("currency")
+  );
   const unitCol = findColumn(
     headers,
-    (h) => h.includes("birim") && !h.includes("fiyat")
+    (h) => h.includes("birim") && !h.includes("fiyat") && !h.includes("para")
   );
   const unitPriceCol = findColumn(
     headers,
@@ -85,10 +96,12 @@ export async function parseMaterialsFromExcel(
   const statusCol = findColumn(headers, (h) => h.includes("durum") || h.includes("stat"));
 
   const matchedColumns = {
+    pozNo: pozCol,
     description: descriptionCol,
     quantity: quantityCol,
     unit: unitCol,
     unitPrice: unitPriceCol,
+    currency: currencyCol,
     status: statusCol,
   };
 
@@ -106,11 +119,13 @@ export async function parseMaterialsFromExcel(
     const name = String(row[descriptionCol] ?? "").trim();
     if (!name) continue;
 
+    const pozNo = pozCol ? String(row[pozCol] ?? "").trim() : "";
     const quantity = parseNumber(row[quantityCol]);
     const unit = unitCol
       ? String(row[unitCol] ?? "").trim()
       : "";
-    const unitPrice = parseNumber(row[unitPriceCol]);
+    const unitPrice = roundMoney(parseNumber(row[unitPriceCol]));
+    const currency = currencyCol ? parseCurrency(String(row[currencyCol] ?? "")) ?? undefined : undefined;
     const rawStatus = statusCol ? String(row[statusCol] ?? "").trim().toLowerCase() : "bekleniyor";
     const status = rawStatus.includes("geld") || rawStatus === "geldi"
       ? "geldi"
@@ -118,7 +133,7 @@ export async function parseMaterialsFromExcel(
         ? "gitti"
         : "bekleniyor";
 
-    materials.push({ name, quantity, unit, unitPrice, status });
+    materials.push({ pozNo, name, quantity, unit, unitPrice, currency, status });
   }
 
   if (materials.length === 0) {
@@ -128,16 +143,12 @@ export async function parseMaterialsFromExcel(
   return { materials, errors, matchedColumns };
 }
 
-export function formatCurrency(value: number): string {
-  return formatTry(value);
-}
-
 export function downloadMaterialsTemplate() {
-  const headers = [["Kalem Adı", "Miktar", "Birim", "Birim Fiyat", "Durum"]];
+  const headers = [["Poz No", "Kalem Adı", "Miktar", "Birim", "Birim Fiyat", "Para Birimi", "Durum"]];
   const sampleData = [
-    ["Cement / Çimento", 150, "torba", 320, "bekleniyor"],
-    ["Steel Bars / İnşaat Demiri", 12, "ton", 28000, "geldi"],
-    ["Copper Pipe / Bakır Boru", 45, "metre", 150, "gitti"],
+    ["10.130.1005", "Cement / Çimento", 150, "torba", 320.5, "TRY", "bekleniyor"],
+    ["10.140.1002", "Steel Bars / İnşaat Demiri", 12, "ton", 28000, "TRY", "geldi"],
+    ["", "Copper Pipe / Bakır Boru", 45, "metre", 4.75, "USD", "gitti"],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([...headers, ...sampleData]);

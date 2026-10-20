@@ -8,6 +8,7 @@ import {
 } from "@/lib/permissions";
 import { normalizeRole } from "@/lib/roles";
 import { ensureApprovals } from "@/lib/store-mapper";
+import { normalizeCurrency } from "@/lib/currency";
 
 export function migrateStore(raw: Record<string, unknown>): Store {
   const createdAt =
@@ -32,6 +33,7 @@ export function migrateStore(raw: Record<string, unknown>): Store {
     phone: raw.phone as string | undefined,
     isCustom: raw.isCustom as boolean | undefined,
     totalBudget: (raw.totalBudget as number) ?? 1500000,
+    budgetCurrency: normalizeCurrency(raw.budgetCurrency),
     approvals: ensureApprovals(raw as Partial<Store>) ?? emptyApprovals(),
     createdBy: (raw.createdBy as string) ?? "system",
     createdByName: (raw.createdByName as string) ?? "Sistem",

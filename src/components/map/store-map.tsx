@@ -227,8 +227,10 @@ export function StoreMap() {
             {visibleStores.length} / {stores.length} görünür
           </p>
           <div className="scrollbar-themed mt-3 max-h-52 space-y-1.5 overflow-y-auto pr-1">
-            {(Object.keys(projectStatusConfig) as ProjectStatus[]).map(
-              (status) => (
+            {(Object.keys(projectStatusConfig) as ProjectStatus[])
+              // "Yakında açılıyor" seçilebilen bir durum değil; aşağıda açılış tarihinden sayılır
+              .filter((status) => status !== "yakinda_aciliyor")
+              .map((status) => (
                 <div
                   key={status}
                   className="flex items-center gap-1.5 text-xs text-zinc-400"

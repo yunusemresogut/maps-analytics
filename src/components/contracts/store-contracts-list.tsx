@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useDb } from "@/contexts/db-context";
 import { usePermissions } from "@/hooks/use-permissions";
-import { formatTry } from "@/lib/currency";
+import { formatMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import type { Store } from "@/types";
 
@@ -57,7 +57,7 @@ export function StoreContractsList({ store }: { store: Store }) {
                   {c.title}
                 </span>
                 <span className="shrink-0 text-xs text-zinc-500">
-                  {STATUS_TR[c.status] ?? c.status} · {formatTry(c.amount)}
+                  {STATUS_TR[c.status] ?? c.status} · {formatMoney(c.amount, c.currency)}
                 </span>
               </Link>
             </li>

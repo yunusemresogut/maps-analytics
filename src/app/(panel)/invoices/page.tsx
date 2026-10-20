@@ -20,7 +20,7 @@ import { mapInvoice, useDb } from "@/contexts/db-context";
 import { useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerTable } from "@/hooks/use-server-table";
-import { formatTry } from "@/lib/currency";
+import { formatMoney } from "@/lib/currency";
 import type { Invoice } from "@/types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 
@@ -129,8 +129,8 @@ function InvoicesContent() {
             <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-cyan-400/90">{item.invoiceNumber}</td>
             <td className="whitespace-nowrap px-4 py-3">{item.storeName}</td>
             <td className="whitespace-nowrap px-4 py-3 text-zinc-400">{item.paymentTitle}</td>
-            <td className="whitespace-nowrap px-4 py-3">{formatTry(item.amount)}</td>
-            <td className="whitespace-nowrap px-4 py-3 font-medium text-zinc-100">{formatTry(item.total)}</td>
+            <td className="whitespace-nowrap px-4 py-3">{formatMoney(item.amount, item.currency)}</td>
+            <td className="whitespace-nowrap px-4 py-3 font-medium text-zinc-100">{formatMoney(item.total, item.currency)}</td>
             <td className="px-4 py-3"><StatusBadge value={item.status} label={STATUS_TR[item.status] ?? item.status} /></td>
             <td className="whitespace-nowrap px-4 py-3">
               <div className="flex gap-1">

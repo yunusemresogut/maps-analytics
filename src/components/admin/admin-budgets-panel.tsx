@@ -13,17 +13,34 @@ import {
 import { useStores } from "@/contexts/stores-context";
 import { useDb } from "@/contexts/db-context";
 import { useTableState } from "@/hooks/use-table-state";
-import { formatCurrency } from "@/lib/excel-materials";
+import {
+  addMoney,
+  DEFAULT_CURRENCY,
+  formatMoney,
+  formatMoneyTotals,
+  mergeMoneyTotals,
+  moneyEntries,
+  roundMoney,
+  sumMoney,
+  type CurrencyCode,
+  type MoneyTotals,
+} from "@/lib/currency";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   SortableTh,
   TablePagination,
 } from "@/components/modules/module-table";
 import type { Store } from "@/types";
 
+/**
+ * Kur çevrimi yok: harcanan ve kalan, bütçenin para birimindeki keşif
+ * toplamıyla hesaplanır. Başka birimdeki keşif ayrıca gösterilir.
+ */
 type BudgetRow = Store & {
   spentAmount: number;
+  /** Bütçeyle karşılaştırılamayan, başka para birimindeki keşif toplamları */
+  otherSpent: MoneyTotals;
   remainingBudget: number;
   isOverrun: boolean;
   percentSpent: number;
@@ -41,14 +58,17 @@ export function AdminBudgetsPanel() {
   const { stores, updateStore } = useStores();
   const { storeSummaries } = useDb();
   const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
-  const [editBudgetValue, setEditBudgetValue] = useState("");
+  const [editBudgetValue, setEditBudgetValue] = useState<number | null>(null);
+  const [editBudgetCurrency, setEditBudgetCurrency] = useState<CurrencyCode>(DEFAULT_CURRENCY);
   const [message, setMessage] = useState("");
 
   const storesData = useMemo(
     () =>
       stores.map((store) => {
-        const spentAmount = storeSummaries[store.id]?.materialTotal ?? 0;
-        const remainingBudget = store.totalBudget - spentAmount;
+        const { [store.budgetCurrency]: spent = 0, ...otherSpent } =
+          storeSummaries[store.id]?.materialTotals ?? {};
+        const spentAmount = spent;
+        const remainingBudget = roundMoney(store.totalBudget - spentAmount);
         const isOverrun = spentAmount > store.totalBudget;
         const percentSpent =
           store.totalBudget > 0 ? (spentAmount / store.totalBudget) * 100 : 0;
@@ -56,6 +76,7 @@ export function AdminBudgetsPanel() {
         return {
           ...store,
           spentAmount,
+          otherSpent,
           remainingBudget,
           isOverrun,
           percentSpent,
@@ -75,26 +96,56 @@ export function AdminBudgetsPanel() {
     getSortValue,
   });
 
-  const totalBudget = storesData.reduce((sum, s) => sum + s.totalBudget, 0);
-  const totalSpent = storesData.reduce((sum, s) => sum + s.spentAmount, 0);
-  const totalRemaining = totalBudget - totalSpent;
+  // Toplamlar para birimine göre; kalan = aynı birimdeki bütçe − harcanan
+  const totalBudget = sumMoney(storesData, (s) => s.budgetCurrency, (s) => s.totalBudget);
+  const totalSpent = mergeMoneyTotals(
+    ...storesData.map((s) => addMoney(s.otherSpent, s.budgetCurrency, s.spentAmount))
+  );
+  const totalRemaining = moneyEntries(totalSpent).reduce(
+    (remaining, [currency, spent]) => addMoney(remaining, currency, -spent),
+    totalBudget
+  );
+  const hasDeficit = moneyEntries(totalRemaining).some(([, amount]) => amount < 0);
   const overrunStores = storesData.filter((s) => s.isOverrun);
   const totalOverrunBudgetStores = overrunStores.length;
 
-  const startEdit = (storeId: string, currentBudget: number) => {
-    setEditingStoreId(storeId);
-    setEditBudgetValue(String(currentBudget));
+  const averageBudget = formatMoneyTotals(
+    Object.fromEntries(
+      moneyEntries(totalBudget).map(([currency, amount]) => [
+        currency,
+        amount / storesData.filter((s) => s.budgetCurrency === currency).length,
+      ])
+    )
+  );
+  // Oran yalnızca aynı birimdeki bütçe ve harcamadan hesaplanır
+  const efficiency =
+    moneyEntries(totalBudget)
+      .map(([currency, budget]) => {
+        const spent = storesData
+          .filter((s) => s.budgetCurrency === currency)
+          .reduce((sum, s) => sum + s.spentAmount, 0);
+        const percent = `%${Math.round((spent / budget) * 100)}`;
+        return moneyEntries(totalBudget).length > 1 ? `${percent} (${currency})` : percent;
+      })
+      .join(" · ") || "%0";
+
+  const startEdit = (store: BudgetRow) => {
+    setEditingStoreId(store.id);
+    setEditBudgetValue(store.totalBudget);
+    setEditBudgetCurrency(store.budgetCurrency);
     setMessage("");
   };
 
   const saveBudget = async (storeId: string) => {
-    const parsedBudget = Number(editBudgetValue);
-    if (isNaN(parsedBudget) || parsedBudget < 0) {
+    if (editBudgetValue === null || editBudgetValue < 0) {
       setMessage("Geçersiz bütçe değeri");
       return;
     }
 
-    const ok = await updateStore(storeId, { totalBudget: parsedBudget });
+    const ok = await updateStore(storeId, {
+      totalBudget: editBudgetValue,
+      budgetCurrency: editBudgetCurrency,
+    });
     if (!ok) {
       setMessage("Bütçe kaydedilemedi");
       return;
@@ -110,20 +161,20 @@ export function AdminBudgetsPanel() {
         <MetricCard
           icon={Wallet}
           label="Toplam Bütçe"
-          value={formatCurrency(totalBudget)}
+          value={formatMoneyTotals(totalBudget)}
           accent="violet"
         />
         <MetricCard
           icon={TrendingUp}
           label="Toplam Harcanan"
-          value={formatCurrency(totalSpent)}
+          value={formatMoneyTotals(totalSpent)}
           accent="amber"
         />
         <MetricCard
           icon={TrendingDown}
           label="Kalan Bütçe"
-          value={formatCurrency(totalRemaining)}
-          accent={totalRemaining >= 0 ? "emerald" : "red"}
+          value={formatMoneyTotals(totalRemaining)}
+          accent={hasDeficit ? "red" : "emerald"}
         />
         <MetricCard
           icon={AlertTriangle}
@@ -158,7 +209,7 @@ export function AdminBudgetsPanel() {
                         }
                       >
                         %{Math.round(store.percentSpent)} (
-                        {formatCurrency(store.spentAmount)})
+                        {formatMoney(store.spentAmount, store.budgetCurrency)})
                       </span>
                     </div>
                     <div className="relative h-2 w-full overflow-hidden rounded-full bg-zinc-800">
@@ -186,9 +237,7 @@ export function AdminBudgetsPanel() {
               <div className="flex justify-between items-center text-xs">
                 <span className="text-zinc-500">Ortalama Bütçe</span>
                 <span className="font-semibold text-zinc-300">
-                  {formatCurrency(
-                    stores.length ? totalBudget / stores.length : 0
-                  )}
+                  {averageBudget}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs">
@@ -196,10 +245,7 @@ export function AdminBudgetsPanel() {
                   Bütçe Verimliliği (Spent/Budget)
                 </span>
                 <span className="font-semibold text-zinc-300">
-                  %
-                  {totalBudget > 0
-                    ? Math.round((totalSpent / totalBudget) * 100)
-                    : 0}
+                  {efficiency}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs">
@@ -297,22 +343,37 @@ export function AdminBudgetsPanel() {
                     <td className="px-4 py-3.5 text-right font-medium">
                       {isEditing ? (
                         <div className="flex justify-end">
-                          <Input
-                            type="number"
+                          <MoneyInput
+                            size="sm"
                             value={editBudgetValue}
-                            onChange={(e) => setEditBudgetValue(e.target.value)}
-                            className="h-7 w-28 text-right text-xs bg-zinc-950"
+                            onValueChange={setEditBudgetValue}
+                            currency={editBudgetCurrency}
+                            onCurrencyChange={setEditBudgetCurrency}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveBudget(store.id);
+                              if (e.key === "Escape") setEditingStoreId(null);
+                            }}
+                            aria-label={`${store.name} bütçesi`}
+                            className="w-48 bg-zinc-950"
                             autoFocus
                           />
                         </div>
                       ) : (
                         <span className="text-zinc-200">
-                          {formatCurrency(store.totalBudget)}
+                          {formatMoney(store.totalBudget, store.budgetCurrency)}
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-3.5 text-right text-zinc-400 font-medium">
-                      {formatCurrency(store.spentAmount)}
+                      {formatMoney(store.spentAmount, store.budgetCurrency)}
+                      {moneyEntries(store.otherSpent).length > 0 && (
+                        <span
+                          className="mt-0.5 block text-[10px] font-normal text-amber-400/80"
+                          title="Bütçeden farklı para birimindeki keşif; kur çevrimi olmadığı için bütçeye sayılmaz"
+                        >
+                          + {formatMoneyTotals(store.otherSpent)}
+                        </span>
+                      )}
                     </td>
                     <td
                       className={`px-4 py-3.5 text-right font-medium ${
@@ -321,7 +382,7 @@ export function AdminBudgetsPanel() {
                           : "text-emerald-400"
                       }`}
                     >
-                      {formatCurrency(store.remainingBudget)}
+                      {formatMoney(store.remainingBudget, store.budgetCurrency)}
                     </td>
                     <td className="px-4 py-3.5 text-center">
                       {isOver ? (
@@ -359,9 +420,7 @@ export function AdminBudgetsPanel() {
                           size="sm"
                           variant="outline"
                           className="h-7 text-[11px] cursor-pointer"
-                          onClick={() =>
-                            startEdit(store.id, store.totalBudget)
-                          }
+                          onClick={() => startEdit(store)}
                         >
                           <Edit2 className="h-3 w-3 mr-1" />
                           Düzenle

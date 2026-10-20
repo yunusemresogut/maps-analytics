@@ -409,3 +409,42 @@ html:not(.light) .maplibregl-ctrl-group button {
 .animate-in {
   animation: slide-in-from-right 0.25s ease-out;
 }
+
+/*
+ * Yazdırma (PDF olarak kaydet): sayfada body'ye eklenmiş .print-root varsa
+ * yalnızca o basılır; uygulama iskeleti, menü ve açık modallar gizlenir.
+ */
+.print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm 14mm;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body:has(> .print-root) > :not(.print-root) {
+    display: none !important;
+  }
+
+  .print-root {
+    display: block;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Kenar boşluğunu @page verir */
+  .print-root .daily-site-report {
+    width: 100%;
+    padding: 0;
+  }
+}

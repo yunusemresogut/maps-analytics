@@ -13,7 +13,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select } from "@/components/ui/select";
-import { formatTry } from "@/lib/currency";
+import { MoneyInput } from "@/components/ui/money-input";
+import { DEFAULT_CURRENCY, formatMoney, formatMoneyTotals, type CurrencyCode } from "@/lib/currency";
 import { encodePaymentPeriod, paidAmountForPayment, parsePaymentPeriod } from "@/lib/module-finance";
 import type { ProgressPaymentStatus } from "@/types";
 
@@ -37,7 +38,8 @@ function EditPaymentContent({ id }: { id: string }) {
   const periodLabel = payment?.periodLabel ?? "";
   const [periodStart, setPeriodStart] = useState(initialPeriod.startDate);
   const [periodEnd, setPeriodEnd] = useState(initialPeriod.endDate);
-  const [amount, setAmount] = useState(String(payment?.amount ?? 0));
+  const [amount, setAmount] = useState<number | null>(payment?.amount ?? null);
+  const [currency, setCurrency] = useState<CurrencyCode>(payment?.currency ?? DEFAULT_CURRENCY);
   const [contractId, setContractId] = useState(payment?.contractId ?? "");
   const [status, setStatus] = useState<ProgressPaymentStatus>(payment?.status ?? "draft");
   const [saving, setSaving] = useState(false);
@@ -68,7 +70,8 @@ function EditPaymentContent({ id }: { id: string }) {
         periodStart && periodEnd
           ? encodePaymentPeriod(periodStart, periodEnd)
           : periodLabel,
-      amount: Number(amount) || 0,
+      amount: amount ?? 0,
+      currency,
       contractId: contractId || undefined,
       storeId: contract?.storeId,
       status,
@@ -89,7 +92,7 @@ function EditPaymentContent({ id }: { id: string }) {
     <ModuleFormShell backHref="/progress-payments" backLabel="Hakedişler" title={title || "Hakediş düzenle"} onSave={save} onDelete={remove} saving={saving} canSave={canEdit} canDelete={canDelete}>
       {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400">
-        Toplam hakediş {formatTry(payment.amount)} · Ödenen {formatTry(paid)}
+        Toplam hakediş {formatMoney(payment.amount, payment.currency)} · Ödenen {formatMoneyTotals(paid, payment.currency)}
         {contract && (
           <Link href={`/contracts/${contract.id}/edit`} className="mt-1 block text-cyan-400 hover:underline">
             Sözleşme: {contract.title}
@@ -121,8 +124,8 @@ function EditPaymentContent({ id }: { id: string }) {
             <DatePicker className="mt-1" value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} disabled={!canEdit} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Toplam hakediş (TRY)</label>
-            <Input className="mt-1" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!canEdit} />
+            <label className="text-xs text-zinc-500">Toplam hakediş</label>
+            <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} disabled={!canEdit} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">Durum</label>

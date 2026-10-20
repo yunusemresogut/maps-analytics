@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
+  ClipboardList,
   Coins,
   FileText,
   LayoutDashboard,
@@ -68,6 +69,7 @@ const MAIN_NAV: NavItem[] = [
     icon: Coins,
     routeKey: "invoices",
   },
+  { href: "/reports", labelKey: "nav.reports", icon: ClipboardList, routeKey: "reports" },
   { href: "/team", labelKey: "nav.team", icon: UsersRound, routeKey: "team" },
 ];
 

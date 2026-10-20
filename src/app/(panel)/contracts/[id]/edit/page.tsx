@@ -13,6 +13,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { MoneyInput } from "@/components/ui/money-input";
+import { DEFAULT_CURRENCY, type CurrencyCode } from "@/lib/currency";
 import type { ContractStatus } from "@/types";
 
 const STATUS_TR: Record<ContractStatus, string> = {
@@ -35,7 +37,8 @@ function EditContractContent({ id }: { id: string }) {
   const [code, setCode] = useState(contract?.code ?? "");
   const [title, setTitle] = useState(contract?.title ?? "");
   const [partyName, setPartyName] = useState(contract?.partyName ?? "");
-  const [amount, setAmount] = useState(String(contract?.amount ?? 0));
+  const [amount, setAmount] = useState<number | null>(contract?.amount ?? null);
+  const [currency, setCurrency] = useState<CurrencyCode>(contract?.currency ?? DEFAULT_CURRENCY);
   const [storeId, setStoreId] = useState(contract?.storeId ?? "");
   const [status, setStatus] = useState<ContractStatus>(contract?.status ?? "draft");
   const [saving, setSaving] = useState(false);
@@ -59,7 +62,8 @@ function EditContractContent({ id }: { id: string }) {
       code: code.trim() || undefined,
       title: title.trim(),
       partyName,
-      amount: Number(amount) || 0,
+      amount: amount ?? 0,
+      currency,
       storeId: storeId || undefined,
       status,
     });
@@ -131,8 +135,8 @@ function EditContractContent({ id }: { id: string }) {
             <Input className="mt-1" value={partyName} onChange={(e) => setPartyName(e.target.value)} disabled={!canEdit} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Tutar (TRY)</label>
-            <Input className="mt-1" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={!canEdit} />
+            <label className="text-xs text-zinc-500">Tutar</label>
+            <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} disabled={!canEdit} />
           </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-zinc-500">Mağaza</label>

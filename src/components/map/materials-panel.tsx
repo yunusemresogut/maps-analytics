@@ -3,15 +3,17 @@
 import { useId, useMemo, useState } from "react";
 import { ChevronDown, Edit2, Lock, Package, Percent, Plus, Search, Trash2 } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
-import { formatCurrency } from "@/lib/excel-materials";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { FormField } from "@/components/ui/form-field";
 import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { TablePagination } from "@/components/modules/module-table";
 import { useStoreData } from "@/contexts/store-data-context";
 import { useDb } from "@/contexts/db-context";
+import { useStores } from "@/contexts/stores-context";
+import { useSettings } from "@/contexts/settings-context";
 import { useServerTable } from "@/hooks/use-server-table";
 import type { SortState } from "@/hooks/use-table-state";
 import {
@@ -30,6 +32,7 @@ import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { MaterialStatus, StoreMaterial } from "@/types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { PERCENT_UNIT, isPercentMaterial, materialLineTotal } from "@/lib/material-totals";
+import { formatMoney, formatMoneyTotals, moneyEntries, sumMoney, type CurrencyCode } from "@/lib/currency";
 
 type MaterialsPanelProps = {
   storeId: string;
@@ -67,35 +70,44 @@ function ReadOnlyValue({ children, icon, title }: { children: React.ReactNode; i
   );
 }
 
-type MaterialFormValues = Pick<StoreMaterial, "name" | "quantity" | "unit" | "unitPrice" | "status">;
+type MaterialFormValues = Pick<StoreMaterial, "pozNo" | "name" | "quantity" | "unit" | "unitPrice" | "currency" | "status">;
 
-/** Seçili kalemlerden yüzdelik kalem eklerken taban: seçilenler ve toplam tutarları */
+/**
+ * Seçili kalemlerden yüzdelik kalem eklerken taban: seçilenler ve toplam tutarları.
+ * Kur çevrimi olmadığı için seçilenler tek para biriminde olmalıdır.
+ */
 type PercentBase =
   | { status: "loading" }
   | { status: "error" }
-  | { status: "ready"; items: StoreMaterial[]; total: number; afterSeq?: number };
+  | { status: "mixed"; items: StoreMaterial[] }
+  | { status: "ready"; items: StoreMaterial[]; total: number; currency: CurrencyCode; afterSeq?: number };
 
 function MaterialFormModal({
   material,
   percentBase,
+  defaultCurrency,
   onClose,
   onSubmit,
 }: {
   material: StoreMaterial | null;
   /** Doluysa yeni kalem, seçilen kalemlerin yüzdesi olarak eklenir */
   percentBase: PercentBase | null;
+  /** Yeni kalemde önerilen para birimi */
+  defaultCurrency: CurrencyCode;
   onClose: () => void;
   onSubmit: (values: MaterialFormValues) => void;
 }) {
   const formId = useId();
   // Yüzde modu: seçimle yeni ekleme ya da birimi "%" olan kalemi düzenleme
   const percentMode = !!percentBase || (!!material && isPercentMaterial(material));
+  const [pozNo, setPozNo] = useState(material?.pozNo ?? "");
   const [name, setName] = useState(material?.name ?? "");
   const [quantity, setQuantity] = useState(
     material ? String(material.quantity) : percentMode ? "" : "1"
   );
   const [unit, setUnit] = useState(material?.unit ?? "adet");
-  const [unitPrice, setUnitPrice] = useState(String(material?.unitPrice ?? 0));
+  const [unitPrice, setUnitPrice] = useState<number | null>(material?.unitPrice ?? null);
+  const [currency, setCurrency] = useState<CurrencyCode>(material?.currency ?? defaultCurrency);
   const [status, setStatus] = useState<MaterialStatus>(material?.status || "bekleniyor");
   const [error, setError] = useState("");
   const [quantityError, setQuantityError] = useState("");
@@ -103,8 +115,10 @@ function MaterialFormModal({
   // Yüzde modunda birim fiyat = seçilen kalemlerin toplam tutarı (düzenlemede kayıtlı taban)
   const percentReady = !percentBase || percentBase.status === "ready";
   const baseTotal = percentBase?.status === "ready" ? percentBase.total : material?.unitPrice ?? 0;
+  // Yüzdelik kalem, tabanının para birimindedir
+  const effectiveCurrency = percentBase?.status === "ready" ? percentBase.currency : currency;
   const effectiveUnit = percentMode ? PERCENT_UNIT : unit;
-  const effectiveUnitPrice = percentMode ? baseTotal : Number(unitPrice) || 0;
+  const effectiveUnitPrice = percentMode ? baseTotal : unitPrice ?? 0;
   const lineTotal = materialLineTotal({
     quantity: Number(quantity) || 0,
     unit: effectiveUnit,
@@ -125,10 +139,12 @@ function MaterialFormModal({
     }
     if (invalid || !percentReady) return;
     onSubmit({
+      pozNo: pozNo.trim(),
       name: name.trim(),
       quantity: percentMode ? amount : amount || 1,
       unit: percentMode ? PERCENT_UNIT : unit.trim() || "adet",
       unitPrice: effectiveUnitPrice,
+      currency: effectiveCurrency,
       status,
     });
   };
@@ -173,12 +189,19 @@ function MaterialFormModal({
               </span>
               {percentBase.status === "ready" && (
                 <span className="tabular-nums text-zinc-300">
-                  Toplam <span className="font-semibold text-zinc-100">{formatCurrency(percentBase.total)}</span>
+                  Toplam <span className="font-semibold text-zinc-100">{formatMoney(percentBase.total, percentBase.currency)}</span>
                 </span>
               )}
             </div>
             {percentBase.status === "loading" && (
               <p className="px-3 py-3 text-xs text-zinc-500">Seçilen kalemler yükleniyor…</p>
+            )}
+            {percentBase.status === "mixed" && (
+              <p role="alert" className="px-3 py-3 text-xs text-amber-400">
+                Seçilen kalemler farklı para birimlerinde (
+                {formatMoneyTotals(sumMoney(percentBase.items, (item) => item.currency, materialLineTotal))}
+                ). Kur çevrimi yapılmadığı için yüzdelik kalem yalnızca aynı birimdeki kalemlerden eklenebilir.
+              </p>
             )}
             {percentBase.status === "error" && (
               <p role="alert" className="px-3 py-3 text-xs text-red-400">
@@ -191,7 +214,7 @@ function MaterialFormModal({
                   <li key={item.id} className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs">
                     <span className="min-w-0 truncate text-zinc-300">{item.name}</span>
                     <span className="shrink-0 tabular-nums text-zinc-400">
-                      {formatCurrency(materialLineTotal(item))}
+                      {formatMoney(materialLineTotal(item), item.currency)}
                     </span>
                   </li>
                 ))}
@@ -200,20 +223,32 @@ function MaterialFormModal({
           </div>
         )}
 
-        <FormField label="Kalem adı" required error={error} htmlFor={`${formId}-name`}>
-          <Input
-            id={`${formId}-name`}
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              if (error) setError("");
-            }}
-            aria-invalid={!!error}
-            autoComplete="off"
-          />
-        </FormField>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+          <FormField label="Poz no" htmlFor={`${formId}-poz`}>
+            <Input
+              id={`${formId}-poz`}
+              value={pozNo}
+              onChange={(e) => setPozNo(e.target.value)}
+              placeholder="ör. 15.150.1005"
+              autoComplete="off"
+              className="font-mono"
+            />
+          </FormField>
+          <FormField label="Kalem adı" required error={error} htmlFor={`${formId}-name`} className="sm:col-span-3">
+            <Input
+              id={`${formId}-name`}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (error) setError("");
+              }}
+              aria-invalid={!!error}
+              autoComplete="off"
+            />
+          </FormField>
+        </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           <FormField
             label={percentMode ? "Yüzde" : "Miktar"}
             required={percentMode}
@@ -253,21 +288,22 @@ function MaterialFormModal({
             )}
           </FormField>
 
-          <FormField label={percentMode ? "Birim fiyat (taban)" : "Birim fiyat (TRY)"} htmlFor={`${formId}-price`}>
+          <FormField
+            label={percentMode ? "Birim fiyat (taban)" : "Birim fiyat"}
+            htmlFor={`${formId}-price`}
+            className="sm:col-span-2"
+          >
             {percentMode ? (
               <ReadOnlyValue icon title="Seçilen kalemlerin toplam tutarı">
-                {percentReady ? formatCurrency(baseTotal) : "…"}
+                {percentReady ? formatMoney(baseTotal, effectiveCurrency) : "…"}
               </ReadOnlyValue>
             ) : (
-              <Input
+              <MoneyInput
                 id={`${formId}-price`}
-                type="number"
-                min="0"
-                step="any"
-                inputMode="decimal"
                 value={unitPrice}
-                onChange={(e) => setUnitPrice(e.target.value)}
-                className="tabular-nums"
+                onValueChange={setUnitPrice}
+                currency={currency}
+                onCurrencyChange={setCurrency}
               />
             )}
           </FormField>
@@ -285,10 +321,10 @@ function MaterialFormModal({
             <div className="flex h-10 items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 text-sm">
               <span className="truncate text-xs text-zinc-500">
                 {percentMode && Number(quantity) > 0
-                  ? `${formatCurrency(baseTotal)} × %${Number(quantity).toLocaleString("tr-TR")}`
+                  ? `${formatMoney(baseTotal, effectiveCurrency)} × %${Number(quantity).toLocaleString("tr-TR")}`
                   : ""}
               </span>
-              <span className="shrink-0 font-semibold tabular-nums text-zinc-100">{formatCurrency(lineTotal)}</span>
+              <span className="shrink-0 font-semibold tabular-nums text-zinc-100">{formatMoney(lineTotal, effectiveCurrency)}</span>
             </div>
           </FormField>
         </div>
@@ -305,7 +341,11 @@ export function MaterialsPanel({
 }: MaterialsPanelProps) {
   const { addMaterial, updateMaterial, getDetailVersion } = useStoreData();
   const { storeSummaries } = useDb();
+  const { getStore } = useStores();
+  const { org } = useSettings();
   const summary = storeSummaries[storeId] ?? EMPTY_SUMMARY;
+  // Yeni kalem, keşfin karşılaştırıldığı bütçenin biriminde önerilir
+  const defaultCurrency = getStore(storeId)?.budgetCurrency ?? org.defaults.currency;
   const [modal, setModal] = useState<{
     key: number;
     material: StoreMaterial | null;
@@ -381,11 +421,17 @@ export function MaterialsPanel({
           })
         : [...selection.selected];
       const items = await fetchMaterialsByIds(ids);
+      const totals = moneyEntries(sumMoney(items, (item) => item.currency, materialLineTotal));
+      if (totals.length > 1) {
+        update({ status: "mixed", items });
+        return;
+      }
       const seqs = items.flatMap((item) => (item.seq === undefined ? [] : [item.seq]));
       update({
         status: "ready",
         items,
-        total: items.reduce((sum, item) => sum + materialLineTotal(item), 0),
+        total: totals[0]?.[1] ?? 0,
+        currency: totals[0]?.[0] ?? items[0]?.currency ?? defaultCurrency,
         // Yeni kalem, seçilenlerden listede en sonda olanın hemen altına eklenir
         afterSeq: seqs.length > 0 ? Math.max(...seqs) : undefined,
       });
@@ -454,7 +500,7 @@ export function MaterialsPanel({
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Kalem, birim veya durum ara…"
+                placeholder="Poz no, kalem, birim veya durum ara…"
                 aria-label="Keşifte ara"
                 className="h-9 pl-9"
               />
@@ -474,7 +520,7 @@ export function MaterialsPanel({
           />
         )}
         <div className="min-w-0 overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead className="border-b border-zinc-800 text-xs text-zinc-500">
               <tr>
                 {isEditing && (
@@ -487,6 +533,7 @@ export function MaterialsPanel({
                     />
                   </th>
                 )}
+                <th className="px-4 py-3 text-left font-medium">Poz no</th>
                 <th className="px-4 py-3 text-left font-medium">Kalem</th>
                 <th className="px-4 py-3 text-right font-medium">Miktar</th>
                 <th className="px-4 py-3 text-left font-medium">Birim</th>
@@ -499,7 +546,7 @@ export function MaterialsPanel({
             <tbody className="divide-y divide-zinc-800/70">
               {table.totalItems === 0 ? (
                 <tr>
-                  <td colSpan={isEditing ? 8 : 6} className="px-4 py-10 text-center text-sm text-zinc-500">
+                  <td colSpan={isEditing ? 9 : 7} className="px-4 py-10 text-center text-sm text-zinc-500">
                     {table.isLoading
                       ? "Yükleniyor…"
                       : summary.materialCount === 0
@@ -527,6 +574,9 @@ export function MaterialsPanel({
                           />
                         </td>
                       )}
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-zinc-400">
+                        {m.pozNo || "—"}
+                      </td>
                       <td className="max-w-[360px] px-4 py-3 font-medium text-zinc-100">
                         <TruncateWithTooltip text={m.name} />
                       </td>
@@ -537,10 +587,10 @@ export function MaterialsPanel({
                         <TruncateWithTooltip text={m.unit || "—"} />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-zinc-400">
-                        {formatCurrency(m.unitPrice)}
+                        {formatMoney(m.unitPrice, m.currency)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-zinc-200">
-                        {formatCurrency(materialLineTotal(m))}
+                        {formatMoney(materialLineTotal(m), m.currency)}
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-950/40 px-2 py-0.5 text-xs font-medium">
@@ -580,11 +630,11 @@ export function MaterialsPanel({
             {table.totalItems > 0 && (
               <tfoot className="border-t border-zinc-800">
                 <tr>
-                  <td colSpan={isEditing ? 5 : 4} className="px-4 py-3 text-right text-xs text-zinc-500">
+                  <td colSpan={isEditing ? 6 : 5} className="px-4 py-3 text-right text-xs text-zinc-500">
                     {table.appliedSearch ? "Tüm keşif toplamı" : "Toplam tutar"}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-cyan-300">
-                    {formatCurrency(summary.materialTotal)}
+                    {formatMoneyTotals(summary.materialTotals, defaultCurrency)}
                   </td>
                   <td colSpan={isEditing ? 2 : 1} />
                 </tr>
@@ -614,6 +664,7 @@ export function MaterialsPanel({
           key={modal.key}
           material={modal.material}
           percentBase={modal.percentBase}
+          defaultCurrency={defaultCurrency}
           onClose={() => setModal(null)}
           onSubmit={handleSubmit}
         />

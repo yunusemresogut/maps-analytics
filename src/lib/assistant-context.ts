@@ -11,6 +11,7 @@ import type {
   Ticket,
 } from "@/types";
 import { materialLineTotal } from "@/lib/material-totals";
+import { DEFAULT_CURRENCY, moneyEntries, roundMoney, type CurrencyCode, type MoneyTotals } from "@/lib/currency";
 
 const STATUS_LABELS: Record<string, string> = {
   proje: "Proje",
@@ -86,8 +87,15 @@ export function pickDetailStores(
   ].slice(0, MAX_DETAIL_STORES);
 }
 
-function money(value: number): string {
-  return `${Math.round(value).toLocaleString("tr-TR")} TRY`;
+/** Örn. "1.250,75 USD"; tutarlar kendi para birimindedir, kur çevrimi yok */
+function money(value: number, currency: CurrencyCode): string {
+  return `${roundMoney(value).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ${currency}`;
+}
+
+function moneyTotals(totals: MoneyTotals): string {
+  const entries = moneyEntries(totals);
+  if (entries.length === 0) return money(0, DEFAULT_CURRENCY);
+  return entries.map(([currency, amount]) => money(amount, currency)).join(" + ");
 }
 
 /**
@@ -113,14 +121,14 @@ export function buildAssistantContext(input: AssistantContextInput): string {
     const parts = [
       `- ${store.name} | ${store.city} | durum: ${STATUS_LABELS[store.projectStatus] ?? store.projectStatus}`,
       store.openingDate ? `açılış: ${store.openingDate}${alert ? ` (${alert.label})` : ""}` : null,
-      store.totalBudget ? `bütçe: ${money(store.totalBudget)}` : null,
+      store.totalBudget ? `bütçe: ${money(store.totalBudget, store.budgetCurrency)}` : null,
       store.contractorCompany ? `yüklenici: ${store.contractorCompany}` : null,
       store.siteManager ? `şantiye şefi: ${store.siteManager}` : null,
       workPlanCount > 0
         ? `iş planı: ${workPlanCount} kalem, ort. %${summary?.workPlanAvgProgress ?? 0}`
         : null,
       materialCount > 0
-        ? `keşif: ${materialCount} kalem, ${money(summary?.materialTotal ?? 0)}`
+        ? `keşif: ${materialCount} kalem, ${moneyTotals(summary?.materialTotals ?? {})}`
         : null,
     ];
     lines.push(parts.filter(Boolean).join(" | "));
@@ -135,7 +143,7 @@ export function buildAssistantContext(input: AssistantContextInput): string {
   lines.push("", `## Sözleşmeler (${input.contracts.length})`);
   for (const contract of input.contracts.slice(0, 100)) {
     lines.push(
-      `- ${contract.code ?? contract.title} | ${storeName(contract.storeId)} | ${contract.partyName} | ${money(contract.amount)} | ${contract.status}`
+      `- ${contract.code ?? contract.title} | ${storeName(contract.storeId)} | ${contract.partyName} | ${money(contract.amount, contract.currency)} | ${contract.status}`
     );
   }
 
@@ -143,14 +151,14 @@ export function buildAssistantContext(input: AssistantContextInput): string {
   for (const payment of input.progressPayments.slice(0, 100)) {
     const paid = paidAmountForPayment(payment.id, input.invoices);
     lines.push(
-      `- ${payment.title} | ${storeName(payment.storeId)} | dönem: ${payment.periodLabel || "—"} | toplam: ${money(payment.amount)} | ödenen: ${money(paid)} | ${payment.status}`
+      `- ${payment.title} | ${storeName(payment.storeId)} | dönem: ${payment.periodLabel || "—"} | toplam: ${money(payment.amount, payment.currency)} | ödenen: ${moneyTotals(paid)} | ${payment.status}`
     );
   }
 
   lines.push("", `## Faturalar (${input.invoices.length})`);
   for (const invoice of input.invoices.slice(0, 100)) {
     lines.push(
-      `- ${invoice.invoiceNumber} | ${storeName(invoice.storeId)} | tutar: ${money(invoice.amount)} | KDV: ${money(invoice.taxAmount)} | ${invoice.status}${invoice.issuedAt ? ` | ${invoice.issuedAt}` : ""}`
+      `- ${invoice.invoiceNumber} | ${storeName(invoice.storeId)} | tutar: ${money(invoice.amount, invoice.currency)} | KDV: ${money(invoice.taxAmount, invoice.currency)} | ${invoice.status}${invoice.issuedAt ? ` | ${invoice.issuedAt}` : ""}`
     );
   }
 
@@ -175,10 +183,10 @@ export function buildAssistantContext(input: AssistantContextInput): string {
     const workPlanCount = summary?.workPlanCount ?? data.workPlan.length;
     const block: string[] = [`### ${store.name} (${store.city})`];
     if (data.materials.length > 0) {
-      block.push("Keşif (kalem | miktar | birim fiyat | tutar | durum):");
+      block.push("Keşif (poz no | kalem | miktar | birim fiyat | tutar | durum):");
       for (const m of data.materials.slice(0, MAX_ITEMS_PER_STORE)) {
         block.push(
-          `- ${m.name} | ${m.quantity} ${m.unit} | ${money(m.unitPrice)} | ${money(materialLineTotal(m))} | ${MATERIAL_STATUS[m.status] ?? m.status}`
+          `- ${m.pozNo || "—"} | ${m.name} | ${m.quantity} ${m.unit} | ${money(m.unitPrice, m.currency)} | ${money(materialLineTotal(m), m.currency)} | ${MATERIAL_STATUS[m.status] ?? m.status}`
         );
       }
       if (materialCount > data.materials.length) {

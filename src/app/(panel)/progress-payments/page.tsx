@@ -20,7 +20,7 @@ import { mapPayment, useDb } from "@/contexts/db-context";
 import { useI18n, useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerTable } from "@/hooks/use-server-table";
-import { formatTry } from "@/lib/currency";
+import { formatMoney, formatMoneyTotals, parseMoneyTotals, type MoneyTotals } from "@/lib/currency";
 import { formatPaymentPeriod } from "@/lib/module-finance";
 import type { ProgressPayment } from "@/types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
@@ -46,7 +46,14 @@ const COLUMNS: DataTableColumn<SortKey>[] = [
   { key: "actions", label: "" },
 ];
 
-type PaymentRow = ProgressPayment & { storeName: string; contractTitle: string; paid: number; progress: number };
+/** paid: hakedişin kendi birimindeki ödenen (sıralama); paidTotals: tüm birimlerde */
+type PaymentRow = ProgressPayment & {
+  storeName: string;
+  contractTitle: string;
+  paid: number;
+  paidTotals: MoneyTotals;
+  progress: number;
+};
 
 function mapPaymentRow(row: Record<string, unknown>): PaymentRow {
   return {
@@ -54,6 +61,7 @@ function mapPaymentRow(row: Record<string, unknown>): PaymentRow {
     storeName: typeof row.store_name === "string" ? row.store_name : "—",
     contractTitle: typeof row.contract_title === "string" ? row.contract_title : "—",
     paid: Number(row.paid ?? 0),
+    paidTotals: parseMoneyTotals(row.paid_totals),
     progress: Number(row.progress ?? 0),
   };
 }
@@ -141,8 +149,8 @@ function ProgressPaymentsContent() {
               ) : "—"}
             </td>
             <td className="whitespace-nowrap px-4 py-3 text-zinc-400">{formatPaymentPeriod(item.periodLabel, dateLocale)}</td>
-            <td className="whitespace-nowrap px-4 py-3">{formatTry(item.amount)}</td>
-            <td className="whitespace-nowrap px-4 py-3 font-medium text-emerald-300/90">{formatTry(item.paid)}</td>
+            <td className="whitespace-nowrap px-4 py-3">{formatMoney(item.amount, item.currency)}</td>
+            <td className="whitespace-nowrap px-4 py-3 font-medium text-emerald-300/90">{formatMoneyTotals(item.paidTotals, item.currency)}</td>
             <td className="min-w-48 px-4 py-3">
               <div className="flex items-center gap-2">
                 <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-zinc-800">

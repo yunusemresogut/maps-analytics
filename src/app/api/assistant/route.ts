@@ -24,7 +24,7 @@ Kurallar:
 - Sayısal sorularda yalnızca aşağıdaki "Firma verisi" bölümüne dayan; veri yoksa bunu açıkça söyle, uydurma.
 - "Malzeme" ile "keşif kalemi" aynı şeydir; kullanıcı hangisini derse desin keşif verisini kullan.
 - Mağaza ve keşif kalemi adlarını büyük/küçük harf ve ek farklarına (örn. "Yunus Mağaza'sındaki") takılmadan eşleştir.
-- Tutarları TRY olarak, tarihleri gün ay yıl biçiminde yaz.
+- Tutarları verideki kendi para birimiyle (TRY, USD, EUR, GBP, CHF) yaz; kur çevrimi yapma, farklı birimdeki tutarları toplamak yerine birim başına ayrı ver. Tarihleri gün ay yıl biçiminde yaz.
 - Riskleri ve öncelikleri yorumlarken gerekçesini veriyle göster.
 - Uygulamanın nasıl kullanılacağı sorulursa genel yönlendirme yap.`;
 
@@ -42,13 +42,13 @@ Kullanıcı mağaza oluşturmak, ticket (tadilat talebi) açmak, bir mağazanın
 - Kullanıcı birden fazla şey isterse aynı blokta en fazla 5 eylem olabilir.
 
 Eylem şemaları (? işaretli alanlar isteğe bağlı):
-- {"type":"create_store","name":"…","city":"…","address":"… (haritada bulunabilecek açık adres)","openingDate":"YYYY-MM-DD","projectStatus?":"proje|ihale|santiye|acilis|hakedis|fatura","locationType?":"avm|cadde|outdoor","grossM2?":0,"floorCount?":1,"totalBudget?":0,"contractorCompany?":"…","siteManager?":"…","phone?":"…"}
+- {"type":"create_store","name":"…","city":"…","address":"… (haritada bulunabilecek açık adres)","openingDate":"YYYY-MM-DD","projectStatus?":"proje|ihale|santiye|acilis|hakedis|fatura","locationType?":"avm|cadde|outdoor","grossM2?":0,"floorCount?":1,"totalBudget?":0,"budgetCurrency?":"TRY|USD|EUR|GBP|CHF","contractorCompany?":"…","siteManager?":"…","phone?":"…"}
   Zorunlu: name, city, address, openingDate.
 - {"type":"create_ticket","title":"…","description?":"…","priority?":"low|medium|high","storeName?":"…"}
   Zorunlu: title.
 - {"type":"add_work_plan","storeName":"…","items":[{"description":"…","startDate":"YYYY-MM-DD","endDate?":"YYYY-MM-DD","responsible?":"…","status?":"yapilacak|devam_ediyor|tamamlandi","percentComplete?":0}]}
   Zorunlu: storeName, her kalemde description ve startDate.
-- {"type":"add_materials","storeName":"…","items":[{"name":"…","quantity":1,"unit?":"adet","unitPrice?":0}]}
+- {"type":"add_materials","storeName":"…","items":[{"pozNo?":"…","name":"…","quantity":1,"unit?":"adet","unitPrice?":0,"currency?":"TRY|USD|EUR|GBP|CHF"}]}
   Zorunlu: storeName, her kalemde name ve quantity (> 0). Birim fiyat bilinmiyorsa sor ya da 0 bırakıp belirt.`;
 
 function errorResponse(message: string, status: number) {

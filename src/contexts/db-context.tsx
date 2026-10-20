@@ -8,6 +8,7 @@ import { normalizeRole } from "@/lib/roles";
 import { normalizePermissions } from "@/lib/permissions";
 import { fetchAllRows } from "@/lib/supabase-query";
 import { fetchStoreSummaries } from "@/lib/store-details";
+import { normalizeCurrency } from "@/lib/currency";
 import type {
   Organization,
   Store,
@@ -83,6 +84,7 @@ export function mapContract(c: any): Contract {
     startDate: c.start_date || undefined,
     endDate: c.end_date || undefined,
     amount: Number(c.amount || 0),
+    currency: normalizeCurrency(c.currency),
     status: c.status,
     fileUrl: c.file_url || undefined,
     createdBy: c.created_by,
@@ -103,6 +105,7 @@ export function mapPayment(p: any): ProgressPayment {
     title: p.title,
     periodLabel: p.period_label || "",
     amount: Number(p.amount || 0),
+    currency: normalizeCurrency(p.currency),
     status: p.status,
     createdBy: p.created_by,
     createdByName: p.created_by_name,
@@ -122,6 +125,7 @@ export function mapInvoice(i: any): Invoice {
     invoiceNumber: i.invoice_number,
     amount: Number(i.amount || 0),
     taxAmount: Number(i.tax_amount || 0),
+    currency: normalizeCurrency(i.currency),
     status: i.status,
     issuedAt: i.issued_at || undefined,
     createdBy: i.created_by,

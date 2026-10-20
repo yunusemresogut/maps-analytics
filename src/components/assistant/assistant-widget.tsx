@@ -339,7 +339,13 @@ export function AssistantWidget() {
       const rawActions = org.assistant.allowActions ? extractActions(fullText) : null;
       if (rawActions) {
         updateLast((message) => ({ ...message, proposal: { status: "preparing", previews: [] } }));
-        const previews = await buildActionPreviews(rawActions, { user, stores, geocode, isModuleEnabled });
+        const previews = await buildActionPreviews(rawActions, {
+          user,
+          stores,
+          geocode,
+          isModuleEnabled,
+          defaultCurrency: org.defaults.currency,
+        });
         updateLast((message) =>
           message.proposal?.status === "preparing"
             ? { ...message, proposal: { status: "ready", previews } }

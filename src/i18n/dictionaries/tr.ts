@@ -18,6 +18,7 @@ const trDict = {
     progressPayments: "Hakediş",
     invoices: "Faturalar",
     team: "Ekip",
+    reports: "Raporlar",
     profile: "Profil",
     budgets: "Bütçe Takibi",
     users: "Kullanıcılar",

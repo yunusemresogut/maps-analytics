@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity-log";
 import { resolveOrganizationId } from "@/lib/organization";
+import { normalizeCurrency, roundMoney, type CurrencyCode } from "@/lib/currency";
 import type {
   Contract,
   Invoice,
@@ -49,6 +50,7 @@ type ModulesContextValue = {
     startDate?: string;
     endDate?: string;
     amount?: number;
+    currency: CurrencyCode;
     status?: ContractStatus;
     storeId?: string;
     fileUrl?: string;
@@ -59,6 +61,7 @@ type ModulesContextValue = {
     title: string;
     periodLabel?: string;
     amount?: number;
+    currency: CurrencyCode;
     status?: ProgressPaymentStatus;
     storeId?: string;
     contractId?: string;
@@ -72,6 +75,7 @@ type ModulesContextValue = {
     invoiceNumber: string;
     amount?: number;
     taxAmount?: number;
+    currency: CurrencyCode;
     status?: InvoiceStatus;
     issuedAt?: string;
     storeId?: string;
@@ -244,6 +248,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       startDate?: string;
       endDate?: string;
       amount?: number;
+      currency: CurrencyCode;
       status?: ContractStatus;
       storeId?: string;
       fileUrl?: string;
@@ -262,7 +267,8 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
           party_name: data.partyName || "",
           start_date: data.startDate || null,
           end_date: data.endDate || null,
-          amount: data.amount ?? 0,
+          amount: roundMoney(data.amount ?? 0),
+          currency: data.currency,
           status: data.status || "draft",
           file_url: data.fileUrl || null,
           created_by: user.id,
@@ -285,6 +291,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         startDate: inserted.start_date || undefined,
         endDate: inserted.end_date || undefined,
         amount: Number(inserted.amount || 0),
+        currency: normalizeCurrency(inserted.currency),
         status: inserted.status,
         fileUrl: inserted.file_url || undefined,
         createdBy: inserted.created_by,
@@ -318,7 +325,8 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       if (data.partyName !== undefined) db.party_name = data.partyName;
       if (data.startDate !== undefined) db.start_date = data.startDate || null;
       if (data.endDate !== undefined) db.end_date = data.endDate || null;
-      if (data.amount !== undefined) db.amount = data.amount;
+      if (data.amount !== undefined) db.amount = roundMoney(data.amount);
+      if (data.currency !== undefined) db.currency = data.currency;
       if (data.status !== undefined) db.status = data.status;
       if (data.storeId !== undefined) db.store_id = data.storeId || null;
       if (data.fileUrl !== undefined) db.file_url = data.fileUrl || null;
@@ -367,6 +375,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       title: string;
       periodLabel?: string;
       amount?: number;
+      currency: CurrencyCode;
       status?: ProgressPaymentStatus;
       storeId?: string;
       contractId?: string;
@@ -382,7 +391,8 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
           contract_id: data.contractId || null,
           title: data.title,
           period_label: data.periodLabel || "",
-          amount: data.amount ?? 0,
+          amount: roundMoney(data.amount ?? 0),
+          currency: data.currency,
           status: data.status || "draft",
           created_by: user.id,
           created_by_name: user.name,
@@ -402,6 +412,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         title: inserted.title,
         periodLabel: inserted.period_label || "",
         amount: Number(inserted.amount || 0),
+        currency: normalizeCurrency(inserted.currency),
         status: inserted.status,
         createdBy: inserted.created_by,
         createdByName: inserted.created_by_name,
@@ -431,7 +442,8 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       };
       if (data.title !== undefined) db.title = data.title;
       if (data.periodLabel !== undefined) db.period_label = data.periodLabel;
-      if (data.amount !== undefined) db.amount = data.amount;
+      if (data.amount !== undefined) db.amount = roundMoney(data.amount);
+      if (data.currency !== undefined) db.currency = data.currency;
       if (data.status !== undefined) db.status = data.status;
       if (data.storeId !== undefined) db.store_id = data.storeId || null;
       if (data.contractId !== undefined) db.contract_id = data.contractId || null;
@@ -487,6 +499,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       invoiceNumber: string;
       amount?: number;
       taxAmount?: number;
+      currency: CurrencyCode;
       status?: InvoiceStatus;
       issuedAt?: string;
       storeId?: string;
@@ -502,8 +515,9 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
           store_id: data.storeId || null,
           progress_payment_id: data.progressPaymentId || null,
           invoice_number: data.invoiceNumber,
-          amount: data.amount ?? 0,
-          tax_amount: data.taxAmount ?? 0,
+          amount: roundMoney(data.amount ?? 0),
+          currency: data.currency,
+          tax_amount: roundMoney(data.taxAmount ?? 0),
           status: data.status || "draft",
           issued_at: data.issuedAt || null,
           created_by: user.id,
@@ -523,6 +537,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         progressPaymentId: inserted.progress_payment_id || undefined,
         invoiceNumber: inserted.invoice_number,
         amount: Number(inserted.amount || 0),
+        currency: normalizeCurrency(inserted.currency),
         taxAmount: Number(inserted.tax_amount || 0),
         status: inserted.status,
         issuedAt: inserted.issued_at || undefined,
@@ -554,8 +569,9 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       };
       if (data.invoiceNumber !== undefined)
         db.invoice_number = data.invoiceNumber;
-      if (data.amount !== undefined) db.amount = data.amount;
-      if (data.taxAmount !== undefined) db.tax_amount = data.taxAmount;
+      if (data.amount !== undefined) db.amount = roundMoney(data.amount);
+      if (data.currency !== undefined) db.currency = data.currency;
+      if (data.taxAmount !== undefined) db.tax_amount = roundMoney(data.taxAmount);
       if (data.status !== undefined) db.status = data.status;
       if (data.issuedAt !== undefined) db.issued_at = data.issuedAt || null;
       if (data.storeId !== undefined) db.store_id = data.storeId || null;

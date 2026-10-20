@@ -5,7 +5,7 @@ import { AuthGuard } from "@/components/auth/auth-guard";
 import { useAuth } from "@/contexts/auth-context";
 import { useSettings } from "@/contexts/settings-context";
 import { VAT_RATE_OPTIONS } from "@/lib/module-finance";
-import { formatTry } from "@/lib/currency";
+import { CurrencySelect, MoneyInput } from "@/components/ui/money-input";
 import { clearFieldError, hasErrors, validateProfile, type FieldErrors } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,13 +90,14 @@ function DefaultsSection() {
   const { org, updateOrgSettings } = useSettings();
   const { state, run } = useAutoSave();
   const [form, setForm] = useState({
-    storeBudget: String(org.defaults.storeBudget),
+    storeBudget: org.defaults.storeBudget as number | null,
+    currency: org.defaults.currency,
     ticketCodePrefix: org.defaults.ticketCodePrefix,
     contractCodePrefix: org.defaults.contractCodePrefix,
     vatRate: org.defaults.vatRate,
   });
-  const budget = Number(form.storeBudget);
-  const budgetInvalid = !form.storeBudget.trim() || !Number.isFinite(budget) || budget < 0;
+  const budget = form.storeBudget ?? 0;
+  const budgetInvalid = form.storeBudget === null || form.storeBudget < 0;
 
   const save = () => {
     if (budgetInvalid) return;
@@ -104,6 +105,7 @@ function DefaultsSection() {
       updateOrgSettings({
         defaults: {
           storeBudget: budget,
+          currency: form.currency,
           ticketCodePrefix: form.ticketCodePrefix,
           contractCodePrefix: form.contractCodePrefix,
           vatRate: form.vatRate,
@@ -128,16 +130,24 @@ function DefaultsSection() {
     >
       <div className="grid gap-3 p-5 sm:grid-cols-2">
         <FormField
-          label="Yeni mağaza bütçesi (TRY)"
-          error={budgetInvalid ? "Geçerli bir tutar girin." : undefined}
-          hint={budgetInvalid ? undefined : formatTry(budget)}
+          label="Varsayılan para birimi"
+          hint="Yeni bütçe, keşif kalemi, sözleşme, hakediş ve faturada önerilir."
         >
-          <Input
-            type="number"
-            min={0}
+          <CurrencySelect
+            value={form.currency}
+            withLabel
+            onChange={(currency) => setForm((prev) => ({ ...prev, currency }))}
+          />
+        </FormField>
+        <FormField
+          label="Yeni mağaza bütçesi"
+          error={budgetInvalid ? "Geçerli bir tutar girin." : undefined}
+        >
+          <MoneyInput
             value={form.storeBudget}
+            currency={form.currency}
             aria-invalid={budgetInvalid}
-            onChange={(e) => setForm((prev) => ({ ...prev, storeBudget: e.target.value }))}
+            onValueChange={(storeBudget) => setForm((prev) => ({ ...prev, storeBudget }))}
           />
         </FormField>
         <FormField label="Fatura KDV oranı">

@@ -12,6 +12,7 @@ import type {
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
 import { materialLineTotal } from "@/lib/material-totals";
+import { formatMoney, formatMoneyTotals, parseCurrency, sumMoney, type CurrencyCode } from "@/lib/currency";
 
 /**
  * Asistanın önerdiği kayıt ekleme eylemleri.
@@ -87,6 +88,8 @@ type BuildContext = {
   geocode: (query: string) => Promise<GeocodeHit | null>;
   /** Firma ayarlarında kapatılan modüllere kayıt eklenmez */
   isModuleEnabled: (module: string) => boolean;
+  /** Para birimi belirtilmeyen tutarlar için firmanın varsayılanı */
+  defaultCurrency: CurrencyCode;
 };
 
 const ACTION_BLOCK = /```action\s*([\s\S]*?)```/;
@@ -152,10 +155,6 @@ export function formatDate(value: string): string {
   return `${day}.${month}.${year}`;
 }
 
-function money(value: number): string {
-  return `${value.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} TRY`;
-}
-
 /** Mağaza adını firma mağazalarıyla eşleştirir: önce tam, sonra kısmi eşleşme */
 function resolveStore(stores: Store[], rawName: unknown): { store?: Store; error?: string } {
   const name = str(rawName);
@@ -209,6 +208,10 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
   const grossM2 = num(raw.grossM2) ?? 0;
   const floorCount = Math.max(1, Math.round(num(raw.floorCount) ?? 1));
   const totalBudget = num(raw.totalBudget);
+  const budgetCurrency = parseCurrency(raw.budgetCurrency) ?? ctx.defaultCurrency;
+  if (str(raw.budgetCurrency) && !parseCurrency(raw.budgetCurrency)) {
+    warnings.push(`"${str(raw.budgetCurrency)}" para birimi tanınmadı; bütçe ${ctx.defaultCurrency} olarak kaydedilecek.`);
+  }
 
   if (!name) errors.push("Mağaza adı eksik.");
   if (!rawCity) errors.push("Şehir eksik.");
@@ -252,7 +255,7 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
     { label: "Konum tipi", value: LOCATION_LABELS[locationType] },
     { label: "Brüt m²", value: String(grossM2) },
     { label: "Kat", value: String(floorCount) },
-    ...(totalBudget ? [{ label: "Bütçe", value: money(totalBudget) }] : []),
+    ...(totalBudget ? [{ label: "Bütçe", value: formatMoney(totalBudget, budgetCurrency) }] : []),
     ...(str(raw.contractorCompany) ? [{ label: "Yüklenici", value: str(raw.contractorCompany) }] : []),
     ...(str(raw.siteManager) ? [{ label: "Şantiye şefi", value: str(raw.siteManager) }] : []),
     ...(str(raw.phone) ? [{ label: "Telefon", value: str(raw.phone) }] : []),
@@ -284,7 +287,7 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
               grossM2,
               floorCount,
               phone: str(raw.phone) || undefined,
-              ...(totalBudget && totalBudget > 0 ? { totalBudget } : {}),
+              ...(totalBudget && totalBudget > 0 ? { totalBudget, budgetCurrency } : {}),
             },
           }
         : undefined,
@@ -385,34 +388,46 @@ function buildMaterials(raw: Record<string, unknown>, ctx: BuildContext): Action
   const { store, error } = resolveStore(ctx.stores, raw.storeName);
   if (error) errors.push(error);
 
-  const rows: ParsedMaterialRow[] = itemsOf(raw, errors).map((item, index) => {
+  // Birim belirtilmezse keşfin karşılaştırıldığı bütçenin birimi
+  const defaultCurrency = store?.budgetCurrency ?? ctx.defaultCurrency;
+  const rows: (ParsedMaterialRow & { currency: CurrencyCode })[] = itemsOf(raw, errors).map((item, index) => {
     const label = `${index + 1}. kalem`;
     const name = str(item.name);
     const quantity = num(item.quantity);
     const unitPrice = num(item.unitPrice) ?? 0;
+    const currency = parseCurrency(item.currency);
     if (!name) errors.push(`${label}: malzeme adı eksik.`);
     if (quantity === null || quantity <= 0) errors.push(`${label}: miktar eksik ya da geçersiz.`);
     if (unitPrice < 0) errors.push(`${label}: birim fiyat negatif olamaz.`);
-    return { name, quantity: quantity ?? 0, unit: str(item.unit) || "adet", unitPrice };
+    if (str(item.currency) && !currency) errors.push(`${label}: "${str(item.currency)}" para birimi tanınmadı.`);
+    return {
+      pozNo: str(item.pozNo),
+      name,
+      quantity: quantity ?? 0,
+      unit: str(item.unit) || "adet",
+      unitPrice,
+      currency: currency ?? defaultCurrency,
+    };
   });
-  const total = rows.reduce((sum, row) => sum + materialLineTotal(row), 0);
+  const totals = sumMoney(rows, (row) => row.currency, materialLineTotal);
 
   return {
     title: `Keşfe ${rows.length} kalem`,
     fields: [
       { label: "Mağaza", value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" },
-      { label: "Toplam", value: money(total) },
+      { label: "Toplam", value: formatMoneyTotals(totals, defaultCurrency) },
     ],
     table: {
-      columns: ["Malzeme", "Miktar", "Birim fiyat", "Tutar"],
+      columns: ["Poz no", "Malzeme", "Miktar", "Birim fiyat", "Tutar"],
       rows: rows.map((row) => [
+        row.pozNo || "—",
         row.name || "—",
         `${row.quantity.toLocaleString("tr-TR")} ${row.unit}`,
-        money(row.unitPrice),
-        money(materialLineTotal(row)),
+        formatMoney(row.unitPrice, row.currency),
+        formatMoney(materialLineTotal(row), row.currency),
       ]),
     },
-    warnings: rows.some((row) => row.unitPrice === 0) ? ["Birim fiyatı belirtilmeyen kalemler 0 TRY olarak eklenecek."] : [],
+    warnings: rows.some((row) => row.unitPrice === 0) ? ["Birim fiyatı belirtilmeyen kalemler 0 tutarla eklenecek."] : [],
     errors,
     resolved: errors.length === 0 && store ? { type: "add_materials", storeId: store.id, rows } : undefined,
   };

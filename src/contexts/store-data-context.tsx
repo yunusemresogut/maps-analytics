@@ -8,10 +8,12 @@ import {
 } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useDb } from "@/contexts/db-context";
+import { useSettings } from "@/contexts/settings-context";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity-log";
 import { isAllowedFileType } from "@/lib/file-types";
 import { chunk } from "@/lib/supabase-query";
+import { roundMoney } from "@/lib/currency";
 import { fetchStoreSummary, fetchStoreWorkPlan } from "@/lib/store-details";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { ParsedWorkPlanPredecessor, ParsedWorkPlanRow } from "@/lib/excel-work-plan";
@@ -82,10 +84,12 @@ function materialToDb(m: StoreMaterial) {
     id: m.id,
     store_id: m.storeId,
     user_id: m.userId,
+    poz_no: m.pozNo,
     name: m.name,
     quantity: m.quantity,
     unit: m.unit,
-    unit_price: m.unitPrice,
+    unit_price: roundMoney(m.unitPrice),
+    currency: m.currency,
     status: m.status,
     imported_at: m.importedAt,
   };
@@ -128,6 +132,7 @@ async function deleteByIds(table: string, ids: string[]) {
 export function StoreDataProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { storeData: data, setStoreData: setData, setStoreSummary } = useDb();
+  const { org } = useSettings();
   const [detailVersions, setDetailVersions] = useState<Record<string, number>>({});
 
   const getDetailVersion = useCallback(
@@ -387,10 +392,13 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         id: `material-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
         storeId,
         userId: user.id,
+        pozNo: row.pozNo ?? "",
         name: row.name,
         quantity: row.quantity,
         unit: row.unit,
         unitPrice: row.unitPrice,
+        // Dosyada para birimi sütunu yoksa firmanın varsayılan birimi
+        currency: row.currency ?? org.defaults.currency,
         status: "bekleniyor",
         importedAt: now,
       }));
@@ -420,7 +428,7 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
       await refreshDetails(storeId);
       return imported.length;
     },
-    [user, refreshDetails]
+    [user, refreshDetails, org.defaults.currency]
   );
 
   const addMaterial = useCallback(
@@ -447,8 +455,10 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
               p_name: newMaterial.name,
               p_quantity: newMaterial.quantity,
               p_unit: newMaterial.unit,
-              p_unit_price: newMaterial.unitPrice,
+              p_unit_price: roundMoney(newMaterial.unitPrice),
               p_status: newMaterial.status,
+              p_currency: newMaterial.currency,
+              p_poz_no: newMaterial.pozNo,
             })
           : await supabase.from("store_materials").insert(materialToDb(newMaterial));
       if (error) console.error("Error adding material:", error);
@@ -460,10 +470,12 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
   const updateMaterial = useCallback(
     async (storeId: string, materialId: string, updates: Partial<StoreMaterial>) => {
       const dbUpdates: Record<string, unknown> = {};
+      if (updates.pozNo !== undefined) dbUpdates.poz_no = updates.pozNo;
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity;
       if (updates.unit !== undefined) dbUpdates.unit = updates.unit;
-      if (updates.unitPrice !== undefined) dbUpdates.unit_price = updates.unitPrice;
+      if (updates.unitPrice !== undefined) dbUpdates.unit_price = roundMoney(updates.unitPrice);
+      if (updates.currency !== undefined) dbUpdates.currency = updates.currency;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
 
       const { error } = await supabase

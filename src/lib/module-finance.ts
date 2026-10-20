@@ -1,13 +1,14 @@
 import type { Contract, Invoice, ProgressPayment } from "@/types";
 import { format, isValid, parseISO } from "date-fns";
 import type { Locale } from "date-fns";
+import { roundMoney, sumMoney, type MoneyTotals } from "@/lib/currency";
 
 const PERIOD_SEPARATOR = "..";
 export const VAT_RATE_OPTIONS = [0, 1, 10, 20] as const;
 
 /** vatRate yüzde olarak verilir (örn. 20 → %20) */
 export function calculateVat(amount: number, vatRate: number): number {
-  return Math.round(((amount * vatRate) / 100 + Number.EPSILON) * 100) / 100;
+  return roundMoney((amount * vatRate) / 100);
 }
 
 export function inferVatRate(amount: number, taxAmount: number): number {
@@ -46,33 +47,41 @@ export function formatPaymentPeriod(periodLabel: string, locale?: Locale): strin
     : formattedStart;
 }
 
-/** Hakedişe bağlı ödenen tutar (status=paid faturaların toplamı) */
+/** Hakedişe bağlı ödenen tutar (status=paid faturaların KDV dahil toplamı), para birimine göre */
 export function paidAmountForPayment(
   paymentId: string,
   invoices: Invoice[]
-): number {
-  return invoices
-    .filter((i) => i.progressPaymentId === paymentId && i.status === "paid")
-    .reduce((sum, i) => sum + i.amount + i.taxAmount, 0);
+): MoneyTotals {
+  return sumMoney(
+    invoices.filter((i) => i.progressPaymentId === paymentId && i.status === "paid"),
+    (i) => i.currency,
+    (i) => i.amount + i.taxAmount
+  );
 }
 
-/** Sözleşmeye bağlı toplam ödenen tutar */
+/**
+ * Sözleşmeye bağlı ödenen tutar, sözleşmenin para biriminde. Kur çevrimi
+ * olmadığından başka birimdeki faturalar sayılmaz (progress_payments_list ile aynı).
+ */
 export function paidAmountForContract(
-  contractId: string,
+  contract: Contract,
   payments: ProgressPayment[],
   invoices: Invoice[]
 ): number {
-  const paymentIds = payments
-    .filter((p) => p.contractId === contractId)
-    .map((p) => p.id);
-  return invoices
-    .filter(
-      (i) =>
-        i.progressPaymentId &&
-        paymentIds.includes(i.progressPaymentId) &&
-        i.status === "paid"
-    )
-    .reduce((sum, i) => sum + i.amount + i.taxAmount, 0);
+  const paymentIds = new Set(
+    payments.filter((p) => p.contractId === contract.id).map((p) => p.id)
+  );
+  return roundMoney(
+    invoices
+      .filter(
+        (i) =>
+          i.progressPaymentId &&
+          paymentIds.has(i.progressPaymentId) &&
+          i.status === "paid" &&
+          i.currency === contract.currency
+      )
+      .reduce((sum, i) => sum + i.amount + i.taxAmount, 0)
+  );
 }
 
 /** Sözleşme ilerleme yüzdesi (0–100) */
@@ -82,7 +91,7 @@ export function contractProgressPercent(
   invoices: Invoice[]
 ): number {
   if (!contract.amount || contract.amount <= 0) return 0;
-  const paid = paidAmountForContract(contract.id, payments, invoices);
+  const paid = paidAmountForContract(contract, payments, invoices);
   return Math.min(100, Math.round((paid / contract.amount) * 100));
 }
 

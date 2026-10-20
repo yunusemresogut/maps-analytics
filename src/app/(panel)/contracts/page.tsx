@@ -20,7 +20,7 @@ import { mapContract } from "@/contexts/db-context";
 import { useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerTable } from "@/hooks/use-server-table";
-import { formatTry } from "@/lib/currency";
+import { formatMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import type { Contract } from "@/types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
@@ -129,7 +129,7 @@ function ContractsContent() {
             <td className="max-w-[260px] px-4 py-3 font-medium text-zinc-100">{item.title}</td>
             <td className="whitespace-nowrap px-4 py-3">{item.storeName}</td>
             <td className="max-w-[180px] px-4 py-3 text-zinc-400">{item.partyName}</td>
-            <td className="whitespace-nowrap px-4 py-3">{formatTry(item.amount)}</td>
+            <td className="whitespace-nowrap px-4 py-3">{formatMoney(item.amount, item.currency)}</td>
             <td className="px-4 py-3">
               <StatusBadge value={item.status} label={STATUS_TR[item.status] ?? item.status} />
             </td>

@@ -1,4 +1,5 @@
 import { VAT_RATE_OPTIONS } from "@/lib/module-finance";
+import { DEFAULT_CURRENCY, normalizeCurrency, roundMoney, type CurrencyCode } from "@/lib/currency";
 import type { NotificationType } from "@/types";
 
 /**
@@ -67,6 +68,8 @@ export type OrgSettings = {
   modules: Record<ToggleableModule, boolean>;
   defaults: {
     storeBudget: number;
+    /** Yeni kayıtlarda (bütçe, keşif, sözleşme, hakediş, fatura) önerilen para birimi */
+    currency: CurrencyCode;
     ticketCodePrefix: string;
     contractCodePrefix: string;
     vatRate: number;
@@ -104,7 +107,7 @@ export const DEFAULT_ORG_SETTINGS: OrgSettings = {
     contractExpiryDays: 30,
   },
   modules: { tickets: true, contracts: true, progressPayments: true, invoices: true, team: true },
-  defaults: { storeBudget: 1500000, ticketCodePrefix: "TT", contractCodePrefix: "SZ", vatRate: 20 },
+  defaults: { storeBudget: 1500000, currency: DEFAULT_CURRENCY, ticketCodePrefix: "TT", contractCodePrefix: "SZ", vatRate: 20 },
   team: { retentionDays: 3, fileSharing: true },
   assistant: { enabled: true, allowActions: true },
 };
@@ -158,7 +161,8 @@ export function normalizeOrgSettings(raw: unknown): OrgSettings {
       contractExpiryDays: clamp(merged.notifications.contractExpiryDays, 1, 180, d.notifications.contractExpiryDays),
     },
     defaults: {
-      storeBudget: Math.max(0, Number(merged.defaults.storeBudget) || 0),
+      storeBudget: Math.max(0, roundMoney(Number(merged.defaults.storeBudget) || 0)),
+      currency: normalizeCurrency(merged.defaults.currency),
       ticketCodePrefix: cleanPrefix(merged.defaults.ticketCodePrefix, d.defaults.ticketCodePrefix),
       contractCodePrefix: cleanPrefix(merged.defaults.contractCodePrefix, d.defaults.contractCodePrefix),
       vatRate: (VAT_RATE_OPTIONS as readonly number[]).includes(merged.defaults.vatRate)

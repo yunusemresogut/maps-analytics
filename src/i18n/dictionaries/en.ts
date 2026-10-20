@@ -20,6 +20,7 @@ export const en: Dictionary = {
     progressPayments: "Progress Payments",
     invoices: "Invoices",
     team: "Team",
+    reports: "Reports",
     profile: "Profile",
     budgets: "Budget Tracking",
     users: "Users",

@@ -13,7 +13,7 @@ import {
 import { useStores } from "@/contexts/stores-context";
 import { useRegions } from "@/contexts/regions-context";
 import { useDb } from "@/contexts/db-context";
-import { formatTry } from "@/lib/currency";
+import { formatMoneyTotals, mergeMoneyTotals } from "@/lib/currency";
 import { useT } from "@/contexts/i18n-context";
 import { findRegionForCity } from "@/data/regions";
 import { getOpeningAlert } from "@/lib/opening-dates";
@@ -99,12 +99,12 @@ export function UserDashboard() {
     .slice(0, 4);
 
   // Financial calculations
-  const totalSpent = Object.values(storeSummaries).reduce(
-    (total, summary) => total + summary.materialTotal,
-    0
+  // Para birimine göre ayrı toplanır (kur çevrimi yok)
+  const totalSpent = mergeMoneyTotals(
+    ...Object.values(storeSummaries).map((summary) => summary.materialTotals)
   );
 
-  const formattedSpent = formatTry(totalSpent);
+  const formattedSpent = formatMoneyTotals(totalSpent);
 
   return (
     <div className="scrollbar-themed h-[calc(100vh-3.5rem)] overflow-y-auto">

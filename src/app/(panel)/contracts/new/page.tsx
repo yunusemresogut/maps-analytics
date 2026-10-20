@@ -15,6 +15,8 @@ import { nextContractCode } from "@/lib/module-codes";
 import { useSettings } from "@/contexts/settings-context";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { MoneyInput } from "@/components/ui/money-input";
+import type { CurrencyCode } from "@/lib/currency";
 import type { ContractStatus } from "@/types";
 
 function NewContractContent() {
@@ -31,7 +33,8 @@ function NewContractContent() {
   const [code, setCode] = useState("");
   const [codeTouched, setCodeTouched] = useState(false);
   const [partyName, setPartyName] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number | null>(null);
+  const [currency, setCurrency] = useState<CurrencyCode>(org.defaults.currency);
   const [storeId, setStoreId] = useState(searchParams.get("storeId") ?? "");
   const [status, setStatus] = useState<ContractStatus>("active");
   const [saving, setSaving] = useState(false);
@@ -64,7 +67,8 @@ function NewContractContent() {
       title: contractTitle.trim(),
       code: contractCode.trim() || undefined,
       partyName: partyName.trim(),
-      amount: Number(amount) || 0,
+      amount: amount ?? 0,
+      currency,
       storeId: storeId || undefined,
       status,
     });
@@ -143,8 +147,8 @@ function NewContractContent() {
             <Input className="mt-1" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Tutar (TRY)</label>
-            <Input className="mt-1" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <label className="text-xs text-zinc-500">Tutar</label>
+            <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">Mağaza</label>

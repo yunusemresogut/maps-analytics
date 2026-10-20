@@ -14,6 +14,9 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select } from "@/components/ui/select";
+import { MoneyInput } from "@/components/ui/money-input";
+import { useSettings } from "@/contexts/settings-context";
+import type { CurrencyCode } from "@/lib/currency";
 import { encodePaymentPeriod } from "@/lib/module-finance";
 import type { ProgressPaymentStatus } from "@/types";
 
@@ -30,11 +33,13 @@ function NewPaymentContent() {
   const { contracts } = useDb();
   const { canAdd } = usePermissions("progressPayments");
   const { user } = useAuth();
+  const { org } = useSettings();
 
   const [title, setTitle] = useState("");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number | null>(null);
+  const [currency, setCurrency] = useState<CurrencyCode>(org.defaults.currency);
   const [contractId, setContractId] = useState("");
   const [storeId, setStoreId] = useState("");
   const [status, setStatus] = useState<ProgressPaymentStatus>("draft");
@@ -51,6 +56,8 @@ function NewPaymentContent() {
     const c = contracts.find((x) => x.id === id);
     setContractId(id);
     setStoreId(c?.storeId ?? "");
+    // Hakediş varsayılan olarak sözleşmenin para biriminde
+    if (c) setCurrency(c.currency);
   };
 
   const save = async () => {
@@ -68,7 +75,8 @@ function NewPaymentContent() {
     const id = await createPayment({
       title: title.trim(),
       periodLabel: encodePaymentPeriod(periodStart, periodEnd),
-      amount: Number(amount) || 0,
+      amount: amount ?? 0,
+      currency,
       contractId,
       storeId: storeId || undefined,
       status,
@@ -131,8 +139,8 @@ function NewPaymentContent() {
             <DatePicker className="mt-1" value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Toplam hakediş (TRY)</label>
-            <Input className="mt-1" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <label className="text-xs text-zinc-500">Toplam hakediş</label>
+            <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">Durum</label>

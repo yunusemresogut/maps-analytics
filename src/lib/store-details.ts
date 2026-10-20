@@ -6,6 +6,7 @@ import {
   searchFilter,
   type ListFilterValue,
 } from "@/lib/supabase-query";
+import { normalizeCurrency, parseMoneyTotals } from "@/lib/currency";
 import type {
   StoreDetailSummary,
   StoreMaterial,
@@ -16,7 +17,7 @@ import type {
 
 /** Malzeme listesi: durum etiketiyle aranabilen view */
 export const MATERIALS_SOURCE = "store_materials_list";
-export const MATERIAL_SEARCH_COLUMNS = ["name", "unit", "status_label"];
+export const MATERIAL_SEARCH_COLUMNS = ["poz_no", "name", "unit", "status_label"];
 
 /** İş planı listesi: durum etiketiyle aranabilen view */
 export const WORK_PLAN_SOURCE = "store_work_plan_list";
@@ -30,7 +31,7 @@ export const WORK_PLAN_SEARCH_COLUMNS = [
 
 export const EMPTY_SUMMARY: StoreDetailSummary = {
   materialCount: 0,
-  materialTotal: 0,
+  materialTotals: {},
   workPlanCount: 0,
   workPlanAvgProgress: null,
 };
@@ -40,10 +41,12 @@ export function mapMaterialFromDb(m: Record<string, unknown>): StoreMaterial {
     id: String(m.id),
     storeId: String(m.store_id),
     userId: String(m.user_id ?? ""),
+    pozNo: String(m.poz_no ?? ""),
     name: String(m.name ?? ""),
     quantity: Number(m.quantity || 0),
     unit: String(m.unit ?? ""),
     unitPrice: Number(m.unit_price || 0),
+    currency: normalizeCurrency(m.currency),
     status: m.status as StoreMaterial["status"],
     importedAt: String(m.imported_at ?? ""),
     seq: m.seq === null || m.seq === undefined ? undefined : Number(m.seq),
@@ -97,7 +100,7 @@ export function mapWorkPlanFromDb(w: Record<string, unknown>): StoreWorkPlanItem
 export function mapSummaryFromDb(row: Record<string, unknown>): StoreDetailSummary {
   return {
     materialCount: Number(row.material_count ?? 0),
-    materialTotal: Number(row.material_total ?? 0),
+    materialTotals: parseMoneyTotals(row.material_totals),
     workPlanCount: Number(row.work_plan_count ?? 0),
     workPlanAvgProgress:
       row.work_plan_avg_progress == null ? null : Number(row.work_plan_avg_progress),

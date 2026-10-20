@@ -1,3 +1,5 @@
+import type { CurrencyCode, MoneyTotals } from "@/lib/currency";
+
 /** Proje / pin durumları */
 export type ProjectStatus =
   | "proje"
@@ -63,6 +65,7 @@ export type AppRouteKey =
   | "progressPayments"
   | "invoices"
   | "team"
+  | "reports"
   | "profile"
   | "settings"
   | "adminSettings"
@@ -151,15 +154,17 @@ export type Store = {
   phone?: string;
   isCustom?: boolean;
   totalBudget: number;
+  budgetCurrency: CurrencyCode;
   approvals: ProjectApprovals;
 } & AuditInfo;
 
 /** Audit alanları hariç mağaza girdisi — create/update formları için */
 export type StoreInput = Omit<
   Store,
-  "id" | "isCustom" | "totalBudget" | "approvals" | keyof AuditInfo
+  "id" | "isCustom" | "totalBudget" | "budgetCurrency" | "approvals" | keyof AuditInfo
 > & {
   totalBudget?: number;
+  budgetCurrency?: CurrencyCode;
   approvals?: ProjectApprovals;
   organizationId?: string;
 };
@@ -204,10 +209,13 @@ export type StoreMaterial = {
   id: string;
   storeId: string;
   userId: string;
+  /** Birim fiyat poz numarası (örn. 15.150.1005); boş olabilir */
+  pozNo: string;
   name: string;
   quantity: number;
   unit: string;
   unitPrice: number;
+  currency: CurrencyCode;
   status: MaterialStatus;
   importedAt: string;
   /** Listedeki sıra (eklenme sırası; araya eklemede kaydırılır) */
@@ -253,8 +261,8 @@ export type StoreUserData = {
 /** Mağazanın malzeme ve iş planı özeti (store_detail_summary view'ı) */
 export type StoreDetailSummary = {
   materialCount: number;
-  /** Miktar × birim fiyat toplamı */
-  materialTotal: number;
+  /** Miktar × birim fiyat toplamı, para birimine göre */
+  materialTotals: MoneyTotals;
   workPlanCount: number;
   /** İş kalemlerinin ortalama ilerleme yüzdesi; kalem yoksa null */
   workPlanAvgProgress: number | null;
@@ -302,6 +310,7 @@ export type Contract = {
   startDate?: string;
   endDate?: string;
   amount: number;
+  currency: CurrencyCode;
   status: ContractStatus;
   fileUrl?: string;
 } & AuditInfo;
@@ -320,6 +329,7 @@ export type ProgressPayment = {
   title: string;
   periodLabel: string;
   amount: number;
+  currency: CurrencyCode;
   status: ProgressPaymentStatus;
 } & AuditInfo;
 
@@ -333,6 +343,7 @@ export type Invoice = {
   invoiceNumber: string;
   amount: number;
   taxAmount: number;
+  currency: CurrencyCode;
   status: InvoiceStatus;
   issuedAt?: string;
 } & AuditInfo;

@@ -341,6 +341,9 @@ export function routeToModule(route: AppRouteKey): AppModuleKey | null | "admin"
     case "progressPayments":
     case "invoices":
       return route;
+    // Raporlar mağaza verisinden hazırlanır
+    case "reports":
+      return "stores";
     case "adminUsers":
     case "adminRegions":
     case "adminPermissions":

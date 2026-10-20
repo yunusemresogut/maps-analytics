@@ -155,6 +155,15 @@ export function useServerTable<Row, K extends string>(options: {
     [initialKey, initialDirection, setUserSort, setPage]
   );
 
+  /** Sıralamayı doğrudan ayarlar (açılır listeden seçim gibi) */
+  const setSort = useCallback(
+    (next: SortState<K>) => {
+      setUserSort(next);
+      setPage(1);
+    },
+    [setUserSort, setPage]
+  );
+
   const setPageSize = useCallback((size: number) => {
     setPageSizeState(size);
     setPage(1);
@@ -168,6 +177,7 @@ export function useServerTable<Row, K extends string>(options: {
   return {
     sort,
     toggleSort,
+    setSort,
     page: currentPage,
     setPage,
     pageSize,

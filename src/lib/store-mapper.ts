@@ -1,4 +1,5 @@
 import type { ProjectApprovals, Store } from "@/types";
+import { normalizeCurrency } from "@/lib/currency";
 import { emptyApprovals } from "@/types";
 
 export function mapApprovalsFromDb(row: Record<string, unknown>): ProjectApprovals {
@@ -65,6 +66,7 @@ export function mapStoreFromDb(s: Record<string, any>): Store {
     phone: s.phone,
     isCustom: s.is_custom,
     totalBudget: Number(s.total_budget || 0),
+    budgetCurrency: normalizeCurrency(s.budget_currency),
     approvals: mapApprovalsFromDb(s),
     createdBy: s.created_by,
     createdByName: s.created_by_name,

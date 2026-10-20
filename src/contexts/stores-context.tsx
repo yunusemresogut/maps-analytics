@@ -9,16 +9,20 @@ import { approvalsToDb } from "@/lib/store-mapper";
 import { emptyApprovals } from "@/types";
 import type { ProjectApprovals, Store, StoreInput } from "@/types";
 import { useSettings } from "@/contexts/settings-context";
+import { formatMoney } from "@/lib/currency";
 
 function describeStoreUpdate(
   prev: Store,
   data: Partial<Store>
 ): { category: "store" | "approval" | "budget"; action: string; message: string } {
-  if (data.totalBudget !== undefined && data.totalBudget !== prev.totalBudget) {
+  const budgetChanged = data.totalBudget !== undefined && data.totalBudget !== prev.totalBudget;
+  const currencyChanged = data.budgetCurrency !== undefined && data.budgetCurrency !== prev.budgetCurrency;
+  if (budgetChanged || currencyChanged) {
+    const amount = formatMoney(data.totalBudget ?? prev.totalBudget, data.budgetCurrency ?? prev.budgetCurrency);
     return {
       category: "budget",
       action: "update",
-      message: `Bütçe güncellendi: ${prev.name} → ${data.totalBudget}`,
+      message: `Bütçe güncellendi: ${prev.name} → ${amount}`,
     };
   }
 
@@ -99,6 +103,7 @@ function buildStoreDbUpdates(
   if (data.floorCount !== undefined) dbUpdates.floor_count = data.floorCount;
   if (data.phone !== undefined) dbUpdates.phone = data.phone || null;
   if (data.totalBudget !== undefined) dbUpdates.total_budget = data.totalBudget;
+  if (data.budgetCurrency !== undefined) dbUpdates.budget_currency = data.budgetCurrency;
   if (data.organizationId !== undefined)
     dbUpdates.organization_id = data.organizationId || null;
   if (data.approvals !== undefined) {
@@ -143,6 +148,7 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
       const store: Store = {
         totalBudget: org.defaults.storeBudget,
         ...data,
+        budgetCurrency: data.budgetCurrency ?? org.defaults.currency,
         id: `custom-${Date.now()}`,
         isCustom: true,
         organizationId: data.organizationId ?? user?.organizationId,
@@ -179,6 +185,7 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
           phone: store.phone,
           is_custom: store.isCustom,
           total_budget: store.totalBudget,
+          budget_currency: store.budgetCurrency,
           created_by: store.createdBy,
           created_by_name: store.createdByName,
           created_at: store.createdAt,
@@ -199,7 +206,7 @@ export function StoresProvider({ children }: { children: React.ReactNode }) {
       });
       return store;
     },
-    [stores, setStores, user?.organizationId, org.defaults.storeBudget]
+    [stores, setStores, user?.organizationId, org.defaults.storeBudget, org.defaults.currency]
   );
 
   const updateStore = useCallback(
