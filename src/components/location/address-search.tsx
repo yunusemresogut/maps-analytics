@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { useT } from "@/contexts/i18n-context";
 import { searchAddresses, type GeocodeResult } from "@/lib/geocode";
 
@@ -49,8 +48,7 @@ export function AddressSearch({
 
   return (
     <div className="relative">
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
-      <Input
+      <SearchInput
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -63,7 +61,6 @@ export function AddressSearch({
         }}
         placeholder={placeholder ?? t("geocode.searchPlaceholder")}
         aria-label="Adres ara"
-        className="pl-9"
       />
       {canSearch && (
         <ul className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-950 shadow-(--panel-shadow)">

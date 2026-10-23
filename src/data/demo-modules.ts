@@ -116,7 +116,7 @@ export const DEMO_TICKETS: DemoTicket[] = [
     priority: "high",
     status: "in_progress",
     assignee: "Satınalma",
-    createdBy: "Mağaza Müdürü",
+    createdBy: "Saha Sorumlusu",
     createdAt: "2026-04-07",
     dueDate: "2026-04-11",
   },

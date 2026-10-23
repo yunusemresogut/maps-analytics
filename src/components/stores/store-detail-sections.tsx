@@ -75,7 +75,7 @@ function SpecialNoteEditor({
     <div className="space-y-2">
       <Textarea
         className="min-h-30 resize-y"
-        placeholder="Bu mağaza için kendinize not alın…"
+        placeholder="Bu saha için kendinize not alın…"
         value={draft}
         onChange={(e) => {
           setDraft(e.target.value);

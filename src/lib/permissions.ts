@@ -35,7 +35,7 @@ export const MODULE_KEYS: AppModuleKey[] = [...CORE_MODULE_KEYS, "inventory"];
 
 export const MODULE_LABELS: Record<AppModuleKey, string> = {
   map: "Harita",
-  stores: "Mağazalar",
+  stores: "Sahalar",
   projects: "Projeler",
   approvals: "Onaylar",
   tickets: "Ticket",

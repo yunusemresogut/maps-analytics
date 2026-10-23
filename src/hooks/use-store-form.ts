@@ -8,6 +8,7 @@ import {
   type StoreFormData,
 } from "@/components/map/store-form-fields";
 import { useStoreLocation } from "@/hooks/use-store-location";
+import { useLocationTypes } from "@/hooks/use-location-types";
 import { canonicalProvince } from "@/data/regions";
 import { hasErrors, validateStoreForm, type FieldErrors } from "@/lib/validation";
 import type { Store, StoreInput } from "@/types";
@@ -17,7 +18,10 @@ import type { Store, StoreInput } from "@/types";
  * Kayıt verisi her zaman konumdan üretilir; il ve adres formda serbest değildir.
  */
 export function useStoreForm(store?: Store) {
-  const [form, setForm] = useState<StoreFormData>(() => (store ? storeToForm(store) : emptyStoreForm()));
+  const { types: locationTypes } = useLocationTypes();
+  const [form, setForm] = useState<StoreFormData>(() =>
+    store ? storeToForm(store) : emptyStoreForm(locationTypes[0]?.key ?? "")
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
   const location = useStoreLocation(
     store

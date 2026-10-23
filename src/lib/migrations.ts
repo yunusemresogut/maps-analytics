@@ -9,6 +9,7 @@ import {
 import { normalizeCustomRoles, normalizeRole } from "@/lib/roles";
 import { ensureApprovals } from "@/lib/store-mapper";
 import { normalizeCurrency } from "@/lib/currency";
+import { normalizeLocationTypes } from "@/lib/location-types";
 
 export function migrateStore(raw: Record<string, unknown>): Store {
   const createdAt =
@@ -27,7 +28,7 @@ export function migrateStore(raw: Record<string, unknown>): Store {
     acceptanceDate: raw.acceptanceDate as string | undefined,
     contractorCompany: raw.contractorCompany as string | undefined,
     siteManager: raw.siteManager as string | undefined,
-    locationType: (raw.locationType as Store["locationType"]) ?? "avm",
+    locationType: (raw.locationType as Store["locationType"]) ?? "magaza",
     grossM2: (raw.grossM2 as number) ?? 0,
     floorCount: (raw.floorCount as number) ?? 1,
     phone: raw.phone as string | undefined,
@@ -80,6 +81,7 @@ export function mapOrganizationFromDb(row: Record<string, any>): Organization {
     ),
     roleLabels: (row.role_labels as Organization["roleLabels"]) || undefined,
     customRoles: normalizeCustomRoles(row.custom_roles),
+    locationTypes: normalizeLocationTypes(row.location_types),
     settings: row.settings && typeof row.settings === "object" ? row.settings : {},
   };
 }

@@ -1,7 +1,7 @@
 import { canModule } from "@/lib/permissions";
 import { canonicalProvince } from "@/data/regions";
 import type {
-  LocationType,
+  LocationTypeOption,
   ProjectStatus,
   Store,
   StoreInput,
@@ -13,6 +13,7 @@ import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
 import { materialLineTotal } from "@/lib/material-totals";
 import { formatMoney, formatMoneyTotals, parseCurrency, sumMoney, type CurrencyCode } from "@/lib/currency";
+import { matchLocationType } from "@/lib/location-types";
 
 /**
  * Asistanın önerdiği kayıt ekleme eylemleri.
@@ -32,7 +33,6 @@ const PROJECT_STATUSES: ProjectStatus[] = [
   "fatura",
   "yakinda_aciliyor",
 ];
-const LOCATION_TYPES: LocationType[] = ["avm", "cadde", "outdoor"];
 const PRIORITIES: TicketPriority[] = ["low", "medium", "high"];
 const WORK_PLAN_STATUSES: WorkPlanStatus[] = ["yapilacak", "devam_ediyor", "tamamlandi"];
 
@@ -45,7 +45,6 @@ const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   fatura: "Fatura",
   yakinda_aciliyor: "Yakında Açılıyor",
 };
-const LOCATION_LABELS: Record<LocationType, string> = { avm: "AVM", cadde: "Cadde", outdoor: "Outdoor" };
 const PRIORITY_LABELS: Record<TicketPriority, string> = { low: "Düşük", medium: "Orta", high: "Yüksek" };
 const WORK_PLAN_STATUS_LABELS: Record<WorkPlanStatus, string> = {
   yapilacak: "Yapılacak",
@@ -90,6 +89,8 @@ type BuildContext = {
   isModuleEnabled: (module: string) => boolean;
   /** Para birimi belirtilmeyen tutarlar için firmanın varsayılanı */
   defaultCurrency: CurrencyCode;
+  /** Firmanın saha türleri */
+  locationTypes: LocationTypeOption[];
 };
 
 const ACTION_BLOCK = /```action\s*([\s\S]*?)```/;
@@ -158,7 +159,7 @@ export function formatDate(value: string): string {
 /** Mağaza adını firma mağazalarıyla eşleştirir: önce tam, sonra kısmi eşleşme */
 function resolveStore(stores: Store[], rawName: unknown): { store?: Store; error?: string } {
   const name = str(rawName);
-  if (!name) return { error: "Mağaza belirtilmemiş." };
+  if (!name) return { error: "Saha belirtilmemiş." };
   const target = normalizeName(name);
   const exact = stores.filter((store) => normalizeName(store.name) === target);
   if (exact.length === 1) return { store: exact[0] };
@@ -171,13 +172,13 @@ function resolveStore(stores: Store[], rawName: unknown): { store?: Store; error
   if (partial.length === 1) return { store: partial[0] };
   if (partial.length > 1) {
     return {
-      error: `"${name}" birden fazla mağazayla eşleşiyor: ${partial
+      error: `"${name}" birden fazla sahayla eşleşiyor: ${partial
         .slice(0, 5)
         .map((store) => `${store.name} (${store.city})`)
         .join(", ")}. Hangisi olduğunu belirtin.`,
     };
   }
-  return { error: `"${name}" adında bir mağaza bulunamadı.` };
+  return { error: `"${name}" adında bir saha bulunamadı.` };
 }
 
 function itemsOf(raw: Record<string, unknown>, errors: string[]): Record<string, unknown>[] {
@@ -192,7 +193,7 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
   const errors: string[] = [];
   const warnings: string[] = [];
   if (!canModule(ctx.user, "map", "add") && !canModule(ctx.user, "stores", "add")) {
-    errors.push("Mağaza ekleme yetkiniz yok.");
+    errors.push("Saha ekleme yetkiniz yok.");
   }
 
   const name = str(raw.name);
@@ -204,7 +205,11 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
   const openingDate = str(raw.openingDate);
   const acceptanceDate = str(raw.acceptanceDate);
   const projectStatus = pick(raw.projectStatus, PROJECT_STATUSES, "proje");
-  const locationType = pick(raw.locationType, LOCATION_TYPES, "avm");
+  const locationType =
+    matchLocationType(str(raw.locationType), ctx.locationTypes) ?? ctx.locationTypes[0] ?? { key: "", label: "—" };
+  if (str(raw.locationType) && !matchLocationType(str(raw.locationType), ctx.locationTypes)) {
+    warnings.push(`"${str(raw.locationType)}" saha türü tanınmadı; ${locationType.label} olarak kaydedilecek.`);
+  }
   const grossM2 = num(raw.grossM2) ?? 0;
   const floorCount = Math.max(1, Math.round(num(raw.floorCount) ?? 1));
   const totalBudget = num(raw.totalBudget);
@@ -213,14 +218,14 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
     warnings.push(`"${str(raw.budgetCurrency)}" para birimi tanınmadı; bütçe ${ctx.defaultCurrency} olarak kaydedilecek.`);
   }
 
-  if (!name) errors.push("Mağaza adı eksik.");
+  if (!name) errors.push("Saha adı eksik.");
   if (!rawCity) errors.push("Şehir eksik.");
   if (address.length < 5) errors.push("Adres eksik ya da çok kısa.");
   if (!isIsoDate(openingDate)) errors.push("Açılış tarihi eksik ya da geçersiz.");
   if (acceptanceDate && !isIsoDate(acceptanceDate)) warnings.push("Kabul tarihi geçersiz olduğu için eklenmeyecek.");
   if (grossM2 < 0) errors.push("Brüt m² negatif olamaz.");
   if (name && ctx.stores.some((store) => normalizeName(store.name) === normalizeName(name))) {
-    warnings.push(`"${name}" adında bir mağaza zaten var; yine de yeni kayıt oluşturulacak.`);
+    warnings.push(`"${name}" adında bir saha zaten var; yine de yeni kayıt oluşturulacak.`);
   }
 
   // Adres başka bir ilde bulunduysa pin ile yazılan il çelişir
@@ -252,7 +257,7 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
     { label: "Adres", value: address || "—" },
     { label: "Durum", value: PROJECT_STATUS_LABELS[projectStatus] },
     { label: "Açılış", value: openingDate ? formatDate(openingDate) : "—" },
-    { label: "Konum tipi", value: LOCATION_LABELS[locationType] },
+    { label: "Saha türü", value: locationType.label },
     { label: "Brüt m²", value: String(grossM2) },
     { label: "Kat", value: String(floorCount) },
     ...(totalBudget ? [{ label: "Bütçe", value: formatMoney(totalBudget, budgetCurrency) }] : []),
@@ -262,7 +267,7 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
   ];
 
   return {
-    title: "Yeni mağaza",
+    title: "Yeni saha",
     fields,
     warnings,
     errors,
@@ -283,7 +288,7 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
               acceptanceDate: acceptanceDate && isIsoDate(acceptanceDate) ? acceptanceDate : undefined,
               contractorCompany: str(raw.contractorCompany) || undefined,
               siteManager: str(raw.siteManager) || undefined,
-              locationType,
+              locationType: locationType.key,
               grossM2,
               floorCount,
               phone: str(raw.phone) || undefined,
@@ -314,7 +319,7 @@ function buildTicket(raw: Record<string, unknown>, ctx: BuildContext): ActionPre
     title: "Yeni ticket",
     fields: [
       { label: "Başlık", value: title || "—" },
-      { label: "Mağaza", value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" },
+      { label: "Saha", value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" },
       { label: "Öncelik", value: PRIORITY_LABELS[priority] },
       { label: "Açıklama", value: description || "—" },
     ],
@@ -363,7 +368,7 @@ function buildWorkPlan(raw: Record<string, unknown>, ctx: BuildContext): ActionP
 
   return {
     title: `İş planına ${rows.length} kalem`,
-    fields: [{ label: "Mağaza", value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" }],
+    fields: [{ label: "Saha", value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" }],
     table: {
       columns: ["İş", "Başlangıç", "Bitiş", "Sorumlu", "Durum"],
       rows: rows.map((row) => [
@@ -414,7 +419,7 @@ function buildMaterials(raw: Record<string, unknown>, ctx: BuildContext): Action
   return {
     title: `Keşfe ${rows.length} kalem`,
     fields: [
-      { label: "Mağaza", value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" },
+      { label: "Saha", value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" },
       { label: "Toplam", value: formatMoneyTotals(totals, defaultCurrency) },
     ],
     table: {

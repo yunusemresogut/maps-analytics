@@ -44,7 +44,7 @@ export function ContractIhaleWarning({
             {store.name} — ihale durumunda sözleşme gerekli
           </p>
           <p className="mt-0.5 text-xs text-amber-200/80">
-            Bu mağaza için sözleşme oluşturulduğunda uyarı kalkar.
+            Bu saha için sözleşme oluşturulduğunda uyarı kalkar.
           </p>
         </div>
       </div>

@@ -12,7 +12,7 @@ import {
   TablePagination,
   type DataTableColumn,
 } from "@/components/modules/module-table";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useModules } from "@/contexts/modules-context";
@@ -35,7 +35,7 @@ type SortKey = "invoiceNumber" | "storeName" | "paymentTitle" | "amount" | "tota
 
 const COLUMNS: DataTableColumn<SortKey>[] = [
   { key: "invoiceNumber", label: "Fatura No" },
-  { key: "storeName", label: "Mağaza" },
+  { key: "storeName", label: "Saha" },
   { key: "paymentTitle", label: "Hakediş" },
   { key: "amount", label: "Tutar" },
   { key: "total", label: "Toplam" },
@@ -110,7 +110,7 @@ function InvoicesContent() {
       }
       toolbar={
         <>
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Fatura no, mağaza…" className="h-10 max-w-sm border-zinc-700/80 bg-zinc-900/80" />
+          <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Fatura no, saha…" aria-label="Faturalarda ara" containerClassName="w-full max-w-sm" className="h-10" />
           <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-auto min-w-[160px]">
             <option value="all">Tüm durumlar</option>
             {Object.entries(STATUS_TR).map(([k, v]) => (

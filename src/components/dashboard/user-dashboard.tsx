@@ -22,15 +22,11 @@ import {
   projectStatusConfig,
 } from "@/lib/project-status";
 import type { ProjectStatus } from "@/types";
-
-const LOCATION_TYPE_LABELS: Record<string, string> = {
-  avm: "AVM",
-  cadde: "Cadde",
-  outdoor: "Açık Alan / Outdoor",
-};
+import { useLocationTypes } from "@/hooks/use-location-types";
 
 export function UserDashboard() {
   const { stores } = useStores();
+  const { types: locationTypes, label: locationTypeLabel } = useLocationTypes();
   const { regions } = useRegions();
   const { storeSummaries } = useDb();
   const t = useT();
@@ -55,7 +51,7 @@ export function UserDashboard() {
     {} as Record<string, number>
   );
 
-  // Location Type distributions
+  // Saha türü dağılımı: firmanın türleri + listede olmayan kayıtlı türler
   const locationCounts = stores.reduce(
     (acc, s) => {
       acc[s.locationType] = (acc[s.locationType] ?? 0) + 1;
@@ -317,10 +313,11 @@ export function UserDashboard() {
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
           <h2 className="text-sm font-medium text-zinc-300 flex items-center gap-2 mb-4">
             <Store className="h-4 w-4 text-amber-400" />
-            Lokasyon Tipine Göre Dağılım
+            Saha Türüne Göre Dağılım
           </h2>
           <div className="grid gap-4 sm:grid-cols-3">
-            {Object.entries(LOCATION_TYPE_LABELS).map(([type, label]) => {
+            {[...new Set([...locationTypes.map((type) => type.key), ...Object.keys(locationCounts)])].map((type) => {
+              const label = locationTypeLabel(type);
               const count = locationCounts[type] ?? 0;
               const pct = stores.length
                 ? Math.round((count / stores.length) * 100)

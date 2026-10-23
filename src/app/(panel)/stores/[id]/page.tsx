@@ -103,7 +103,7 @@ function StorePageContent({ id }: { id: string }) {
         <div className="grid gap-6 lg:grid-cols-[1.35fr_0.85fr] lg:items-start">
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-sm">
             <h2 className="mb-4 text-sm font-medium uppercase tracking-wider text-zinc-500">
-              Mağaza bilgileri
+              Saha bilgileri
             </h2>
             <StoreViewFields store={store} />
             <div className="mt-5 border-t border-zinc-800/80 pt-4">

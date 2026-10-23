@@ -102,7 +102,7 @@ function EditTicketContent({ id }: { id: string }) {
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         {store && (
           <Link href={`/stores/${store.id}`} className="text-sm text-cyan-400 hover:underline">
-            Mağaza: {store.name}
+            Saha: {store.name}
           </Link>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
@@ -126,7 +126,7 @@ function EditTicketContent({ id }: { id: string }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Mağaza</label>
+            <label className="text-xs text-zinc-500">Saha</label>
             <Select className="mt-1" value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={!canEdit}>
               <option value="">Seçiniz</option>
               {stores.map((s) => (

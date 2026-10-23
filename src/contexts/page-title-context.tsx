@@ -37,7 +37,7 @@ export function PageTitleProvider({ children }: { children: React.ReactNode }) {
   return <PageTitleContext.Provider value={setDetail}>{children}</PageTitleContext.Provider>;
 }
 
-/** Detay sayfalarında kayıt adını başlığa ekler: "Kadıköy · Mağazalar | Koordine" */
+/** Detay sayfalarında kayıt adını başlığa ekler: "Kadıköy · Sahalar | Koordine" */
 export function usePageTitle(detail: string | null | undefined) {
   const setDetail = useContext(PageTitleContext);
 

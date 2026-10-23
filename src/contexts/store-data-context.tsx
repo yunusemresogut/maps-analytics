@@ -147,7 +147,7 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
       try {
         setStoreSummary(storeId, await fetchStoreSummary(storeId));
       } catch (err) {
-        console.error("Mağaza özeti güncellenemedi:", err);
+        console.error("Saha özeti güncellenemedi:", err);
       }
     },
     [setStoreSummary]

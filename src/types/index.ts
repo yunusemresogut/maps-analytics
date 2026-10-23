@@ -10,7 +10,10 @@ export type ProjectStatus =
   | "fatura"
   | "yakinda_aciliyor";
 
-export type LocationType = "cadde" | "avm" | "outdoor";
+/** Saha türü anahtarı (organizations.location_types içindeki key) */
+export type LocationType = string;
+
+export type LocationTypeOption = { key: LocationType; label: string };
 
 /** Uygulamayla gelen roller; onay disiplini gibi kurallar bunlara bağlıdır */
 export type BuiltInRole =
@@ -128,6 +131,8 @@ export type Organization = {
   roleLabels?: Partial<Record<UserRole, string>>;
   /** Firmaya özel roller */
   customRoles?: CustomRole[];
+  /** Kurucunun düzenlediği saha türleri; yoksa varsayılanlar kullanılır */
+  locationTypes?: LocationTypeOption[];
   /** Ham firma ayarları; normalizeOrgSettings ile okunur */
   settings?: Record<string, unknown>;
 };

@@ -7,7 +7,7 @@ import { tr } from "date-fns/locale";
 import { ChevronRight, HardHat, Images, Pencil, Eye, Trash2 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { DataTable, TablePagination, type DataTableColumn } from "@/components/modules/module-table";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/contexts/auth-context";
 import { useStores } from "@/contexts/stores-context";
@@ -104,12 +104,13 @@ function ReportHistory() {
           <p className="text-sm text-zinc-500">Kaydedilen raporlar. Raporu yazan kişi ve yöneticiler düzenleyip silebilir.</p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-          <Input
+          <SearchInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Şantiye, şehir, hazırlayan…"
             aria-label="Raporlarda ara"
-            className="h-10 sm:w-64"
+            containerClassName="w-full sm:w-64"
+            className="h-10"
           />
           <Select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="h-10 w-auto min-w-[180px]">
             <option value="all">Tüm şantiyeler</option>

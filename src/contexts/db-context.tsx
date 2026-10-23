@@ -266,7 +266,7 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
         ),
         // Özetler yüklenemezse (örn. migration eksik) uygulamanın geri kalanı açılsın
         fetchStoreSummaries().catch((err) => {
-          console.error("Mağaza özetleri yüklenemedi:", err);
+          console.error("Saha özetleri yüklenemedi:", err);
           return {} as Record<string, StoreDetailSummary>;
         }),
       ]);

@@ -33,6 +33,7 @@ import type { Store } from "@/types";
 import { apiFetch } from "@/lib/api-client";
 import { searchAddresses } from "@/lib/geocode";
 import { useHorizontalDrag } from "@/hooks/use-horizontal-drag";
+import { useLocationTypes } from "@/hooks/use-location-types";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -44,12 +45,12 @@ type ChatMessage = {
 
 const SUGGESTIONS = [
   "Genel durumu özetle",
-  "Önümüzdeki 30 günde açılacak mağazalar hangileri?",
-  "Açılış tarihi geçmiş mağazalar var mı?",
+  "Önümüzdeki 30 günde açılacak sahalar hangileri?",
+  "Açılış tarihi geçmiş sahalar var mı?",
   "Hakediş ve fatura durumunu yorumla",
   "Riskli projeleri ve önerilerini listele",
   "Yeni bir ticket aç",
-  "Bir mağazanın keşfine malzeme ekle",
+  "Bir sahanın keşfine malzeme ekle",
 ];
 
 /** Modelin önceki önerilerin akıbetini bilmesi için geçmişe eklenen not */
@@ -147,7 +148,7 @@ async function loadStoreDetails(stores: Store[]): Promise<Record<string, StoreDe
         ]);
         return [[store.id, { materials, workPlan }] as const];
       } catch (err) {
-        console.error("Asistan için mağaza detayı alınamadı:", err);
+        console.error("Asistan için saha detayı alınamadı:", err);
         return [];
       }
     })
@@ -163,6 +164,7 @@ export function AssistantWidget() {
   const { createTicket } = useModules();
   const { importMaterials, importWorkPlan } = useStoreData();
   const { org, prefs, prefsLoaded, isModuleEnabled } = useSettings();
+  const { types: locationTypes } = useLocationTypes();
   const historyKey = user ? `maps-analytics-assistant:${user.id}` : null;
   const keepHistory = prefs.assistant.keepHistory;
   const [open, setOpen] = useState(false);
@@ -302,6 +304,7 @@ export function AssistantWidget() {
             progressPayments,
             invoices,
             tickets,
+            locationTypes,
           }),
         }),
         signal: controller.signal,
@@ -345,6 +348,7 @@ export function AssistantWidget() {
           geocode,
           isModuleEnabled,
           defaultCurrency: org.defaults.currency,
+          locationTypes,
         });
         updateLast((message) =>
           message.proposal?.status === "preparing"
@@ -378,11 +382,11 @@ export function AssistantWidget() {
     );
 
   const runAction = async (action: ResolvedAction): Promise<ActionResult> => {
-    const storeName = (id: string) => stores.find((store) => store.id === id)?.name ?? "mağaza";
+    const storeName = (id: string) => stores.find((store) => store.id === id)?.name ?? "saha";
     switch (action.type) {
       case "create_store": {
         const store = addStore(action.store, { userId: user.id, userName: user.name });
-        return { ok: true, label: `"${store.name}" mağazası oluşturuldu`, href: `/stores/${store.id}` };
+        return { ok: true, label: `"${store.name}" sahası oluşturuldu`, href: `/stores/${store.id}` };
       }
       case "create_ticket": {
         const id = await createTicket({
@@ -502,7 +506,7 @@ export function AssistantWidget() {
                     Merhaba {user.name.split(" ")[0]}, ne öğrenmek istersiniz?
                   </p>
                   <p className="mt-1 text-sm text-zinc-500">
-                    Mağazalar, açılış takvimi, iş planları ve finans kayıtlarınız hakkında sorun. Mağaza, ticket, iş planı
+                    Sahalar, açılış takvimi, iş planları ve finans kayıtlarınız hakkında sorun. Saha, ticket, iş planı
                     ya da keşif kalemi eklemesini de isteyebilirsiniz; önce önizleme gösterilir, onaylarsanız eklenir.
                   </p>
                 </div>
@@ -643,7 +647,7 @@ export function AssistantWidget() {
           </span>
           <span className="shrink-0 text-sm font-semibold text-zinc-100">Maps&apos;e Sor</span>
           <span className="min-w-0 flex-1 truncate text-sm text-zinc-500">
-            {messages.length > 0 ? "Sohbete devam et" : "Mağazalar, açılışlar, finans…"}
+            {messages.length > 0 ? "Sohbete devam et" : "Sahalar, açılışlar, finans…"}
           </span>
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-brand-on transition-colors group-hover:bg-brand-hover">
             <ArrowUp className="h-4 w-4" />

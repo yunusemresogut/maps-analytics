@@ -5,10 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { format, parseISO, isValid } from "date-fns";
 import { tr } from "date-fns/locale";
-import { CalendarDays, Check, Clock3, HardHat, MapPin, Pencil, Ruler, Search } from "lucide-react";
+import { CalendarDays, Check, Clock3, HardHat, MapPin, Pencil, Ruler } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { TablePagination } from "@/components/modules/module-table";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { useStores } from "@/contexts/stores-context";
 import { useT } from "@/contexts/i18n-context";
@@ -18,7 +18,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { getProjectStatusLabel, projectStatusConfig } from "@/lib/project-status";
 import { getOpeningAlert } from "@/lib/opening-dates";
 import { cn } from "@/lib/utils";
-import { emptyApprovals, type LocationType, type Store } from "@/types";
+import { emptyApprovals, type Store } from "@/types";
+import { useLocationTypes } from "@/hooks/use-location-types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 
 type Tab = "all" | "pending";
@@ -41,8 +42,6 @@ const SORT_COLUMNS: Partial<Record<SortKey, string>> = {
 };
 
 const SEARCH_COLUMNS = ["name", "city", "district", "address", "contractor_company", "site_manager"];
-
-const LOCATION_LABELS: Record<LocationType, string> = { avm: "AVM", cadde: "Cadde", outdoor: "Outdoor" };
 
 const DISCIPLINES = [
   { key: "architectural", labelKey: "approvals.architectural" },
@@ -101,13 +100,14 @@ function DetailItem({
 
 function StoreCard({ store, canEdit }: { store: Store; canEdit: boolean }) {
   const t = useT();
+  const { label: locationTypeLabel } = useLocationTypes();
   const status = projectStatusConfig[store.projectStatus];
   const approvals = store.approvals ?? emptyApprovals();
   const done = DISCIPLINES.filter((d) => approvals[d.key].approved).length;
   const location = [store.district, store.city].filter(Boolean).join(", ");
   const people = [store.contractorCompany, store.siteManager].filter(Boolean).join(" · ");
   const area = [
-    LOCATION_LABELS[store.locationType] ?? store.locationType,
+    locationTypeLabel(store.locationType),
     store.grossM2 > 0 ? `${store.grossM2.toLocaleString("tr-TR")} m²` : null,
     store.floorCount > 1 ? `${store.floorCount} kat` : null,
   ]
@@ -281,16 +281,13 @@ function StoresList() {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 flex-1 sm:max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" aria-hidden />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Mağaza, şehir, yüklenici…"
-            aria-label="Mağazalarda ara"
-            className="pl-9"
-          />
-        </div>
+        <SearchInput
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Saha, şehir, yüklenici…"
+          aria-label="Sahalarda ara"
+          containerClassName="flex-1 sm:max-w-sm"
+        />
         <Select
           value={table.sort.key}
           onChange={(e) => {
@@ -325,7 +322,7 @@ function StoresList() {
         </ul>
       ) : table.totalItems === 0 ? (
         <div className="rounded-xl border border-dashed border-zinc-800 px-4 py-12 text-center text-sm text-zinc-500">
-          {query ? "Aramayla eşleşen mağaza yok." : t("common.noData")}
+          {query ? "Aramayla eşleşen saha yok." : t("common.noData")}
         </div>
       ) : (
         <ul className={cn("flex flex-col gap-3", table.isLoading && "opacity-60")}>

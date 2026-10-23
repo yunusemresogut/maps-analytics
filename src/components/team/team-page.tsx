@@ -20,7 +20,6 @@ import {
   MessageSquare,
   Paperclip,
   Phone,
-  Search,
   Shield,
   Trash2,
   Users,
@@ -42,6 +41,7 @@ import { getRoleLabel } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import type { TeamMessage, User } from "@/types";
 import { useSettings } from "@/contexts/settings-context";
+import { SearchInput } from "@/components/ui/search-input";
 
 function formatFileSize(bytes = 0) {
   if (bytes < 1024) return `${bytes} B`;
@@ -612,16 +612,14 @@ export function TeamPage() {
               </p>
             </div>
           </div>
-          <div className="relative mt-3">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Kişi ara…"
-              aria-label="Kişi ara"
-              className="h-9 w-full rounded-lg border border-zinc-700/80 bg-zinc-900/80 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30"
-            />
-          </div>
+          <SearchInput
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Kişi ara…"
+            aria-label="Kişi ara"
+            containerClassName="mt-3"
+            className="h-9"
+          />
         </div>
 
         <ul className="scrollbar-themed flex-1 overflow-y-auto p-2">

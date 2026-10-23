@@ -22,7 +22,7 @@ export const TOGGLEABLE_MODULES: { key: ToggleableModule; label: string; descrip
 ];
 
 export const NOTIFICATION_MODULES: { key: NotificationModule; label: string }[] = [
-  { key: "stores", label: "Mağaza ve açılışlar" },
+  { key: "stores", label: "Sahalar ve açılışlar" },
   { key: "contracts", label: "Sözleşmeler" },
   { key: "tickets", label: "Tadilat talepleri" },
   { key: "progressPayments", label: "Hakedişler" },
@@ -36,9 +36,9 @@ export const NOTIFICATION_TYPES: {
   label: string;
   description: string;
 }[] = [
-  { type: "opening_soon", module: "stores", label: "Yaklaşan açılış", description: "Açılışına belirlenen gün sayısı kalan mağazalar" },
-  { type: "opening_overdue", module: "stores", label: "Geciken açılış", description: "Açılış tarihi geçtiği hâlde açılmamış mağazalar" },
-  { type: "ihale_contract_reminder", module: "contracts", label: "Sözleşme gerekli", description: "İhale aşamasında sözleşmesi olmayan mağazalar" },
+  { type: "opening_soon", module: "stores", label: "Yaklaşan açılış", description: "Açılışına belirlenen gün sayısı kalan sahalar" },
+  { type: "opening_overdue", module: "stores", label: "Geciken açılış", description: "Açılış tarihi geçtiği hâlde açılmamış sahalar" },
+  { type: "ihale_contract_reminder", module: "contracts", label: "Sözleşme gerekli", description: "İhale aşamasında sözleşmesi olmayan sahalar" },
   { type: "contract_expiring", module: "contracts", label: "Bitmek üzere olan sözleşme", description: "Bitiş tarihi yaklaşan aktif sözleşmeler" },
   { type: "ticket_assigned", module: "tickets", label: "Bana atanan talepler", description: "Size atanmış, açık ya da devam eden talepler" },
   { type: "ticket_high_priority", module: "tickets", label: "Yüksek öncelikli talepler", description: "Açık durumdaki yüksek öncelikli talepler" },
@@ -50,7 +50,7 @@ export const NOTIFICATION_TYPES: {
 export const START_PAGES: { value: string; label: string; routeKey: "dashboard" | "map" | "stores" | "tickets" | "contracts" }[] = [
   { value: "/map", label: "Harita", routeKey: "map" },
   { value: "/dashboard", label: "Dashboard", routeKey: "dashboard" },
-  { value: "/stores", label: "Mağazalar", routeKey: "stores" },
+  { value: "/stores", label: "Sahalar", routeKey: "stores" },
   { value: "/tickets", label: "Tadilat Talepleri", routeKey: "tickets" },
   { value: "/contracts", label: "Sözleşmeler", routeKey: "contracts" },
 ];

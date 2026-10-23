@@ -12,7 +12,7 @@ import {
   TablePagination,
   type DataTableColumn,
 } from "@/components/modules/module-table";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useModules } from "@/contexts/modules-context";
@@ -40,7 +40,7 @@ type SortKey = "code" | "title" | "storeName" | "priority" | "status" | "assigne
 const COLUMNS: DataTableColumn<SortKey>[] = [
   { key: "code", label: "Kod" },
   { key: "title", label: "Başlık" },
-  { key: "storeName", label: "Mağaza" },
+  { key: "storeName", label: "Saha" },
   { key: "priority", label: "Öncelik" },
   { key: "status", label: "Durum" },
   { key: "assignee", label: "Atanan" },
@@ -97,7 +97,7 @@ function TicketsContent() {
   return (
     <ModuleTableShell
       title="Tadilat Talepleri"
-      description="Mağaza tadilat ve bakım talepleri."
+      description="Saha tadilat ve bakım talepleri."
       headerAction={
         canAdd ? (
           <Button size="sm" onClick={() => router.push("/tickets/new")}>
@@ -108,11 +108,13 @@ function TicketsContent() {
       }
       toolbar={
         <>
-          <Input
+          <SearchInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Kod, mağaza, başlık veya atanandan ara…"
-            className="h-10 max-w-sm border-zinc-700/80 bg-zinc-900/80"
+            placeholder="Kod, saha, başlık veya atanandan ara…"
+            aria-label="Ticketlarda ara"
+            containerClassName="w-full max-w-sm"
+            className="h-10"
           />
           <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-auto min-w-[160px]">
             <option value="all">Tüm durumlar</option>

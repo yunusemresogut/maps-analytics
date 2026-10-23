@@ -9,7 +9,6 @@ import {
   Package,
   Pencil,
   Plus,
-  Search,
   Trash2,
   UserRound,
   UserRoundPlus,
@@ -24,7 +23,7 @@ import {
   formatDay,
 } from "@/components/inventory/inventory-modals";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/contexts/auth-context";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -351,16 +350,13 @@ function InventoryContent() {
       )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 flex-1 sm:max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" aria-hidden />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ad, demirbaş no, seri no, kişi…"
-            aria-label="Envanterde ara"
-            className="pl-9"
-          />
-        </div>
+        <SearchInput
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Ad, demirbaş no, seri no, kişi…"
+          aria-label="Envanterde ara"
+          containerClassName="flex-1 sm:max-w-sm"
+        />
         <Select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} className="w-auto min-w-[150px]" aria-label="Durum">
           <option value="all">Tüm durumlar</option>
           {STAT_ORDER.map((state) => (

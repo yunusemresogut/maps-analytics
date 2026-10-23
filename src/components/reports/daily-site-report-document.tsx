@@ -90,7 +90,7 @@ export function DailySiteReportDocument({
       </header>
 
       <div className="mt-4 grid grid-cols-2 border-l border-t border-neutral-300">
-        <InfoCell label="Şantiye / Mağaza" value={store?.name} />
+        <InfoCell label="Saha" value={store?.name} />
         <InfoCell label="Tarih" value={formatReportDate(report.date)} />
         <InfoCell label="Adres" value={location} className="col-span-2" />
         <InfoCell label="Yüklenici firma" value={report.contractor} />

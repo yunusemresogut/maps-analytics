@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/ui/form-field";
 import { SaveIndicator, SettingsPageHeader, SettingsSection, useAutoSave } from "@/components/settings/settings-ui";
+import { LocationTypesSection } from "@/components/settings/location-types-section";
 
 function CompanyInfoSection() {
   const { organization, updateOrganization } = useAuth();
@@ -140,7 +141,7 @@ function DefaultsSection() {
           />
         </FormField>
         <FormField
-          label="Yeni mağaza bütçesi"
+          label="Yeni saha bütçesi"
           error={budgetInvalid ? "Geçerli bir tutar girin." : undefined}
         >
           <MoneyInput
@@ -188,9 +189,10 @@ export default function CompanySettingsPage() {
   return (
     <AuthGuard routeKey="adminSettings">
       <div className="space-y-6">
-        <SettingsPageHeader title="Firma ve varsayılanlar" description="Firma bilgileri ve yeni kayıtlarda kullanılan varsayılan değerler." />
+        <SettingsPageHeader title="Firma ve varsayılanlar" description="Firma bilgileri, yeni kayıtlarda kullanılan varsayılan değerler ve saha türleri." />
         <CompanyInfoSection />
         <DefaultsSection />
+        <LocationTypesSection />
       </div>
     </AuthGuard>
   );

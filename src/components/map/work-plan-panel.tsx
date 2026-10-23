@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { ChevronDown, CalendarRange, Edit2, List, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, CalendarRange, Edit2, List, Plus, Trash2 } from "lucide-react";
 import {
   addMonths,
   differenceInCalendarDays,
@@ -15,7 +15,7 @@ import {
 import { tr } from "date-fns/locale";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { BulkSelectionBar, SelectCheckbox } from "@/components/ui/row-selection";
 import { TablePagination } from "@/components/modules/module-table";
 import { useStoreData } from "@/contexts/store-data-context";
@@ -376,16 +376,14 @@ export function WorkPlanPanel({
           <>
             {summary.workPlanCount > 0 && (
               <div className="border-b border-zinc-800 px-4 py-3">
-                <div className="relative max-w-sm">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" aria-hidden />
-                  <Input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="İş kalemi, kod, sorumlu ara…"
-                    aria-label="İş planında ara"
-                    className="h-9 pl-9"
-                  />
-                </div>
+                <SearchInput
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="İş kalemi, kod, sorumlu ara…"
+                  aria-label="İş planında ara"
+                  containerClassName="max-w-sm"
+                  className="h-9"
+                />
               </div>
             )}
             {isEditing && (

@@ -1,10 +1,11 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { ChevronDown, Edit2, Lock, Package, Percent, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, Edit2, Lock, Package, Percent, Plus, Trash2 } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { MoneyInput } from "@/components/ui/money-input";
 import { FormField } from "@/components/ui/form-field";
 import { Select } from "@/components/ui/select";
@@ -495,16 +496,14 @@ export function MaterialsPanel({
       <div id={bodyId} hidden={!expanded}>
         {summary.materialCount > 0 && (
           <div className="border-b border-zinc-800 px-4 py-3">
-            <div className="relative max-w-sm">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" aria-hidden />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Poz no, kalem, birim veya durum ara…"
-                aria-label="Keşifte ara"
-                className="h-9 pl-9"
-              />
-            </div>
+            <SearchInput
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Poz no, kalem, birim veya durum ara…"
+              aria-label="Keşifte ara"
+              containerClassName="max-w-sm"
+              className="h-9"
+            />
           </div>
         )}
         {isEditing && (

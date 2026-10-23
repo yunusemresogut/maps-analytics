@@ -12,7 +12,7 @@ import {
   TablePagination,
   type DataTableColumn,
 } from "@/components/modules/module-table";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useModules } from "@/contexts/modules-context";
@@ -39,7 +39,7 @@ type SortKey = "code" | "title" | "storeName" | "partyName" | "amount" | "status
 const COLUMNS: DataTableColumn<SortKey>[] = [
   { key: "code", label: "Kod" },
   { key: "title", label: "Sözleşme" },
-  { key: "storeName", label: "Mağaza" },
+  { key: "storeName", label: "Saha" },
   { key: "partyName", label: "Taraf" },
   { key: "amount", label: "Tutar" },
   { key: "status", label: "Durum" },
@@ -98,7 +98,7 @@ function ContractsContent() {
   return (
     <ModuleTableShell
       title={t("modules.contractsTitle")}
-      description="Mağaza projelerine bağlı sözleşmeler."
+      description="Saha projelerine bağlı sözleşmeler."
       headerAction={
         canAdd ? (
           <Button size="sm" onClick={() => router.push(newHref)}>
@@ -109,7 +109,7 @@ function ContractsContent() {
       }
       toolbar={
         <>
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Kod, taraf, mağaza…" className="h-10 max-w-sm border-zinc-700/80 bg-zinc-900/80" />
+          <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Kod, taraf, saha…" aria-label="Sözleşmelerde ara" containerClassName="w-full max-w-sm" className="h-10" />
           <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-auto min-w-[160px]">
             <option value="all">Tüm durumlar</option>
             {Object.entries(STATUS_TR).map(([k, v]) => (

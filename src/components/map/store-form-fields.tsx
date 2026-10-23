@@ -1,6 +1,7 @@
 "use client";
 
 import { useT } from "@/contexts/i18n-context";
+import { useLocationTypes } from "@/hooks/use-location-types";
 import { getProjectStatusOptions } from "@/lib/project-status";
 import { clearFieldError, type FieldErrors } from "@/lib/validation";
 import { FormField } from "@/components/ui/form-field";
@@ -24,7 +25,7 @@ export type StoreFormData = {
   phone: string;
 };
 
-export function emptyStoreForm(): StoreFormData {
+export function emptyStoreForm(locationType: LocationType): StoreFormData {
   return {
     name: "",
     city: "",
@@ -34,7 +35,7 @@ export function emptyStoreForm(): StoreFormData {
     acceptanceDate: "",
     contractorCompany: "",
     siteManager: "",
-    locationType: "avm",
+    locationType,
     grossM2: "",
     floorCount: "1",
     phone: "",
@@ -97,6 +98,9 @@ export function StoreFormFields({
 }: StoreFormFieldsProps) {
   const t = useT();
   const statusOptions = getProjectStatusOptions(t);
+  const { types: locationTypes, label: locationTypeLabel } = useLocationTypes();
+  // Listeden kaldırılmış ya da eski bir tür kayıtlıysa seçenek olarak korunur
+  const keepCurrent = form.locationType && !locationTypes.some((type) => type.key === form.locationType);
 
   const set = <K extends keyof StoreFormData>(
     key: K,
@@ -110,11 +114,11 @@ export function StoreFormFields({
 
   return (
     <div className="space-y-3">
-      <FormField label="Mağaza Adı" required error={errors.name}>
+      <FormField label="Saha Adı" required error={errors.name}>
         <Input
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
-          placeholder="Mağaza adı..."
+          placeholder="Saha adı..."
           readOnly={readOnly}
           aria-invalid={!!errors.name}
         />
@@ -136,7 +140,7 @@ export function StoreFormFields({
             ))}
           </Select>
         </FormField>
-        <FormField label="Konum Tipi" required>
+        <FormField label="Saha Türü" required>
           <Select
             value={form.locationType}
             onChange={(e) =>
@@ -144,8 +148,12 @@ export function StoreFormFields({
             }
             disabled={readOnly}
           >
-            <option value="avm">AVM</option>
-            <option value="cadde">Cadde</option>
+            {keepCurrent && <option value={form.locationType}>{locationTypeLabel(form.locationType)}</option>}
+            {locationTypes.map((type) => (
+              <option key={type.key} value={type.key}>
+                {type.label}
+              </option>
+            ))}
           </Select>
         </FormField>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { Search, Store, X } from "lucide-react";
+import { Store, X } from "lucide-react";
 import { useMapUi } from "@/contexts/map-ui-context";
 import { useT } from "@/contexts/i18n-context";
 import { TablePagination } from "@/components/modules/module-table";
@@ -11,7 +11,7 @@ import {
   getProjectStatusLabel,
   projectStatusConfig,
 } from "@/lib/project-status";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import {
   MAP_PANEL_HEIGHT_CLASS,
   MAP_PANEL_SHELL_CLASS,
@@ -108,7 +108,7 @@ export function StoreListPanel({
         <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
           <div className="flex items-center gap-2">
             <Store className="h-4 w-4 text-cyan-400" />
-            <span className="text-sm font-medium text-zinc-200">Mağazalar</span>
+            <span className="text-sm font-medium text-zinc-200">Sahalar</span>
             <span className="rounded-full bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-500">
               {filtered.length}
             </span>
@@ -123,15 +123,12 @@ export function StoreListPanel({
         </div>
 
         <div className="space-y-2 border-b border-zinc-800 px-3 py-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Mağaza, şehir ara..."
-              className="pl-8 text-sm"
-            />
-          </div>
+          <SearchInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Saha, şehir ara..."
+            aria-label="Sahalarda ara"
+          />
 
           <div className="scrollbar-themed flex gap-1 overflow-x-auto pb-0.5">
             {statusFilters.map(({ value, label }) => (
@@ -156,7 +153,7 @@ export function StoreListPanel({
         <ul className="scrollbar-themed flex-1 overflow-y-auto p-2">
           {table.totalItems === 0 && (
             <li className="px-3 py-8 text-center text-sm text-zinc-600">
-              Mağaza bulunamadı
+              Saha bulunamadı
             </li>
           )}
           {table.pageItems.map((store) => {

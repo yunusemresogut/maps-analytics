@@ -3,6 +3,7 @@
 import { format, parseISO } from "date-fns";
 import { useI18n, useT } from "@/contexts/i18n-context";
 import { getProjectStatusLabel } from "@/lib/project-status";
+import { useLocationTypes } from "@/hooks/use-location-types";
 import type { Store } from "@/types";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -21,6 +22,7 @@ type StoreViewFieldsProps = {
 export function StoreViewFields({ store }: StoreViewFieldsProps) {
   const t = useT();
   const { dateLocale } = useI18n();
+  const { label: locationTypeLabel } = useLocationTypes();
 
   return (
     <div className="space-y-3">
@@ -67,10 +69,7 @@ export function StoreViewFields({ store }: StoreViewFieldsProps) {
         <Field label="Şantiye Şefi" value={store.siteManager} />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field
-          label="Konum Tipi"
-          value={store.locationType === "avm" ? "AVM" : "Cadde"}
-        />
+        <Field label="Saha Türü" value={locationTypeLabel(store.locationType)} />
         <Field label="Brüt m²" value={`${store.grossM2} m²`} />
       </div>
       <div className="grid grid-cols-2 gap-3">

@@ -221,7 +221,7 @@ export function StoreMap() {
       <div className="pointer-events-none absolute left-2 top-2 z-10 flex w-[min(220px,calc(100vw-1rem))] flex-col gap-2 sm:left-4 sm:top-4">
         <div className="pointer-events-auto rounded-xl border border-zinc-700/60 bg-zinc-950/80 p-4 backdrop-blur-md">
           <h2 className="text-sm font-semibold text-zinc-100">
-            Mağaza Haritası
+            Saha Haritası
           </h2>
           <p className="mt-1 text-xs text-zinc-500">
             {visibleStores.length} / {stores.length} görünür

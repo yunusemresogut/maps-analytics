@@ -278,7 +278,7 @@ export function AdminBudgetsPanel() {
               <tr className="border-b border-zinc-800">
                 <SortableTh
                   columnKey="name"
-                  label="Şantiye / Mağaza"
+                  label="Saha"
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}

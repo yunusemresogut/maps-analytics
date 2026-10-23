@@ -29,7 +29,7 @@ export const ROLE_LABELS: Record<BuiltInRole, string> = {
   civil_engineer: "İnşaat Mühendisi",
   manager: "Yönetici",
   regional_manager: "Bölge Müdürü",
-  store_manager: "Mağaza Müdürü",
+  store_manager: "Saha Sorumlusu",
   accounting: "Muhasebe",
 };
 

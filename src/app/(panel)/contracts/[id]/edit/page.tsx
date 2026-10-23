@@ -110,7 +110,7 @@ function EditContractContent({ id }: { id: string }) {
         {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
         {store && (
           <Link href={`/stores/${store.id}`} className="text-sm text-cyan-400 hover:underline">
-            Mağaza: {store.name}
+            Saha: {store.name}
           </Link>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
@@ -141,7 +141,7 @@ function EditContractContent({ id }: { id: string }) {
             <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} disabled={!canEdit} />
           </div>
           <div className="sm:col-span-2">
-            <label className="text-xs text-zinc-500">Mağaza</label>
+            <label className="text-xs text-zinc-500">Saha</label>
             <Select className="mt-1" value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={!canEdit}>
               <option value="">Seçiniz</option>
               {stores.map((s) => (

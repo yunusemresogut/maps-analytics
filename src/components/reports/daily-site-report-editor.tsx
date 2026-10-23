@@ -338,7 +338,7 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
 
       <Panel title="Genel bilgiler">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <FormField label="Şantiye / mağaza" required className="sm:col-span-2">
+          <FormField label="Saha" required className="sm:col-span-2">
             <Select value={report.storeId} onChange={(e) => onStoreChange(e.target.value)} placeholder="Şantiye seçin">
               {stores.map((item) => (
                 <option key={item.id} value={item.id}>

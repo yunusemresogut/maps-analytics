@@ -151,7 +151,7 @@ function NewContractContent() {
             <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Mağaza</label>
+            <label className="text-xs text-zinc-500">Saha</label>
             <Select className="mt-1" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
               <option value="">Seçiniz</option>
               {stores.map((s) => (

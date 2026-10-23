@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin", "latin-ext"],
 });
 
-const DESCRIPTION = "Mağaza ağı ve saha operasyonları için harita tabanlı yönetim platformu";
+const DESCRIPTION = "Saha ve proje operasyonları için harita tabanlı yönetim platformu";
 
 export const metadata: Metadata = {
   title: {

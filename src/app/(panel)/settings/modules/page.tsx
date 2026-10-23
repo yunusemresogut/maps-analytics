@@ -80,7 +80,7 @@ function ModulesContent() {
         />
         <SwitchRow
           label="Asistanla kayıt ekleme"
-          description="Mağaza, ticket, iş planı ve keşif kalemlerinin sohbetten (önizleme ve onayla) eklenmesine izin verir. Kullanıcı yetkileri yine geçerlidir."
+          description="Saha, ticket, iş planı ve keşif kalemlerinin sohbetten (önizleme ve onayla) eklenmesine izin verir. Kullanıcı yetkileri yine geçerlidir."
           checked={org.assistant.allowActions}
           disabled={!org.assistant.enabled}
           indent

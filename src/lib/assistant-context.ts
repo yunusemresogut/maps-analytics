@@ -3,6 +3,7 @@ import { paidAmountForPayment } from "@/lib/module-finance";
 import type {
   Contract,
   Invoice,
+  LocationTypeOption,
   ProgressPayment,
   Store,
   StoreDetailSummary,
@@ -12,6 +13,7 @@ import type {
 } from "@/types";
 import { materialLineTotal } from "@/lib/material-totals";
 import { DEFAULT_CURRENCY, moneyEntries, roundMoney, type CurrencyCode, type MoneyTotals } from "@/lib/currency";
+import { getLocationTypeLabel } from "@/lib/location-types";
 
 const STATUS_LABELS: Record<string, string> = {
   proje: "Proje",
@@ -59,6 +61,7 @@ type AssistantContextInput = {
   progressPayments: ProgressPayment[];
   invoices: Invoice[];
   tickets: Ticket[];
+  locationTypes: LocationTypeOption[];
 };
 
 export type StoreDetails = {
@@ -108,10 +111,13 @@ export function buildAssistantContext(input: AssistantContextInput): string {
     `Bugün: ${today}`,
     `Kullanıcı: ${input.userName}${input.organizationName ? ` (${input.organizationName})` : ""}`,
     "",
-    `## Mağazalar (${input.stores.length})`,
+    `## Saha türleri (locationType anahtarı = ad)`,
+    input.locationTypes.map((type) => `${type.key} = ${type.label}`).join(", ") || "Tanımlı tür yok.",
+    "",
+    `## Sahalar (${input.stores.length})`,
   ];
 
-  if (input.stores.length === 0) lines.push("Henüz mağaza yok.");
+  if (input.stores.length === 0) lines.push("Henüz saha yok.");
 
   for (const store of input.stores.slice(0, MAX_STORES)) {
     const summary = input.storeSummaries[store.id];
@@ -119,7 +125,7 @@ export function buildAssistantContext(input: AssistantContextInput): string {
     const workPlanCount = summary?.workPlanCount ?? 0;
     const materialCount = summary?.materialCount ?? 0;
     const parts = [
-      `- ${store.name} | ${store.city} | durum: ${STATUS_LABELS[store.projectStatus] ?? store.projectStatus}`,
+      `- ${store.name} | ${store.city} | tür: ${getLocationTypeLabel(store.locationType, input.locationTypes)} | durum: ${STATUS_LABELS[store.projectStatus] ?? store.projectStatus}`,
       store.openingDate ? `açılış: ${store.openingDate}${alert ? ` (${alert.label})` : ""}` : null,
       store.totalBudget ? `bütçe: ${money(store.totalBudget, store.budgetCurrency)}` : null,
       store.contractorCompany ? `yüklenici: ${store.contractorCompany}` : null,
@@ -134,7 +140,7 @@ export function buildAssistantContext(input: AssistantContextInput): string {
     lines.push(parts.filter(Boolean).join(" | "));
   }
   if (input.stores.length > MAX_STORES) {
-    lines.push(`… ve ${input.stores.length - MAX_STORES} mağaza daha`);
+    lines.push(`… ve ${input.stores.length - MAX_STORES} saha daha`);
   }
 
   const storeName = (id?: string) =>
@@ -173,7 +179,7 @@ export function buildAssistantContext(input: AssistantContextInput): string {
   const ordered = pickDetailStores(input.stores, input.storeSummaries, input.question ?? "");
   const storesWithDetails = ordered.filter((store) => input.storeDetails[store.id]);
 
-  lines.push("", "## Mağaza detayları (keşif ve iş planı)");
+  lines.push("", "## Saha detayları (keşif ve iş planı)");
   let length = lines.join("\n").length;
   let skipped = 0;
   for (const store of storesWithDetails) {
@@ -220,7 +226,7 @@ export function buildAssistantContext(input: AssistantContextInput): string {
   // Detayı hiç çekilmeyen mağazalar da atlanmış sayılır
   skipped += totalWithDetails - storesWithDetails.length;
   if (skipped > 0) {
-    lines.push(`(${skipped} mağazanın detayı boyut sınırı nedeniyle eklenmedi; soruda mağaza adını belirtin.)`);
+    lines.push(`(${skipped} sahanın detayı boyut sınırı nedeniyle eklenmedi; soruda saha adını belirtin.)`);
   }
 
   return lines.join("\n");

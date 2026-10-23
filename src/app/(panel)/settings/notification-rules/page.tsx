@@ -64,7 +64,7 @@ function NotificationRulesContent() {
       />
 
       <SettingsSection title="Eşikler">
-        <SettingRow label="Yaklaşan açılış uyarısı" description="Açılışına bu kadar gün kalan mağazalar için bildirim (1–90)">
+        <SettingRow label="Yaklaşan açılış uyarısı" description="Açılışına bu kadar gün kalan sahalar için bildirim (1–90)">
           <DaysInput
             label="Yaklaşan açılış uyarısı"
             value={org.notifications.openingSoonDays}

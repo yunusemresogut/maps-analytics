@@ -120,7 +120,7 @@ export function StoreLocationFields({ controller, mapPick, mapSlot, errors = {} 
           <span>
             {mismatchCity
               ? `Kayıtlı şehir (${location.city || "boş"}) pinin konumuyla uyuşmuyor; pin ${mismatchCity} içinde.`
-              : "Bu mağazanın şehir bilgisi eksik."}
+              : "Bu sahanın şehir bilgisi eksik."}
           </span>
           <Button type="button" size="sm" variant="outline" onClick={() => void resolveCurrent()}>
             <RefreshCw className="h-3.5 w-3.5" />
@@ -133,7 +133,7 @@ export function StoreLocationFields({ controller, mapPick, mapSlot, errors = {} 
         label="Adres"
         required
         error={errors.address}
-        hint="Konumdan otomatik doldurulur; bina, kat, mağaza no gibi detay ekleyebilirsiniz."
+        hint="Konumdan otomatik doldurulur; bina, kat, birim no gibi detay ekleyebilirsiniz."
       >
         <Textarea
           value={location.address}
