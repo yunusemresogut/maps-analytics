@@ -9,6 +9,7 @@ import { ModuleFormShell } from "@/components/modules/module-form-shell";
 import { useModules } from "@/contexts/modules-context";
 import { useStores } from "@/contexts/stores-context";
 import { useT } from "@/contexts/i18n-context";
+import { usePageTitle } from "@/contexts/page-title-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ function EditContractContent({ id }: { id: string }) {
   const { canEdit, canDelete } = usePermissions("contracts");
   const t = useT();
   const contract = contracts.find((x) => x.id === id);
+  usePageTitle(contract?.title);
 
   const [code, setCode] = useState(contract?.code ?? "");
   const [title, setTitle] = useState(contract?.title ?? "");

@@ -9,6 +9,7 @@ import { useModules } from "@/contexts/modules-context";
 import { useStores } from "@/contexts/stores-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useT } from "@/contexts/i18n-context";
+import { usePageTitle } from "@/contexts/page-title-context";
 import type { TicketPriority, TicketStatus } from "@/types";
 
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
@@ -30,6 +31,7 @@ function TicketDetail({ id }: { id: string }) {
   const { canEdit } = usePermissions("tickets");
   const t = useT();
   const ticket = tickets.find((item) => item.id === id);
+  usePageTitle(ticket?.title);
 
   if (!ticket) {
     return (

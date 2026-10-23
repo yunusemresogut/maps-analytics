@@ -22,7 +22,7 @@ export const ALL_ROLES: BuiltInRole[] = [
 ];
 
 export const ROLE_LABELS: Record<BuiltInRole, string> = {
-  admin: "Admin",
+  admin: "Kurucu",
   mechanical_engineer: "Makine Mühendisi",
   electrical_engineer: "Elektrik Mühendisi",
   architect: "Mimar",

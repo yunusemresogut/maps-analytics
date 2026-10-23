@@ -10,6 +10,7 @@ import { ThemeProvider } from "@/contexts/theme-context";
 import { DbProvider } from "@/contexts/db-context";
 import { SidebarProvider } from "@/contexts/sidebar-context";
 import { I18nProvider } from "@/contexts/i18n-context";
+import { PageTitleProvider } from "@/contexts/page-title-context";
 import { ModulesProvider } from "@/contexts/modules-context";
 import { TeamChatProvider } from "@/contexts/team-chat-context";
 import { SettingsProvider } from "@/contexts/settings-context";
@@ -18,28 +19,30 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <I18nProvider>
-        <DbProvider>
-          <AuthProvider>
-            <SettingsProvider>
-              <SidebarProvider>
-                <RegionsProvider>
-                  <StoresProvider>
-                    <ModulesProvider>
-                      {/* Bildirimler ekip mesajlarını da kullanır */}
-                      <TeamChatProvider>
-                        <NotificationsProvider>
-                          <MapUiProvider>
-                            <StoreDataProvider>{children}</StoreDataProvider>
-                          </MapUiProvider>
-                        </NotificationsProvider>
-                      </TeamChatProvider>
-                    </ModulesProvider>
-                  </StoresProvider>
-                </RegionsProvider>
-              </SidebarProvider>
-            </SettingsProvider>
-          </AuthProvider>
-        </DbProvider>
+        <PageTitleProvider>
+          <DbProvider>
+            <AuthProvider>
+              <SettingsProvider>
+                <SidebarProvider>
+                  <RegionsProvider>
+                    <StoresProvider>
+                      <ModulesProvider>
+                        {/* Bildirimler ekip mesajlarını da kullanır */}
+                        <TeamChatProvider>
+                          <NotificationsProvider>
+                            <MapUiProvider>
+                              <StoreDataProvider>{children}</StoreDataProvider>
+                            </MapUiProvider>
+                          </NotificationsProvider>
+                        </TeamChatProvider>
+                      </ModulesProvider>
+                    </StoresProvider>
+                  </RegionsProvider>
+                </SidebarProvider>
+              </SettingsProvider>
+            </AuthProvider>
+          </DbProvider>
+        </PageTitleProvider>
       </I18nProvider>
     </ThemeProvider>
   );

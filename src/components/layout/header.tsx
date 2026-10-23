@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, Map, Menu, Moon, PanelLeftClose, Sun } from "lucide-react";
+import { LogOut, Menu, Moon, PanelLeftClose, Sun } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useTheme } from "@/contexts/theme-context";
 import { useSidebar } from "@/contexts/sidebar-context";
@@ -11,6 +11,7 @@ import { MapHeaderActions } from "@/components/layout/map-header-actions";
 import { NotificationsBell } from "@/components/layout/notifications-bell";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { Button } from "@/components/ui/button";
+import { BrandLogo } from "@/components/layout/brand-logo";
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -45,13 +46,8 @@ export function Header() {
             </Button>
           ) : null}
 
-          <Link href={homeHref} className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand">
-              <Map className="h-4 w-4 text-brand-on" />
-            </div>
-            <span className="truncate text-sm font-semibold text-zinc-100">
-              Maps Analytics
-            </span>
+          <Link href={homeHref} className="flex min-w-0 items-center">
+            <BrandLogo className="h-7" />
           </Link>
         </div>
 

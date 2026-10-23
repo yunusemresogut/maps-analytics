@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useStores } from "@/contexts/stores-context";
 import { useDb } from "@/contexts/db-context";
 import { useT } from "@/contexts/i18n-context";
+import { usePageTitle } from "@/contexts/page-title-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { StoreFormFields } from "@/components/map/store-form-fields";
 import { StoreLocationFields } from "@/components/location/store-location-fields";
@@ -36,6 +37,7 @@ function StoreEditContent({ id }: { id: string }) {
   const { canEdit } = usePermissions("stores");
   const t = useT();
   const store = getStore(id);
+  usePageTitle(store?.name);
 
   if (!store) {
     return (

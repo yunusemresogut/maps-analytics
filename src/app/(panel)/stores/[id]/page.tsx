@@ -7,6 +7,7 @@ import { AuthGuard } from "@/components/auth/auth-guard";
 import { useStores } from "@/contexts/stores-context";
 import { useDb } from "@/contexts/db-context";
 import { useT } from "@/contexts/i18n-context";
+import { usePageTitle } from "@/contexts/page-title-context";
 import { StoreViewFields } from "@/components/map/store-view-fields";
 import { ApprovalSwitches } from "@/components/projects/approval-switches";
 import { AuditLogSection } from "@/components/map/audit-log-section";
@@ -29,6 +30,7 @@ function StorePageContent({ id }: { id: string }) {
   const { canEdit } = usePermissions("stores");
   const t = useT();
   const store = getStore(id);
+  usePageTitle(store?.name);
 
   if (!store) {
     return (

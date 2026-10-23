@@ -10,12 +10,12 @@ import {
   LogIn,
   Map,
   MapPinOff,
-  MapPinned,
   Receipt,
   Store,
   Ticket,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { BrandLogo } from "@/components/layout/brand-logo";
 import { useAuth } from "@/contexts/auth-context";
 import { useT } from "@/contexts/i18n-context";
 import { canAccessRoute } from "@/lib/permissions";
@@ -75,10 +75,7 @@ export function NotFoundView() {
         href={user ? homePathForRole(user.role) : "/login"}
         className="relative flex w-fit items-center gap-2.5 rounded-lg px-4 pt-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 sm:px-8 sm:pt-7"
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-300">
-          <MapPinned className="h-4 w-4" aria-hidden />
-        </span>
-        <span className="text-sm font-semibold tracking-wide text-zinc-200">Maps Analytics</span>
+        <BrandLogo className="h-7" />
       </Link>
 
       <div className="relative mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-4 py-12 text-center sm:px-6">

@@ -26,7 +26,7 @@ type NominatimItem = {
 };
 
 export const NOMINATIM_HEADERS = {
-  "User-Agent": "MapsAnalytics/1.0 (store-location)",
+  "User-Agent": "Koordine/1.0 (+https://koordine.com.tr)",
   Accept: "application/json",
   "Accept-Language": "tr",
 };

@@ -9,6 +9,7 @@ import { ModuleAttachments } from "@/components/modules/module-attachments";
 import { useModules } from "@/contexts/modules-context";
 import { useDb } from "@/contexts/db-context";
 import { useT } from "@/contexts/i18n-context";
+import { usePageTitle } from "@/contexts/page-title-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -32,6 +33,7 @@ function EditPaymentContent({ id }: { id: string }) {
   const { canEdit, canDelete } = usePermissions("progressPayments");
   const t = useT();
   const payment = progressPayments.find((p) => p.id === id);
+  usePageTitle(payment?.title);
   const initialPeriod = parsePaymentPeriod(payment?.periodLabel ?? "");
 
   const [title, setTitle] = useState(payment?.title ?? "");

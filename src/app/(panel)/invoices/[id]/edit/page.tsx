@@ -8,6 +8,7 @@ import { ModuleFormShell } from "@/components/modules/module-form-shell";
 import { useModules } from "@/contexts/modules-context";
 import { useDb } from "@/contexts/db-context";
 import { useT } from "@/contexts/i18n-context";
+import { usePageTitle } from "@/contexts/page-title-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -30,6 +31,7 @@ function EditInvoiceContent({ id }: { id: string }) {
   const { canEdit, canDelete } = usePermissions("invoices");
   const t = useT();
   const invoice = invoices.find((i) => i.id === id);
+  usePageTitle(invoice?.invoiceNumber);
 
   const [invoiceNumber, setInvoiceNumber] = useState(invoice?.invoiceNumber ?? "");
   const [amount, setAmount] = useState<number | null>(invoice?.amount ?? null);

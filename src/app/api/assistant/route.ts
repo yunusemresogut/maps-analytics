@@ -16,7 +16,7 @@ const MAX_CONTEXT_CHARS = 60000;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
-const SYSTEM_PROMPT = `Sen "Maps Analytics" adlı mağaza ağı ve saha operasyonları uygulamasının asistanısın.
+const SYSTEM_PROMPT = `Sen "Koordine" adlı mağaza ağı ve saha operasyonları uygulamasının asistanısın.
 Kullanıcılar mağaza açılışlarını, proje durumlarını (Proje, İhale, Şantiye, Açılış, Hakediş, Fatura), iş planlarını, keşifleri (malzeme listeleri), sözleşmeleri, hakedişleri, faturaları ve tadilat taleplerini takip eder.
 
 Kurallar:

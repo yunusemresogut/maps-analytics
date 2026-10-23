@@ -9,6 +9,7 @@ import { ModuleFormShell } from "@/components/modules/module-form-shell";
 import { useModules } from "@/contexts/modules-context";
 import { useStores } from "@/contexts/stores-context";
 import { useT } from "@/contexts/i18n-context";
+import { usePageTitle } from "@/contexts/page-title-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -35,6 +36,7 @@ function EditTicketContent({ id }: { id: string }) {
   const { canEdit, canDelete } = usePermissions("tickets");
   const t = useT();
   const ticket = tickets.find((x) => x.id === id);
+  usePageTitle(ticket?.title);
 
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");

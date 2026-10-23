@@ -2,6 +2,7 @@
 
 import { CalendarDays, MapPinned, PanelsTopLeft } from "lucide-react";
 import { useI18n } from "@/contexts/i18n-context";
+import { BrandLogo } from "@/components/layout/brand-logo";
 
 type AuthLayoutProps = {
   title: string;
@@ -31,12 +32,7 @@ export function AuthLayout({ title, description, children }: AuthLayoutProps) {
           }}
         />
 
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2f55a8] text-white">
-            <MapPinned className="h-5 w-5" aria-hidden />
-          </div>
-          <span className="text-base font-semibold tracking-wide">Maps Analytics</span>
-        </div>
+        <BrandLogo tone="dark" className="h-10 sm:h-12" />
 
         <div className="my-10 max-w-xl lg:my-0">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9bb4e6]">
@@ -71,7 +67,7 @@ export function AuthLayout({ title, description, children }: AuthLayoutProps) {
         <div className="flex flex-1 items-center justify-center py-8 lg:py-12">
           <div className="w-full max-w-md">
             <div className="mb-8">
-              <p className="text-sm font-semibold text-cyan-300">Maps Analytics</p>
+              <p className="text-sm font-semibold text-cyan-300">Koordine</p>
               <h2 className="mt-3 text-3xl font-semibold leading-tight text-zinc-100">{title}</h2>
               <p className="mt-2 text-sm leading-6 text-zinc-500">{description}</p>
             </div>

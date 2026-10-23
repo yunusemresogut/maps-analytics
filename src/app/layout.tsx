@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Public_Sans } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { tr } from "@/i18n/dictionaries/tr";
+import { SITE_NAME, TITLE_TEMPLATE } from "@/lib/page-titles";
 import "./globals.css";
 
 // Türkçe ğ, ş, ı, İ harfleri "latin-ext" alt kümesindedir
@@ -14,9 +16,28 @@ const geistMono = Geist_Mono({
   subsets: ["latin", "latin-ext"],
 });
 
+const DESCRIPTION = "Mağaza ağı ve saha operasyonları için harita tabanlı yönetim platformu";
+
 export const metadata: Metadata = {
-  title: "Maps Analytics",
-  description: "Çok markalı mağaza haritası ve analitik paneli",
+  title: {
+    template: TITLE_TEMPLATE,
+    default: `${SITE_NAME} | ${tr.pageTitle.home}`,
+  },
+  description: DESCRIPTION,
+  applicationName: SITE_NAME,
+  metadataBase: new URL("https://koordine.com.tr"),
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "tr_TR",
+    title: SITE_NAME,
+    description: DESCRIPTION,
+  },
+  twitter: {
+    card: "summary",
+    title: SITE_NAME,
+    description: DESCRIPTION,
+  },
 };
 
 export default function RootLayout({
