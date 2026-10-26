@@ -45,6 +45,7 @@ function EditContractContent({ id }: { id: string }) {
   const [status, setStatus] = useState<ContractStatus>(contract?.status ?? "draft");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [showErrors, setShowErrors] = useState(false);
 
   if (!contract) {
     return (
@@ -58,6 +59,11 @@ function EditContractContent({ id }: { id: string }) {
 
   const save = async () => {
     if (!canEdit) return;
+    setShowErrors(true);
+    if (!title.trim()) {
+      setSaveError("Başlık zorunludur.");
+      return;
+    }
     setSaveError("");
     setSaving(true);
     const ok = await updateContract(id, {
@@ -128,8 +134,8 @@ function EditContractContent({ id }: { id: string }) {
           </div>
         </div>
         <div>
-          <label className="text-xs text-zinc-500">Başlık</label>
-          <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit} />
+          <label className="text-xs text-zinc-500">Başlık *</label>
+          <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit} aria-invalid={showErrors && !title.trim()} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>

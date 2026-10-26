@@ -60,11 +60,18 @@ export type InventoryItemInput = {
   status: InventoryStatus;
   purchaseDate: string;
   notes: string;
+  /** Yalnızca araçta: zorunlu trafik sigortası, kasko ve muayene bitişi, kilometre */
+  insuranceExpires: string;
+  cascoExpires: string;
+  inspectionExpires: string;
+  odometerKm: number | null;
 };
 
 export type InventoryItem = InventoryItemInput & {
   id: string;
   state: InventoryState;
+  /** Aracın en yakın belge bitişi (hurda araçta yok) */
+  nextVehicleExpiry?: string;
   createdByName: string;
   updatedAt?: string;
   /** Açık zimmet */
@@ -119,6 +126,11 @@ export function mapInventoryRow(row: Record<string, unknown>): InventoryItem {
     status: (text(row.status) || "active") as InventoryStatus,
     purchaseDate: text(row.purchase_date),
     notes: text(row.notes),
+    insuranceExpires: text(row.insurance_expires),
+    cascoExpires: text(row.casco_expires),
+    inspectionExpires: text(row.inspection_expires),
+    odometerKm: row.odometer_km === null || row.odometer_km === undefined ? null : Number(row.odometer_km),
+    nextVehicleExpiry: optional(row.next_vehicle_expiry),
     state: (text(row.state) || "available") as InventoryState,
     createdByName: text(row.created_by_name),
     updatedAt: optional(row.updated_at),
@@ -165,7 +177,44 @@ function itemToDb(input: InventoryItemInput) {
     status: input.status,
     purchase_date: input.purchaseDate || null,
     notes: input.notes.trim(),
+    ...vehicleToDb(input),
   };
+}
+
+function vehicleToDb(input: InventoryItemInput) {
+  const vehicle = input.category === "vehicle";
+  return {
+    insurance_expires: vehicle ? input.insuranceExpires || null : null,
+    casco_expires: vehicle ? input.cascoExpires || null : null,
+    inspection_expires: vehicle ? input.inspectionExpires || null : null,
+    odometer_km: vehicle ? input.odometerKm : null,
+  };
+}
+
+export const VEHICLE_DOCUMENTS = [
+  { key: "insuranceExpires", label: "Trafik sigortası" },
+  { key: "cascoExpires", label: "Kasko" },
+  { key: "inspectionExpires", label: "Muayene" },
+] as const;
+
+/** Aracın bitişi en yakın belgesi (ad ve tarih) */
+export function nearestVehicleDocument(item: InventoryItemInput): { label: string; date: string } | null {
+  const documents = VEHICLE_DOCUMENTS.map((doc) => ({ label: doc.label, date: item[doc.key] })).filter((doc) => doc.date);
+  if (documents.length === 0) return null;
+  return documents.reduce((nearest, doc) => (doc.date < nearest.date ? doc : nearest));
+}
+
+/** Bildirimler: verilen tarihe kadar belgesi biten araçlar (RLS: yetkisizse yalnızca zimmetindekiler) */
+export async function fetchExpiringVehicles(untilDate: string): Promise<InventoryItem[]> {
+  const { data, error } = await supabase
+    .from(INVENTORY_SOURCE)
+    .select("*")
+    .eq("category", "vehicle")
+    .lte("next_vehicle_expiry", untilDate)
+    .order("next_vehicle_expiry")
+    .limit(200);
+  if (error) throw error;
+  return (data ?? []).map((row) => mapInventoryRow(row as Record<string, unknown>));
 }
 
 function assignmentToDb(input: AssignmentInput) {

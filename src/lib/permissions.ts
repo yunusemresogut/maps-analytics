@@ -31,18 +31,33 @@ const CORE_MODULE_KEYS: AppModuleKey[] = [
  * Tüm modüller. Sonradan eklenenler (envanter) eski matrislerde bulunmaz;
  * eksik modül "yetki yok" sayılır (veritabanındaki app_module_permission ile aynı).
  */
-export const MODULE_KEYS: AppModuleKey[] = [...CORE_MODULE_KEYS, "inventory"];
+export const MODULE_KEYS: AppModuleKey[] = [
+  ...CORE_MODULE_KEYS,
+  "inventory",
+  "personnel",
+  "personnelPrivate",
+  "timesheets",
+  "leaves",
+  "announcements",
+  "hrRequests",
+];
 
 export const MODULE_LABELS: Record<AppModuleKey, string> = {
   map: "Harita",
   stores: "Sahalar",
   projects: "Projeler",
   approvals: "Onaylar",
-  tickets: "Ticket",
+  tickets: "Tadilat Talepleri",
   contracts: "Sözleşmeler",
   progressPayments: "Hakediş",
   invoices: "Faturalar",
   inventory: "Envanter",
+  personnel: "Personel ve belgeler",
+  personnelPrivate: "Özlük bilgileri (hassas)",
+  timesheets: "Puantaj",
+  leaves: "İzinler (İK onayı)",
+  announcements: "Duyurular (yayınlama)",
+  hrRequests: "Personel talepleri (İK)",
 };
 
 export const CRUD_ACTIONS: PermissionAction[] = [
@@ -115,6 +130,12 @@ function emptyMatrix(): PermissionMatrix {
     progressPayments: cloneCrud(NONE_CRUD),
     invoices: cloneCrud(NONE_CRUD),
     inventory: cloneCrud(NONE_CRUD),
+    personnel: cloneCrud(NONE_CRUD),
+    personnelPrivate: cloneCrud(NONE_CRUD),
+    timesheets: cloneCrud(NONE_CRUD),
+    leaves: cloneCrud(NONE_CRUD),
+    announcements: cloneCrud(NONE_CRUD),
+    hrRequests: cloneCrud(NONE_CRUD),
   };
 }
 
@@ -354,6 +375,17 @@ export function routeToModule(route: AppRouteKey): AppModuleKey | null | "admin"
     // Yetkisi olmayan da sayfayı açar; yalnızca kendi zimmetini görür
     case "inventory":
       return null;
+    // İK sayfaları: yetkisi olmayan personel kendi kaydını görür (RLS)
+    case "personnel":
+    case "certificates":
+    case "timesheets":
+    case "leaves":
+    case "announcements":
+    case "hrRequests":
+      return null;
+    // İK raporları personel verisinden hazırlanır
+    case "hrReports":
+      return "personnel";
     // Raporlar mağaza verisinden hazırlanır
     case "reports":
       return "stores";

@@ -8,18 +8,45 @@ import type { NotificationType } from "@/types";
  * eski olabilir; her okuma normalize* fonksiyonlarından geçer.
  */
 
-export type NotificationModule = "stores" | "contracts" | "tickets" | "progressPayments" | "invoices" | "team";
+export type NotificationModule =
+  | "stores"
+  | "contracts"
+  | "tickets"
+  | "progressPayments"
+  | "invoices"
+  | "team"
+  | "hr"
+  | "inventory";
+
+/** Firma ayarlarından kapatılamayan bildirim modülleri */
+const ALWAYS_ON_NOTIFICATION_MODULES: NotificationModule[] = ["stores", "inventory"];
+
+export function notificationModuleDisabled(module: NotificationModule, org: OrgSettings) {
+  return !ALWAYS_ON_NOTIFICATION_MODULES.includes(module) && !org.modules[module as ToggleableModule];
+}
 
 /** Firma genelinde kapatılabilen modüller; harita ve mağazalar çekirdektir */
-export type ToggleableModule = "tickets" | "contracts" | "progressPayments" | "invoices" | "team";
+export type ToggleableModule = "tickets" | "contracts" | "progressPayments" | "invoices" | "team" | "hr";
 
 export const TOGGLEABLE_MODULES: { key: ToggleableModule; label: string; description: string }[] = [
-  { key: "tickets", label: "Tadilat Talepleri", description: "Ticket oluşturma ve takibi" },
+  { key: "tickets", label: "Tadilat Talepleri", description: "Tadilat talebi oluşturma ve takibi" },
   { key: "contracts", label: "Sözleşmeler", description: "Sözleşmeler ve ekleri" },
   { key: "progressPayments", label: "Hakedişler", description: "Hakediş kayıtları ve ekleri" },
   { key: "invoices", label: "Faturalar", description: "Fatura kayıtları" },
   { key: "team", label: "Ekip", description: "Firma içi mesajlaşma" },
+  { key: "hr", label: "İnsan Kaynakları", description: "Personel kartları, belge / sertifika takibi ve puantaj" },
 ];
+
+/** Bir modüle bağlı sayfalar (modül kapalıysa menüde görünmez ve açılmaz) */
+export const MODULE_ROUTES: Partial<Record<string, ToggleableModule>> = {
+  personnel: "hr",
+  certificates: "hr",
+  timesheets: "hr",
+  leaves: "hr",
+  announcements: "hr",
+  hrRequests: "hr",
+  hrReports: "hr",
+};
 
 export const NOTIFICATION_MODULES: { key: NotificationModule; label: string }[] = [
   { key: "stores", label: "Sahalar ve açılışlar" },
@@ -28,6 +55,8 @@ export const NOTIFICATION_MODULES: { key: NotificationModule; label: string }[] 
   { key: "progressPayments", label: "Hakedişler" },
   { key: "invoices", label: "Faturalar" },
   { key: "team", label: "Ekip mesajları" },
+  { key: "hr", label: "İnsan kaynakları" },
+  { key: "inventory", label: "Envanter ve araçlar" },
 ];
 
 export const NOTIFICATION_TYPES: {
@@ -45,6 +74,14 @@ export const NOTIFICATION_TYPES: {
   { type: "payment_pending_approval", module: "progressPayments", label: "Onay bekleyen hakedişler", description: "Gönderilmiş ve onay bekleyen hakedişler" },
   { type: "invoice_unpaid", module: "invoices", label: "Ödenmemiş faturalar", description: "Kesilmiş ama ödenmemiş faturalar" },
   { type: "team_unread", module: "team", label: "Okunmamış mesajlar", description: "Ekip sohbetinde size gelen yeni mesajlar" },
+  { type: "certificate_expiring", module: "hr", label: "Süresi dolan belgeler", description: "Süresi geçmiş ya da yaklaşan personel belge ve sertifikaları" },
+  { type: "certificate_pending", module: "hr", label: "Onay bekleyen belgeler", description: "Personelin yüklediği, İK onayı bekleyen belgeler" },
+  { type: "leave_pending", module: "hr", label: "Onay bekleyen izinler", description: "Yöneticisi ya da İK olarak onaylamanız gereken izin talepleri" },
+  { type: "leave_decided", module: "hr", label: "İzin talebimin sonucu", description: "İzin talebiniz onaylandığında ya da reddedildiğinde" },
+  { type: "announcement_unread", module: "hr", label: "Yeni duyurular", description: "Henüz okumadığınız firma duyuruları" },
+  { type: "hr_request_pending", module: "hr", label: "Bekleyen personel talepleri", description: "Sonuçlandırmanız gereken avans, belge ve diğer talepler" },
+  { type: "hr_request_decided", module: "hr", label: "Talebimin sonucu", description: "Avans ya da diğer talebiniz onaylandığında, reddedildiğinde ya da tamamlandığında" },
+  { type: "vehicle_expiring", module: "inventory", label: "Araç belgesi bitiyor", description: "Sigortası, kaskosu ya da muayenesi yaklaşan veya geçen araçlar" },
 ];
 
 export const START_PAGES: { value: string; label: string; routeKey: "dashboard" | "map" | "stores" | "tickets" | "contracts" }[] = [
@@ -57,6 +94,9 @@ export const START_PAGES: { value: string; label: string; routeKey: "dashboard" 
 
 export const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
+/** Günlük normal çalışma saati seçenekleri (haftalık 45 saat: 6 × 7,5 ya da 5 × 9) */
+export const DAILY_HOUR_OPTIONS = [7.5, 8, 9] as const;
+
 export type NotificationRule = { enabled: boolean; mandatory: boolean };
 
 export type OrgSettings = {
@@ -64,6 +104,8 @@ export type OrgSettings = {
     rules: Record<NotificationType, NotificationRule>;
     openingSoonDays: number;
     contractExpiryDays: number;
+    certificateExpiryDays: number;
+    vehicleExpiryDays: number;
   };
   modules: Record<ToggleableModule, boolean>;
   defaults: {
@@ -75,6 +117,8 @@ export type OrgSettings = {
     vatRate: number;
   };
   team: { retentionDays: number; fileSharing: boolean };
+  /** İK: Cumartesi iş günü mü (izin gün sayımı ve puantaja yazım); günlük normal çalışma saati */
+  hr: { saturdayWorking: boolean; dailyHours: number };
   assistant: { enabled: boolean; allowActions: boolean };
 };
 
@@ -105,16 +149,19 @@ export const DEFAULT_ORG_SETTINGS: OrgSettings = {
     >,
     openingSoonDays: 7,
     contractExpiryDays: 30,
+    certificateExpiryDays: 30,
+    vehicleExpiryDays: 30,
   },
-  modules: { tickets: true, contracts: true, progressPayments: true, invoices: true, team: true },
+  modules: { tickets: true, contracts: true, progressPayments: true, invoices: true, team: true, hr: true },
   defaults: { storeBudget: 1500000, currency: DEFAULT_CURRENCY, ticketCodePrefix: "TT", contractCodePrefix: "SZ", vatRate: 20 },
   team: { retentionDays: 3, fileSharing: true },
+  hr: { saturdayWorking: true, dailyHours: 7.5 },
   assistant: { enabled: true, allowActions: true },
 };
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   notifications: {
-    modules: { stores: true, contracts: true, tickets: true, progressPayments: true, invoices: true, team: true },
+    modules: { stores: true, contracts: true, tickets: true, progressPayments: true, invoices: true, team: true, hr: true, inventory: true },
     types: Object.fromEntries(ALL_TYPES.map((type) => [type, true])) as Record<NotificationType, boolean>,
     desktop: false,
   },
@@ -159,6 +206,8 @@ export function normalizeOrgSettings(raw: unknown): OrgSettings {
       ...merged.notifications,
       openingSoonDays: clamp(merged.notifications.openingSoonDays, 1, 90, d.notifications.openingSoonDays),
       contractExpiryDays: clamp(merged.notifications.contractExpiryDays, 1, 180, d.notifications.contractExpiryDays),
+      certificateExpiryDays: clamp(merged.notifications.certificateExpiryDays, 1, 180, d.notifications.certificateExpiryDays),
+      vehicleExpiryDays: clamp(merged.notifications.vehicleExpiryDays, 1, 180, d.notifications.vehicleExpiryDays),
     },
     defaults: {
       storeBudget: Math.max(0, roundMoney(Number(merged.defaults.storeBudget) || 0)),
@@ -172,6 +221,12 @@ export function normalizeOrgSettings(raw: unknown): OrgSettings {
     team: {
       ...merged.team,
       retentionDays: clamp(merged.team.retentionDays, 1, 30, d.team.retentionDays),
+    },
+    hr: {
+      ...merged.hr,
+      dailyHours: (DAILY_HOUR_OPTIONS as readonly number[]).includes(merged.hr.dailyHours)
+        ? merged.hr.dailyHours
+        : d.hr.dailyHours,
     },
   };
 }
@@ -209,7 +264,7 @@ export function notificationState(
 ): NotificationState {
   const rule = org.notifications.rules[type];
   if (!rule.enabled) return "disabled_by_org";
-  if (module !== "stores" && !org.modules[module]) return "disabled_by_org";
+  if (notificationModuleDisabled(module, org)) return "disabled_by_org";
   if (rule.mandatory) return "mandatory";
   return prefs.notifications.modules[module] && prefs.notifications.types[type] ? "active" : "off";
 }

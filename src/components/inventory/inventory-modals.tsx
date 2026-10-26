@@ -66,6 +66,10 @@ export function InventoryItemModal({
     status: item?.status ?? "active",
     purchaseDate: item?.purchaseDate ?? "",
     notes: item?.notes ?? "",
+    insuranceExpires: item?.insuranceExpires ?? "",
+    cascoExpires: item?.cascoExpires ?? "",
+    inspectionExpires: item?.inspectionExpires ?? "",
+    odometerKm: item?.odometerKm ?? null,
   });
   const [nameError, setNameError] = useState("");
   const set = <K extends keyof InventoryItemInput>(key: K, value: InventoryItemInput[K]) =>
@@ -151,6 +155,31 @@ export function InventoryItemModal({
             <DatePicker value={form.purchaseDate} onChange={(value) => set("purchaseDate", value)} />
           </FormField>
         </div>
+        {form.category === "vehicle" && (
+          <div className="grid gap-4 rounded-lg border border-zinc-800 bg-zinc-950/40 p-4 sm:grid-cols-4">
+            <p className="text-xs text-zinc-500 sm:col-span-4">
+              Belge bitişleri yaklaşınca araç sorumlularına ve aracın zimmetli olduğu kişiye bildirim gider.
+            </p>
+            <FormField label="Trafik sigortası bitişi">
+              <DatePicker value={form.insuranceExpires} onChange={(value) => set("insuranceExpires", value)} />
+            </FormField>
+            <FormField label="Kasko bitişi">
+              <DatePicker value={form.cascoExpires} onChange={(value) => set("cascoExpires", value)} />
+            </FormField>
+            <FormField label="Muayene bitişi">
+              <DatePicker value={form.inspectionExpires} onChange={(value) => set("inspectionExpires", value)} />
+            </FormField>
+            <FormField label="Kilometre">
+              <Input
+                type="number"
+                min={0}
+                value={form.odometerKm ?? ""}
+                onChange={(e) => set("odometerKm", e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value)) || 0))}
+                className="tabular-nums"
+              />
+            </FormField>
+          </div>
+        )}
         <FormField label="Not">
           <Textarea rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
         </FormField>

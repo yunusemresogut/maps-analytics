@@ -49,7 +49,7 @@ const SUGGESTIONS = [
   "Açılış tarihi geçmiş sahalar var mı?",
   "Hakediş ve fatura durumunu yorumla",
   "Riskli projeleri ve önerilerini listele",
-  "Yeni bir ticket aç",
+  "Yeni bir tadilat talebi aç",
   "Bir sahanın keşfine malzeme ekle",
 ];
 
@@ -395,7 +395,7 @@ export function AssistantWidget() {
         });
         return id
           ? { ok: true, label: `"${action.ticket.title}" ticket'ı açıldı`, href: `/tickets/${id}` }
-          : { ok: false, label: "Ticket oluşturulamadı" };
+          : { ok: false, label: "Tadilat talebi oluşturulamadı" };
       }
       case "add_work_plan": {
         const count = await importWorkPlan(action.storeId, action.rows, "append");

@@ -4,7 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
+  CalendarDays,
+  CalendarRange,
+  ChartColumn,
+  Inbox,
+  Megaphone,
   ClipboardList,
+  FileBadge,
+  IdCard,
   Boxes,
   Coins,
   FileText,
@@ -28,7 +35,8 @@ import { useSidebar } from "@/contexts/sidebar-context";
 import { useT } from "@/contexts/i18n-context";
 import { useTeamChat } from "@/contexts/team-chat-context";
 import { useSettings } from "@/contexts/settings-context";
-import { canAccessRoute } from "@/lib/permissions";
+import { canAccessRoute, canModule } from "@/lib/permissions";
+import { useMyPersonnelId } from "@/hooks/use-my-personnel";
 import { getRoleLabel } from "@/lib/roles";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import type { TranslationKey } from "@/i18n";
@@ -121,6 +129,7 @@ export function AppSidebar() {
   const t = useT();
   const { totalUnread } = useTeamChat();
   const { isModuleEnabled } = useSettings();
+  const { myPersonnelId } = useMyPersonnelId();
 
   if (!user) return null;
 
@@ -131,6 +140,35 @@ export function AppSidebar() {
   const mainItems = filterNav(MAIN_NAV);
   const adminItems =
     user.role === "admin" ? filterNav(ADMIN_NAV) : [];
+
+  // İK: yetkili tüm personeli yönetir; personel kartına bağlı kullanıcı kendi kaydını görür
+  const hrItems: NavItem[] = [];
+  if (isModuleEnabled("personnel")) {
+    const canPersonnel = canModule(user, "personnel", "view");
+    const canTimesheets = canModule(user, "timesheets", "view");
+    if (canPersonnel) {
+      hrItems.push(
+        { href: "/hr/personnel", labelKey: "nav.personnel", icon: IdCard, routeKey: "personnel" },
+        { href: "/hr/certificates", labelKey: "nav.certificates", icon: FileBadge, routeKey: "certificates" }
+      );
+    } else if (myPersonnelId) {
+      hrItems.push({ href: `/hr/personnel/${myPersonnelId}`, labelKey: "nav.myRecord", icon: IdCard, routeKey: "personnel" });
+    }
+    if (canTimesheets || myPersonnelId) {
+      hrItems.push({ href: "/hr/timesheets", labelKey: "nav.timesheets", icon: CalendarDays, routeKey: "timesheets" });
+    }
+    if (canModule(user, "leaves", "view") || myPersonnelId) {
+      hrItems.push({ href: "/hr/leaves", labelKey: "nav.leaves", icon: CalendarRange, routeKey: "leaves" });
+    }
+    if (canModule(user, "hrRequests", "view") || myPersonnelId) {
+      hrItems.push({ href: "/hr/requests", labelKey: "nav.hrRequests", icon: Inbox, routeKey: "hrRequests" });
+    }
+    // Duyurular firmadaki herkese
+    hrItems.push({ href: "/hr/announcements", labelKey: "nav.announcements", icon: Megaphone, routeKey: "announcements" });
+    if (canPersonnel) {
+      hrItems.push({ href: "/hr/reports", labelKey: "nav.hrReports", icon: ChartColumn, routeKey: "hrReports" });
+    }
+  }
 
   const handleNavClick = () => {
     if (!isPinned) close();
@@ -249,6 +287,14 @@ export function AppSidebar() {
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {mainItems.map(renderLink)}
+          {hrItems.length > 0 && (
+            <>
+              <p className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+                {t("nav.hr")}
+              </p>
+              {hrItems.map(renderLink)}
+            </>
+          )}
           {adminItems.length > 0 && (
             <>
               <p className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">

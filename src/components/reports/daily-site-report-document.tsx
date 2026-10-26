@@ -1,6 +1,11 @@
 import { format, isValid, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
-import { crewTotal, type DailySiteReport } from "@/lib/daily-site-report";
+import {
+  ATTENDANCE_STATUS_LABELS,
+  attendancePresent,
+  crewTotal,
+  type DailySiteReport,
+} from "@/lib/daily-site-report";
 import type { Store } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -100,9 +105,40 @@ export function DailySiteReportDocument({
       </div>
 
       <Section title="Sahadaki personel">
-        {crew.length === 0 ? (
-          <p className="text-neutral-400">Belirtilmedi</p>
-        ) : (
+        {crew.length === 0 && report.attendance.length === 0 && <p className="text-neutral-400">Belirtilmedi</p>}
+        {report.attendance.length > 0 && (
+          <table className="mb-2 w-full border-collapse text-[11px]">
+            <thead>
+              <tr className="bg-neutral-100 text-left text-[9px] uppercase tracking-wide text-neutral-600">
+                <th className="border border-neutral-300 px-2 py-1 font-semibold">Ad soyad</th>
+                <th className="border border-neutral-300 px-2 py-1 font-semibold">Görev</th>
+                <th className="w-24 border border-neutral-300 px-2 py-1 font-semibold">Durum</th>
+                <th className="w-24 border border-neutral-300 px-2 py-1 text-right font-semibold">Fazla mesai</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.attendance.map((row) => (
+                <tr key={row.personnelId}>
+                  <td className="border border-neutral-300 px-2 py-1">{row.name}</td>
+                  <td className="border border-neutral-300 px-2 py-1">{row.jobTitle || "—"}</td>
+                  <td className="border border-neutral-300 px-2 py-1">{ATTENDANCE_STATUS_LABELS[row.status]}</td>
+                  <td className="border border-neutral-300 px-2 py-1 text-right tabular-nums">
+                    {row.status !== "absent" && row.overtimeHours > 0 ? `${row.overtimeHours} sa` : "—"}
+                  </td>
+                </tr>
+              ))}
+              <tr className="font-semibold">
+                <td colSpan={3} className="border border-neutral-300 px-2 py-1 text-right">
+                  Sahada
+                </td>
+                <td className="border border-neutral-300 px-2 py-1 text-right tabular-nums">
+                  {attendancePresent(report.attendance)} kişi
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        )}
+        {crew.length > 0 && (
           <table className="w-full border-collapse text-[11px]">
             <thead>
               <tr className="bg-neutral-100 text-left text-[9px] uppercase tracking-wide text-neutral-600">

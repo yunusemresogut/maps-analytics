@@ -7,6 +7,7 @@ import { canModule } from "@/lib/permissions";
 import {
   NOTIFICATION_MODULES,
   NOTIFICATION_TYPES,
+  notificationModuleDisabled,
   notificationState,
   type NotificationModule,
 } from "@/lib/settings";
@@ -20,7 +21,10 @@ import type { NotificationType, User } from "@/types";
 
 /** Modülü görebilen kullanıcıya o modülün bildirim ayarları gösterilir */
 function canSeeModule(user: User, module: NotificationModule) {
-  if (module === "team") return true;
+  // Personel kendi belgelerinin bildirimini de alır
+  if (module === "team" || module === "hr") return true;
+  // Zimmetli aracın belgesi bitince aracı kullanan da bildirim alır
+  if (module === "inventory") return true;
   if (module === "stores") return canModule(user, "map", "view") || canModule(user, "stores", "view");
   return canModule(user, module, "view");
 }
@@ -57,7 +61,7 @@ export default function NotificationSettingsPage() {
   };
 
   const modules = NOTIFICATION_MODULES.filter(
-    (module) => canSeeModule(user, module.key) && (module.key === "stores" || org.modules[module.key])
+    (module) => canSeeModule(user, module.key) && !notificationModuleDisabled(module.key, org)
   );
 
   return (

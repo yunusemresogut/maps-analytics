@@ -302,7 +302,7 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
 function buildTicket(raw: Record<string, unknown>, ctx: BuildContext): ActionPreview {
   const errors: string[] = [];
   if (!ctx.isModuleEnabled("tickets")) errors.push("Tadilat talepleri modülü firma ayarlarından kapatılmış.");
-  else if (!canModule(ctx.user, "tickets", "add")) errors.push("Ticket oluşturma yetkiniz yok.");
+  else if (!canModule(ctx.user, "tickets", "add")) errors.push("Tadilat talebi oluşturma yetkiniz yok.");
   const title = str(raw.title);
   const description = str(raw.description);
   const priority = pick(raw.priority, PRIORITIES, "medium");
@@ -316,7 +316,7 @@ function buildTicket(raw: Record<string, unknown>, ctx: BuildContext): ActionPre
   }
 
   return {
-    title: "Yeni ticket",
+    title: "Yeni tadilat talebi",
     fields: [
       { label: "Başlık", value: title || "—" },
       { label: "Saha", value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" },

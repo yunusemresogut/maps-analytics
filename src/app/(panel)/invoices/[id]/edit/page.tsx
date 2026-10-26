@@ -41,6 +41,7 @@ function EditInvoiceContent({ id }: { id: string }) {
   const [status, setStatus] = useState<InvoiceStatus>(invoice?.status ?? "draft");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [showErrors, setShowErrors] = useState(false);
 
   if (!invoice) {
     return <div className="flex h-full items-center justify-center text-sm text-zinc-500">{t("common.noData")}</div>;
@@ -51,11 +52,13 @@ function EditInvoiceContent({ id }: { id: string }) {
   const taxAmount = calculateVat(amountValue, vatRate);
   const contractCurrency = contracts.find((c) => c.id === payment?.contractId)?.currency;
   const currencyMismatch = !!contractCurrency && contractCurrency !== currency;
+  const invalid = { payment: !progressPaymentId, number: !invoiceNumber.trim(), amount: amountValue <= 0 };
   const isCustomVatRate = !VAT_RATE_OPTIONS.some((rate) => rate === vatRate);
 
   const save = async () => {
     if (!canEdit) return;
-    if (!invoiceNumber.trim() || !progressPaymentId || amountValue <= 0) {
+    setShowErrors(true);
+    if (invalid.payment || invalid.number || invalid.amount) {
       setSaveError("Fatura numarası, hakediş ve sıfırdan büyük tutar zorunludur.");
       return;
     }
@@ -95,8 +98,8 @@ function EditInvoiceContent({ id }: { id: string }) {
       </div>
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div>
-          <label className="text-xs text-zinc-500">Hakediş</label>
-          <Select className="mt-1" value={progressPaymentId} onChange={(e) => setProgressPaymentId(e.target.value)} disabled={!canEdit}>
+          <label className="text-xs text-zinc-500">Hakediş *</label>
+          <Select className="mt-1" value={progressPaymentId} onChange={(e) => setProgressPaymentId(e.target.value)} disabled={!canEdit} aria-invalid={showErrors && invalid.payment}>
             <option value="">Seçiniz</option>
             {progressPayments.map((p) => (
               <option key={p.id} value={p.id}>{p.title}</option>
@@ -104,13 +107,13 @@ function EditInvoiceContent({ id }: { id: string }) {
           </Select>
         </div>
         <div>
-          <label className="text-xs text-zinc-500">Fatura no</label>
-          <Input className="mt-1" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} disabled={!canEdit} />
+          <label className="text-xs text-zinc-500">Fatura no *</label>
+          <Input className="mt-1" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} disabled={!canEdit} aria-invalid={showErrors && invalid.number} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Tutar (KDV hariç)</label>
-            <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} disabled={!canEdit} />
+            <label className="text-xs text-zinc-500">Tutar (KDV hariç) *</label>
+            <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} disabled={!canEdit} aria-invalid={showErrors && invalid.amount} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">KDV oranı</label>

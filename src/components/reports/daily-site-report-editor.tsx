@@ -8,6 +8,11 @@ import { tr } from "date-fns/locale";
 import { Eye, ImagePlus, ListChecks, Plus, Printer, Save, Trash2, X } from "lucide-react";
 import { ModuleFormShell } from "@/components/modules/module-form-shell";
 import { DailySiteReportDocument } from "@/components/reports/daily-site-report-document";
+import { ReportAttendanceSection } from "@/components/reports/report-attendance";
+import { Switch } from "@/components/ui/switch";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useSettings } from "@/contexts/settings-context";
+import { hrErrorMessage, syncAttendanceToTimesheet } from "@/lib/hr";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FormField } from "@/components/ui/form-field";
@@ -20,6 +25,7 @@ import { useStores } from "@/contexts/stores-context";
 import { fetchStoreWorkPlan } from "@/lib/store-details";
 import {
   WEATHER_OPTIONS,
+  attendancePresent,
   crewTotal,
   emptyDailySiteReport,
   newRowId,
@@ -95,11 +101,17 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState<{ tone: "error" | "success"; text: string } | null>(null);
+  const [storeMissing, setStoreMissing] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [workPlanState, setWorkPlanState] = useState<{ status: "idle" | "loading" | "error" | "empty" }>({
     status: "idle",
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const timesheetPerms = usePermissions("timesheets");
+  const { isModuleEnabled } = useSettings();
+  // Yoklama kaydedilirken puantaja işlenir (puantaj yazma yetkisi gerekir)
+  const canSyncTimesheet = (timesheetPerms.canAdd || timesheetPerms.canEdit) && isModuleEnabled("timesheets");
+  const [syncTimesheet, setSyncTimesheet] = useState(true);
 
   const store = getStore(report.storeId);
   const update = (patch: Partial<DailySiteReport>) => {
@@ -205,6 +217,7 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
 
   const save = async () => {
     if (!report.storeId) {
+      setStoreMissing(true);
       setNotice({ tone: "error", text: "Kaydetmek için şantiye seçin." });
       return;
     }
@@ -218,7 +231,27 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
         userName: user?.name ?? "",
       });
       setSavedId(result.id);
-      if (!meta && result.errors.length === 0) {
+
+      // Yoklama puantaja: hata raporun kaydını geri almaz, yalnızca bildirilir
+      let timesheetNote = "";
+      let timesheetFailed = false;
+      if (canSyncTimesheet && syncTimesheet && report.attendance.length > 0) {
+        try {
+          const sync = await syncAttendanceToTimesheet({
+            storeId: report.storeId,
+            date: report.date,
+            attendance: report.attendance,
+          });
+          timesheetNote = ` Puantaja ${sync.written} kişi işlendi.`;
+          if (sync.skipped.length > 0) timesheetNote += ` İzinli olduğu için işlenmeyen: ${sync.skipped.join(", ")}.`;
+        } catch (err) {
+          console.error("Yoklama puantaja işlenemedi:", err);
+          timesheetFailed = true;
+          timesheetNote = ` Ancak yoklama puantaja işlenemedi: ${hrErrorMessage(err, "bağlantınızı kontrol edin.")}`;
+        }
+      }
+
+      if (!meta && result.errors.length === 0 && !timesheetFailed) {
         // Yeni rapor: kayıtlı raporun sayfasına geçilir (fotoğraflar depodan gelir)
         setDirty(false);
         router.replace(`/reports/daily-site/${result.id}`);
@@ -235,8 +268,8 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
       setDirty(result.errors.length > 0);
       setNotice(
         result.errors.length > 0
-          ? { tone: "error", text: `Rapor kaydedildi ancak bazı fotoğraflar yüklenemedi: ${result.errors.join(" ")}` }
-          : { tone: "success", text: "Rapor kaydedildi." }
+          ? { tone: "error", text: `Rapor kaydedildi ancak bazı fotoğraflar yüklenemedi: ${result.errors.join(" ")}${timesheetNote}` }
+          : { tone: timesheetFailed ? "error" : "success", text: `Rapor kaydedildi.${timesheetNote}` }
       );
     } catch (err) {
       console.error("Rapor kaydedilemedi:", err);
@@ -339,7 +372,7 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
       <Panel title="Genel bilgiler">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <FormField label="Saha" required className="sm:col-span-2">
-            <Select value={report.storeId} onChange={(e) => onStoreChange(e.target.value)} placeholder="Şantiye seçin">
+            <Select value={report.storeId} onChange={(e) => onStoreChange(e.target.value)} placeholder="Şantiye seçin" aria-invalid={storeMissing && !report.storeId}>
               {stores.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name} ({item.city})
@@ -381,8 +414,32 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
 
       <Panel
         title="Sahadaki personel"
-        description={`Toplam ${crewTotal(report.crew)} kişi`}
-        action={
+        description={`Toplam ${attendancePresent(report.attendance) + crewTotal(report.crew)} kişi`}
+      >
+        <ReportAttendanceSection
+          storeId={report.storeId}
+          date={report.date}
+          attendance={report.attendance}
+          onChange={(attendance) => update({ attendance })}
+          autoFill={!meta}
+        />
+        {report.attendance.length > 0 &&
+          (canSyncTimesheet ? (
+            <Switch
+              checked={syncTimesheet}
+              onChange={setSyncTimesheet}
+              label="Kaydederken yoklamayı puantaja işle (izinli günler değişmez)"
+            />
+          ) : (
+            <p className="text-xs text-zinc-500">
+              Yoklama raporla birlikte saklanır; puantaja insan kaynakları aktarır.
+            </p>
+          ))}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 pt-4">
+          <div>
+            <h3 className="text-sm font-medium text-zinc-200">Ekip sayıları</h3>
+            <p className="text-xs text-zinc-500">İsim girilmeyen ekipler (ör. taşeron ekipleri) için kişi sayısı</p>
+          </div>
           <Button
             size="sm"
             variant="outline"
@@ -391,8 +448,7 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
             <Plus className="h-3.5 w-3.5" />
             Ekip ekle
           </Button>
-        }
-      >
+        </div>
         <div className="space-y-2">
           {report.crew.map((row, index) => (
             <div key={row.id} className="flex items-center gap-2">

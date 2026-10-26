@@ -16,6 +16,7 @@ import { STORAGE_KEYS } from "@/lib/storage-keys";
 import { clearTableMemory } from "@/lib/table-memory";
 import {
   DEFAULT_USER_PREFERENCES,
+  MODULE_ROUTES,
   START_PAGES,
   applyPatch,
   normalizeOrgSettings,
@@ -178,7 +179,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const isModuleEnabled = useCallback(
-    (module: string) => (module in org.modules ? org.modules[module as ToggleableModule] : true),
+    (module: string) => {
+      const key = MODULE_ROUTES[module] ?? module;
+      return key in org.modules ? org.modules[key as ToggleableModule] : true;
+    },
     [org.modules]
   );
 

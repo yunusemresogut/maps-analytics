@@ -157,7 +157,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       logActivity({
         category: "ticket",
         action: "create",
-        message: `Ticket oluşturuldu: ${ticket.title}`,
+        message: `Tadilat talebi oluşturuldu: ${ticket.title}`,
         ...actorOf(user),
         targetId: ticket.id,
         targetLabel: ticket.title,
@@ -208,7 +208,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       logActivity({
         category: "ticket",
         action: "update",
-        message: `Ticket güncellendi: ${title}`,
+        message: `Tadilat talebi güncellendi: ${title}`,
         ...actorOf(user),
         targetId: id,
         targetLabel: title,
@@ -230,7 +230,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       logActivity({
         category: "ticket",
         action: "delete",
-        message: `Ticket silindi: ${prev?.title ?? id}`,
+        message: `Tadilat talebi silindi: ${prev?.title ?? id}`,
         ...actorOf(user),
         targetId: id,
         targetLabel: prev?.title,

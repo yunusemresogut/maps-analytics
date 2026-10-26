@@ -38,11 +38,13 @@ function NewInvoiceContent() {
   const [status, setStatus] = useState<InvoiceStatus>("draft");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [showErrors, setShowErrors] = useState(false);
   const amountValue = amount ?? 0;
   const taxAmount = calculateVat(amountValue, vatRate);
   const payment = progressPayments.find((p) => p.id === progressPaymentId);
   const contractCurrency = contracts.find((c) => c.id === payment?.contractId)?.currency;
   const currencyMismatch = !!contractCurrency && contractCurrency !== currency;
+  const invalid = { payment: !progressPaymentId, number: !invoiceNumber.trim(), amount: amountValue <= 0 };
 
   if (!canAdd) {
     return <div className="flex h-full items-center justify-center text-sm text-zinc-500">Ekleme yetkiniz yok</div>;
@@ -57,7 +59,8 @@ function NewInvoiceContent() {
   };
 
   const save = async () => {
-    if (!invoiceNumber.trim() || !progressPaymentId || amountValue <= 0) {
+    setShowErrors(true);
+    if (invalid.payment || invalid.number || invalid.amount) {
       setSaveError("Fatura numarası, hakediş ve sıfırdan büyük tutar zorunludur.");
       return;
     }
@@ -78,12 +81,12 @@ function NewInvoiceContent() {
   };
 
   return (
-    <ModuleFormShell backHref="/invoices" backLabel="Faturalar" title="Yeni fatura" onSave={save} saving={saving} saveLabel="Oluştur" canSave={!!invoiceNumber.trim() && !!progressPaymentId && amountValue > 0}>
+    <ModuleFormShell backHref="/invoices" backLabel="Faturalar" title="Yeni fatura" onSave={save} saving={saving} saveLabel="Oluştur" canSave>
       {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div>
           <label className="text-xs text-zinc-500">Hakediş *</label>
-          <Select className="mt-1" value={progressPaymentId} onChange={(e) => onPaymentChange(e.target.value)}>
+          <Select className="mt-1" value={progressPaymentId} onChange={(e) => onPaymentChange(e.target.value)} aria-invalid={showErrors && invalid.payment}>
             <option value="">Seçiniz</option>
             {progressPayments.map((p) => (
               <option key={p.id} value={p.id}>{p.title}{p.periodLabel ? ` (${p.periodLabel})` : ""}</option>
@@ -92,12 +95,12 @@ function NewInvoiceContent() {
         </div>
         <div>
           <label className="text-xs text-zinc-500">Fatura no *</label>
-          <Input className="mt-1" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
+          <Input className="mt-1" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} aria-invalid={showErrors && invalid.number} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Tutar (KDV hariç)</label>
-            <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} />
+            <label className="text-xs text-zinc-500">Tutar (KDV hariç) *</label>
+            <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} aria-invalid={showErrors && invalid.amount} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">KDV oranı</label>

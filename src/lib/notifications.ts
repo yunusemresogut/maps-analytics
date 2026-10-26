@@ -10,6 +10,10 @@ import type {
   User,
 } from "@/types";
 import { getOpeningAlert } from "@/lib/opening-dates";
+import { CERTIFICATE_TYPE_LABELS, formatHours, type Certificate } from "@/lib/hr";
+import { LEAVE_TYPE_LABELS, canDecide, type LeaveRequest } from "@/lib/leaves";
+import { REQUEST_STATUS_LABELS, REQUEST_TYPE_LABELS, type Announcement, type PersonnelRequest } from "@/lib/hr-admin";
+import { nearestVehicleDocument, type InventoryItem } from "@/lib/inventory";
 import { needsContractWarning } from "@/lib/module-finance";
 import { canModule } from "@/lib/permissions";
 import {
@@ -31,6 +35,15 @@ type NotificationInput = {
   invoices: Invoice[];
   teamMessages: TeamMessage[];
   users: Pick<User, "id" | "name">[];
+  /** Süresi geçmiş / yaklaşan ve onay bekleyen belgeler (RLS: yetkisizse yalnızca kendi belgeleri) */
+  certificates: Certificate[];
+  /** Bekleyen ve kullanıcının son sonuçlanan izin talepleri */
+  leaves: LeaveRequest[];
+  announcements: Announcement[];
+  /** Bekleyen ve kullanıcının son sonuçlanan personel talepleri */
+  requests: PersonnelRequest[];
+  /** Belgesi eşik gününe kadar biten araçlar (RLS: yetkisizse yalnızca zimmetindekiler) */
+  vehicles: InventoryItem[];
 };
 
 function daysUntil(date: string): number | null {
@@ -209,6 +222,153 @@ export function computeNotifications(input: NotificationInput): AppNotification[
         read: false,
         actionHref: `/team?peer=${senderId}`,
         actionLabel: "Sohbeti aç",
+      });
+    }
+  }
+
+  if (org.modules.hr) {
+    const seen = new Set<string>();
+    for (const certificate of input.certificates) {
+      if (seen.has(certificate.id)) continue;
+      seen.add(certificate.id);
+      const label = certificate.name || CERTIFICATE_TYPE_LABELS[certificate.type];
+      const href = `/hr/personnel/${certificate.personnelId}`;
+
+      const left = daysUntil(certificate.expiresAt);
+      if (
+        shown.has("certificate_expiring") &&
+        certificate.personnelActive &&
+        left !== null &&
+        left <= org.notifications.certificateExpiryDays
+      ) {
+        notifications.push({
+          // Belge yenilenince (bitiş değişince) bildirim yeniden görünür
+          id: `notif-cert-expiry-${certificate.id}-${certificate.expiresAt}`,
+          type: "certificate_expiring",
+          message:
+            left < 0
+              ? `${certificate.personnelName} · ${label}: süresi ${-left} gün önce doldu`
+              : left === 0
+                ? `${certificate.personnelName} · ${label}: süresi bugün doluyor`
+                : `${certificate.personnelName} · ${label}: süresinin dolmasına ${left} gün kaldı`,
+          createdAt: now,
+          read: false,
+          actionHref: href,
+          actionLabel: "Personeli aç",
+        });
+      }
+
+      if (shown.has("certificate_pending") && !certificate.verified && canModule(user, "personnel", "edit")) {
+        notifications.push({
+          id: `notif-cert-pending-${certificate.id}`,
+          type: "certificate_pending",
+          message: `${certificate.personnelName} · ${label} onay bekliyor`,
+          createdAt: now,
+          read: false,
+          actionHref: href,
+          actionLabel: "Belgeyi incele",
+        });
+      }
+    }
+
+    const seenLeaves = new Set<string>();
+    for (const leave of input.leaves) {
+      if (seenLeaves.has(leave.id)) continue;
+      seenLeaves.add(leave.id);
+      const period = `${LEAVE_TYPE_LABELS[leave.type]}, ${formatHours(leave.dayCount)} gün`;
+      if (
+        shown.has("leave_pending") &&
+        canDecide(leave, user, canModule(user, "leaves", "edit")) &&
+        // İK, yönetici adımındaki talepler için bildirim almaz (yöneticisi var)
+        (leave.status === "pending_hr" || leave.managerId === user.id)
+      ) {
+        notifications.push({
+          // Yönetici onayından sonra İK için yeniden görünür
+          id: `notif-leave-pending-${leave.id}-${leave.status}`,
+          type: "leave_pending",
+          message: `${leave.personnelName} · ${period} onayınızı bekliyor`,
+          createdAt: leave.managerDecidedAt ?? leave.createdAt,
+          read: false,
+          actionHref: "/hr/leaves",
+          actionLabel: "Talebi incele",
+        });
+      }
+      if (shown.has("leave_decided") && leave.personnelUserId === user.id && (leave.status === "approved" || leave.status === "rejected")) {
+        notifications.push({
+          id: `notif-leave-decided-${leave.id}-${leave.status}`,
+          type: "leave_decided",
+          message: `İzin talebiniz (${period}) ${leave.status === "approved" ? "onaylandı" : "reddedildi"}`,
+          createdAt: leave.hrDecidedAt ?? leave.managerDecidedAt ?? leave.createdAt,
+          read: false,
+          actionHref: "/hr/leaves",
+          actionLabel: "İzinlerim",
+        });
+      }
+    }
+
+    if (shown.has("announcement_unread")) {
+      for (const announcement of input.announcements) {
+        notifications.push({
+          id: `notif-announcement-${announcement.id}`,
+          type: "announcement_unread",
+          message: announcement.requiresAck ? `${announcement.title} — okuyup onaylamanız gerekiyor` : announcement.title,
+          createdAt: announcement.publishAt,
+          read: false,
+          actionHref: "/hr/announcements",
+          actionLabel: "Duyuruyu oku",
+        });
+      }
+    }
+
+    const isRequestHr = canModule(user, "hrRequests", "edit");
+    for (const request of input.requests) {
+      const own = request.personnelUserId === user.id;
+      const label = `${REQUEST_TYPE_LABELS[request.type].split(" (")[0]}: ${request.title}`;
+      if (shown.has("hr_request_pending") && request.status === "pending" && isRequestHr && !own) {
+        notifications.push({
+          id: `notif-request-pending-${request.id}`,
+          type: "hr_request_pending",
+          message: `${request.personnelName} · ${label}`,
+          createdAt: request.createdAt,
+          read: false,
+          actionHref: "/hr/requests",
+          actionLabel: "Talebi incele",
+        });
+      }
+      if (shown.has("hr_request_decided") && own && ["approved", "rejected", "completed"].includes(request.status)) {
+        notifications.push({
+          id: `notif-request-decided-${request.id}-${request.status}`,
+          type: "hr_request_decided",
+          message: `${label} — ${REQUEST_STATUS_LABELS[request.status].toLocaleLowerCase("tr-TR")}`,
+          createdAt: request.completedAt ?? request.decidedAt ?? request.createdAt,
+          read: false,
+          actionHref: "/hr/requests",
+          actionLabel: "Taleplerim",
+        });
+      }
+    }
+  }
+
+  if (shown.has("vehicle_expiring")) {
+    for (const vehicle of input.vehicles) {
+      const doc = nearestVehicleDocument(vehicle);
+      const left = doc ? daysUntil(doc.date) : null;
+      if (!doc || left === null || left > org.notifications.vehicleExpiryDays) continue;
+      const name = [vehicle.serialNo, vehicle.name].filter(Boolean).join(" · ");
+      notifications.push({
+        // Belge yenilenince (tarih değişince) yeniden görünür
+        id: `notif-vehicle-${vehicle.id}-${doc.label}-${doc.date}`,
+        type: "vehicle_expiring",
+        message:
+          left < 0
+            ? `${name}: ${doc.label.toLocaleLowerCase("tr-TR")} ${-left} gün önce bitti`
+            : left === 0
+              ? `${name}: ${doc.label.toLocaleLowerCase("tr-TR")} bugün bitiyor`
+              : `${name}: ${doc.label.toLocaleLowerCase("tr-TR")} bitişine ${left} gün kaldı`,
+        createdAt: now,
+        read: false,
+        actionHref: "/inventory",
+        actionLabel: "Envantere git",
       });
     }
   }

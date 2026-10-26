@@ -42,6 +42,7 @@ import {
   fetchInventoryCounts,
   inventoryErrorMessage,
   mapInventoryRow,
+  nearestVehicleDocument,
   returnInventoryItem,
   updateAssignment,
   updateInventoryItem,
@@ -49,6 +50,7 @@ import {
   type InventoryState,
 } from "@/lib/inventory";
 import { cn } from "@/lib/utils";
+import { differenceInCalendarDays, parseISO } from "date-fns";
 
 type SortKey = "name" | "code" | "category" | "state" | "assignee";
 
@@ -90,6 +92,8 @@ function InventoryRow({
   const assignment = item.assignment;
   const overdue = isOverdue(item);
   const details = [CATEGORY_LABELS[item.category], item.brand, item.serialNo].filter(Boolean).join(" · ");
+  const vehicleDoc = item.category === "vehicle" && item.state !== "retired" ? nearestVehicleDocument(item) : null;
+  const vehicleDays = vehicleDoc ? differenceInCalendarDays(parseISO(vehicleDoc.date), new Date()) : null;
 
   return (
     <li className="flex flex-col gap-4 rounded-xl border border-zinc-800 bg-zinc-900/40 px-5 py-4 transition-colors hover:border-zinc-700 lg:flex-row lg:items-center lg:gap-8">
@@ -104,6 +108,18 @@ function InventoryRow({
             <span className="truncate text-base font-semibold text-zinc-100">{item.name}</span>
           </p>
           <p className="mt-1 truncate text-sm text-zinc-500">{details}</p>
+          {vehicleDoc && vehicleDays !== null && vehicleDays <= 30 && (
+            <span
+              className={cn(
+                "mt-1 inline-flex rounded-full border px-2 py-0.5 text-xs font-medium",
+                vehicleDays < 0
+                  ? "border-red-500/25 bg-red-500/10 text-red-400"
+                  : "border-amber-500/25 bg-amber-500/10 text-amber-400"
+              )}
+            >
+              {vehicleDoc.label}: {vehicleDays < 0 ? `${-vehicleDays} gün geçti` : vehicleDays === 0 ? "bugün bitiyor" : `${vehicleDays} gün kaldı`}
+            </span>
+          )}
         </div>
       </div>
 

@@ -2,7 +2,7 @@
 
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useSettings } from "@/contexts/settings-context";
-import { TOGGLEABLE_MODULES } from "@/lib/settings";
+import { DAILY_HOUR_OPTIONS, TOGGLEABLE_MODULES } from "@/lib/settings";
 import { Select } from "@/components/ui/select";
 import {
   SettingRow,
@@ -71,6 +71,34 @@ function ModulesContent() {
         </SettingsSection>
       )}
 
+      {org.modules.hr && (
+        <SettingsSection title="İnsan kaynakları">
+          <SwitchRow
+            label="Cumartesi iş günü"
+            description="Açıksa Cumartesi izinden düşülür ve izin onaylanınca puantaja izin olarak yazılır. Kapalıysa (5 günlük çalışma) Cumartesi izin gününe sayılmaz."
+            checked={org.hr.saturdayWorking}
+            onChange={(enabled) => void run(() => updateOrgSettings({ hr: { saturdayWorking: enabled } }))}
+          />
+          <SettingRow
+            label="Günlük çalışma saati"
+            description="Puantaj ve günlük rapor yoklamasında “Çalıştı” günü için varsayılan normal çalışma saati"
+          >
+            <Select
+              aria-label="Günlük çalışma saati"
+              value={org.hr.dailyHours}
+              onChange={(e) => void run(() => updateOrgSettings({ hr: { dailyHours: Number(e.target.value) } }))}
+              className="h-9 w-32"
+            >
+              {DAILY_HOUR_OPTIONS.map((hours) => (
+                <option key={hours} value={hours}>
+                  {String(hours).replace(".", ",")} saat
+                </option>
+              ))}
+            </Select>
+          </SettingRow>
+        </SettingsSection>
+      )}
+
       <SettingsSection title="Asistan" description="Sayfanın altındaki “Maps'e Sor” yapay zekâ asistanı">
         <SwitchRow
           label="Asistanı etkinleştir"
@@ -80,7 +108,7 @@ function ModulesContent() {
         />
         <SwitchRow
           label="Asistanla kayıt ekleme"
-          description="Saha, ticket, iş planı ve keşif kalemlerinin sohbetten (önizleme ve onayla) eklenmesine izin verir. Kullanıcı yetkileri yine geçerlidir."
+          description="Saha, tadilat talebi, iş planı ve keşif kalemlerinin sohbetten (önizleme ve onayla) eklenmesine izin verir. Kullanıcı yetkileri yine geçerlidir."
           checked={org.assistant.allowActions}
           disabled={!org.assistant.enabled}
           indent

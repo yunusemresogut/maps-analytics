@@ -10,6 +10,26 @@ export const WEATHER_OPTIONS = ["Açık", "Parçalı bulutlu", "Bulutlu", "Yağm
 
 export type ReportCrewRow = { id: string; trade: string; count: number | null };
 
+/** İsimli yoklamada seçilebilen durumlar (puantaj durumlarının sahada belirlenenleri) */
+export type AttendanceStatus = "worked" | "half_day" | "absent";
+
+export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
+  worked: "Çalıştı",
+  half_day: "Yarım gün",
+  absent: "Gelmedi",
+};
+
+/** İsimli yoklama satırı; kayıtta puantaja işlenir (src/lib/hr.ts) */
+export type ReportAttendance = {
+  personnelId: string;
+  /** Rapor yazdırılırken ve personel silinse de görünsün diye ad da saklanır */
+  name: string;
+  jobTitle: string;
+  status: AttendanceStatus;
+  hours: number;
+  overtimeHours: number;
+};
+
 export type ReportPhoto = {
   id: string;
   /** Gösterim adresi: yeni fotoğrafta blob URL, kayıtlıda imzalı depo bağlantısı */
@@ -31,6 +51,7 @@ export type DailySiteReport = {
   siteManager: string;
   contractor: string;
   crew: ReportCrewRow[];
+  attendance: ReportAttendance[];
   worksDone: string;
   materialsReceived: string;
   issues: string;
@@ -53,6 +74,7 @@ export function emptyDailySiteReport(preparedBy: string, date: string): DailySit
     siteManager: "",
     contractor: "",
     crew: [{ id: newRowId(), trade: "", count: null }],
+    attendance: [],
     worksDone: "",
     materialsReceived: "",
     issues: "",
@@ -64,6 +86,11 @@ export function emptyDailySiteReport(preparedBy: string, date: string): DailySit
 
 export function crewTotal(crew: ReportCrewRow[]): number {
   return crew.reduce((sum, row) => sum + (row.count ?? 0), 0);
+}
+
+/** Yoklamada sahada olan (çalıştı / yarım gün) kişi sayısı */
+export function attendancePresent(attendance: ReportAttendance[]): number {
+  return attendance.filter((row) => row.status !== "absent").length;
 }
 
 /** Rapor gününe denk gelen ya da devam eden iş kalemleri, madde listesi olarak */

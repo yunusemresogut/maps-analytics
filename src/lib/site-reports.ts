@@ -4,7 +4,9 @@ import { FULL_MANAGER_ROLES, isAdmin } from "@/lib/roles";
 import {
   WEATHER_OPTIONS,
   newRowId,
+  type AttendanceStatus,
   type DailySiteReport,
+  type ReportAttendance,
   type ReportCrewRow,
   type ReportPhoto,
 } from "@/lib/daily-site-report";
@@ -65,6 +67,30 @@ function crewRows(raw: unknown): ReportCrewRow[] {
   });
 }
 
+const ATTENDANCE_STATUSES: AttendanceStatus[] = ["worked", "half_day", "absent"];
+
+export function attendanceRows(raw: unknown): ReportAttendance[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item): ReportAttendance[] => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const status = row.status as AttendanceStatus;
+    if (typeof row.personnelId !== "string" || !ATTENDANCE_STATUSES.includes(status)) return [];
+    const hours = Number(row.hours);
+    const overtime = Number(row.overtimeHours);
+    return [
+      {
+        personnelId: row.personnelId,
+        name: text(row.name),
+        jobTitle: text(row.jobTitle),
+        status,
+        hours: Number.isFinite(hours) ? hours : 0,
+        overtimeHours: Number.isFinite(overtime) ? overtime : 0,
+      },
+    ];
+  });
+}
+
 /** Kaydedilen içerik: şantiye ve tarih sütunlarda, geri kalanı data'da */
 function reportData(report: DailySiteReport, photos: StoredPhoto[]) {
   return {
@@ -74,6 +100,7 @@ function reportData(report: DailySiteReport, photos: StoredPhoto[]) {
     siteManager: report.siteManager,
     contractor: report.contractor,
     crew: report.crew.map(({ id, trade, count }) => ({ id, trade, count })),
+    attendance: report.attendance,
     worksDone: report.worksDone,
     materialsReceived: report.materialsReceived,
     issues: report.issues,
@@ -132,6 +159,7 @@ export async function fetchSiteReport(id: string): Promise<{ report: DailySiteRe
       siteManager: text(data.siteManager),
       contractor: text(data.contractor),
       crew: crewRows(data.crew),
+      attendance: attendanceRows(data.attendance),
       worksDone: text(data.worksDone),
       materialsReceived: text(data.materialsReceived),
       issues: text(data.issues),

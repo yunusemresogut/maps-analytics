@@ -164,7 +164,7 @@ function DefaultsSection() {
           </Select>
         </FormField>
         <FormField
-          label="Ticket kod öneki"
+          label="Tadilat talebi kod öneki"
           hint={`Örnek: ${form.ticketCodePrefix || "TT"}-0001`}
         >
           <Input {...prefixInput("ticketCodePrefix")} />

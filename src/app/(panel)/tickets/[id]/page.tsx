@@ -72,7 +72,7 @@ function TicketDetail({ id }: { id: string }) {
           )}
         </header>
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             <p className="text-xs text-zinc-500">Durum</p>
             <p className="mt-1 text-sm font-medium text-zinc-200">{STATUS_LABELS[ticket.status]}</p>
@@ -80,6 +80,10 @@ function TicketDetail({ id }: { id: string }) {
           <div>
             <p className="text-xs text-zinc-500">Öncelik</p>
             <p className="mt-1 text-sm font-medium text-zinc-200">{PRIORITY_LABELS[ticket.priority]}</p>
+          </div>
+          <div>
+            <p className="text-xs text-zinc-500">Atanan</p>
+            <p className="mt-1 text-sm font-medium text-zinc-200">{ticket.assigneeName || "Atanmamış"}</p>
           </div>
           <div>
             <p className="text-xs text-zinc-500">Oluşturan</p>

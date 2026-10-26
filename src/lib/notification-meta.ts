@@ -3,6 +3,12 @@ import {
   CalendarClock,
   Clock,
   Coins,
+  FileBadge,
+  FileClock,
+  CalendarCheck,
+  Car,
+  Inbox,
+  Megaphone,
   MessageSquare,
   Receipt,
   ShoppingCart,
@@ -24,6 +30,14 @@ export const NOTIFICATION_META: Record<NotificationType, { icon: LucideIcon; col
   payment_pending_approval: { icon: Receipt, color: "text-emerald-400", label: "Onay Bekleyen Hakediş" },
   invoice_unpaid: { icon: Coins, color: "text-amber-400", label: "Ödenmemiş Fatura" },
   team_unread: { icon: MessageSquare, color: "text-cyan-400", label: "Yeni Mesaj" },
+  certificate_expiring: { icon: FileClock, color: "text-amber-400", label: "Belge Süresi" },
+  certificate_pending: { icon: FileBadge, color: "text-teal-400", label: "Onay Bekleyen Belge" },
+  leave_pending: { icon: CalendarClock, color: "text-sky-400", label: "Onay Bekleyen İzin" },
+  leave_decided: { icon: CalendarCheck, color: "text-emerald-400", label: "İzin Sonucu" },
+  announcement_unread: { icon: Megaphone, color: "text-cyan-400", label: "Duyuru" },
+  hr_request_pending: { icon: Inbox, color: "text-sky-400", label: "Bekleyen Talep" },
+  hr_request_decided: { icon: Inbox, color: "text-emerald-400", label: "Talep Sonucu" },
+  vehicle_expiring: { icon: Car, color: "text-amber-400", label: "Araç Belgesi" },
 };
 
 export function notificationModule(type: NotificationType) {

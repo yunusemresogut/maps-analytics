@@ -56,7 +56,13 @@ export type AppModuleKey =
   | "contracts"
   | "progressPayments"
   | "invoices"
-  | "inventory";
+  | "inventory"
+  | "personnel"
+  | "personnelPrivate"
+  | "timesheets"
+  | "leaves"
+  | "announcements"
+  | "hrRequests";
 
 export type ModuleCrud = Record<PermissionAction, boolean>;
 
@@ -84,6 +90,13 @@ export type AppRouteKey =
   | "team"
   | "reports"
   | "inventory"
+  | "personnel"
+  | "certificates"
+  | "timesheets"
+  | "leaves"
+  | "announcements"
+  | "hrRequests"
+  | "hrReports"
   | "profile"
   | "settings"
   | "adminSettings"
@@ -379,7 +392,15 @@ export type NotificationType =
   | "ticket_high_priority"
   | "payment_pending_approval"
   | "invoice_unpaid"
-  | "team_unread";
+  | "team_unread"
+  | "certificate_expiring"
+  | "certificate_pending"
+  | "leave_pending"
+  | "leave_decided"
+  | "announcement_unread"
+  | "hr_request_pending"
+  | "hr_request_decided"
+  | "vehicle_expiring";
 
 export type AppNotification = {
   id: string;
@@ -414,7 +435,8 @@ export type ActivityCategory =
   | "file"
   | "material"
   | "workplan"
-  | "inventory";
+  | "inventory"
+  | "hr";
 
 export type ActivityLogEntry = {
   id: string;

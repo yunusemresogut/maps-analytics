@@ -46,6 +46,7 @@ function EditPaymentContent({ id }: { id: string }) {
   const [status, setStatus] = useState<ProgressPaymentStatus>(payment?.status ?? "draft");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [showErrors, setShowErrors] = useState(false);
 
   if (!payment) {
     return <div className="flex h-full items-center justify-center text-sm text-zinc-500">{t("common.noData")}</div>;
@@ -53,10 +54,22 @@ function EditPaymentContent({ id }: { id: string }) {
 
   const contract = contracts.find((c) => c.id === contractId);
   const paid = paidAmountForPayment(id, invoices);
+  // Dönem isteğe bağlı; girildiyse iki tarih birlikte ve sıralı olmalı
+  const periodPartial = (!!periodStart || !!periodEnd) && (!periodStart || !periodEnd);
+  const invalid = {
+    title: !title.trim(),
+    start: periodPartial && !periodStart,
+    end: (periodPartial && !periodEnd) || (!!periodStart && !!periodEnd && periodEnd < periodStart),
+  };
 
   const save = async () => {
     if (!canEdit) return;
-    if ((periodStart || periodEnd) && (!periodStart || !periodEnd)) {
+    setShowErrors(true);
+    if (invalid.title) {
+      setSaveError("Başlık zorunludur.");
+      return;
+    }
+    if (periodPartial) {
       setSaveError("Dönem için başlangıç ve bitiş tarihlerini birlikte girin.");
       return;
     }
@@ -112,18 +125,18 @@ function EditPaymentContent({ id }: { id: string }) {
           </Select>
         </div>
         <div>
-          <label className="text-xs text-zinc-500">Başlık</label>
-          <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit} />
+          <label className="text-xs text-zinc-500">Başlık *</label>
+          <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit} aria-invalid={showErrors && invalid.title} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="text-xs text-zinc-500">Dönem başlangıcı</label>
-            <DatePicker className="mt-1" value={periodStart} onChange={setPeriodStart} disabled={!canEdit} />
+            <DatePicker className="mt-1" value={periodStart} onChange={setPeriodStart} disabled={!canEdit} aria-invalid={showErrors && invalid.start} />
             {!periodStart && periodLabel && <p className="mt-1 text-xs text-zinc-500">Mevcut dönem: {periodLabel}</p>}
           </div>
           <div>
             <label className="text-xs text-zinc-500">Dönem bitişi</label>
-            <DatePicker className="mt-1" value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} disabled={!canEdit} />
+            <DatePicker className="mt-1" value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} disabled={!canEdit} aria-invalid={showErrors && invalid.end} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">Toplam hakediş</label>

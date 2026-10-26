@@ -9,6 +9,7 @@ import { ModuleFormShell } from "@/components/modules/module-form-shell";
 import { useModules } from "@/contexts/modules-context";
 import { useStores } from "@/contexts/stores-context";
 import { usePermissions } from "@/hooks/use-permissions";
+import { getRoleLabel } from "@/lib/roles";
 import { nextTicketCode } from "@/lib/module-codes";
 import { useSettings } from "@/contexts/settings-context";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,7 @@ const PRIORITY_TR: Record<TicketPriority, string> = {
 
 function NewTicketContent() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, users, organization } = useAuth();
   const { tickets, createTicket } = useModules();
   const { stores } = useStores();
   const { canAdd } = usePermissions("tickets");
@@ -38,11 +39,20 @@ function NewTicketContent() {
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [storeId, setStoreId] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
   const [saving, setSaving] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [saveError, setSaveError] = useState("");
+  const [showErrors, setShowErrors] = useState(false);
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null);
+  const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name, "tr"));
   const ticketCode = codeTouched ? code : nextTicketCode(tickets, org.defaults.ticketCodePrefix);
+  const invalid = {
+    code: !ticketCode.trim(),
+    title: !title.trim(),
+    store: !storeId,
+    assignee: !users.some((u) => u.id === assigneeId),
+  };
 
   if (!canAdd) {
     return (
@@ -53,16 +63,30 @@ function NewTicketContent() {
   }
 
   const save = async () => {
-    if (!title.trim() || createdTicketId) return;
+    if (createdTicketId) return;
+    setShowErrors(true);
+    const missing = [
+      invalid.code && "Kod",
+      invalid.title && "Başlık",
+      invalid.store && "Saha",
+      invalid.assignee && "Atanan",
+    ].filter(Boolean);
+    if (missing.length > 0) {
+      setSaveError(`Zorunlu alanları doldurun: ${missing.join(", ")}`);
+      return;
+    }
     setSaveError("");
     setSaving(true);
+    const assignee = users.find((u) => u.id === assigneeId);
     const id = await createTicket({
       title: title.trim(),
-      code: ticketCode.trim() || undefined,
+      code: ticketCode.trim(),
       description,
       priority,
       status: "open",
-      storeId: storeId || undefined,
+      storeId,
+      assigneeId: assignee?.id,
+      assigneeName: assignee?.name,
     });
     if (!id) {
       setSaving(false);
@@ -95,7 +119,7 @@ function NewTicketContent() {
       onSave={save}
       saving={saving}
       saveLabel="Oluştur"
-      canSave={!!title.trim() && !createdTicketId}
+      canSave={!createdTicketId}
     >
       {saveError && (
         <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -108,21 +132,22 @@ function NewTicketContent() {
         </p>
       )}
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-4">
           <div>
-            <label className="text-xs text-zinc-500">Kod</label>
+            <label className="text-xs text-zinc-500">Kod *</label>
             <Input
               className="mt-1 font-mono"
               value={ticketCode}
+              aria-invalid={showErrors && invalid.code}
               onChange={(e) => {
                 setCodeTouched(true);
                 setCode(e.target.value);
               }}
             />
           </div>
-          <div>
+          <div className="sm:col-span-3">
             <label className="text-xs text-zinc-500">Başlık *</label>
-            <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} aria-invalid={showErrors && invalid.title} />
           </div>
         </div>
         <div>
@@ -131,8 +156,8 @@ function NewTicketContent() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Saha</label>
-            <Select className="mt-1" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
+            <label className="text-xs text-zinc-500">Saha *</label>
+            <Select className="mt-1" value={storeId} onChange={(e) => setStoreId(e.target.value)} aria-invalid={showErrors && invalid.store}>
               <option value="">Seçiniz</option>
               {stores.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
@@ -144,6 +169,15 @@ function NewTicketContent() {
             <Select className="mt-1" value={priority} onChange={(e) => setPriority(e.target.value as TicketPriority)}>
               {Object.entries(PRIORITY_TR).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500">Atanan *</label>
+            <Select className="mt-1" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} aria-invalid={showErrors && invalid.assignee}>
+              <option value="">Seçiniz</option>
+              {sortedUsers.map((u) => (
+                <option key={u.id} value={u.id}>{u.name} — {getRoleLabel(u.role, organization)}</option>
               ))}
             </Select>
           </div>

@@ -1,4 +1,4 @@
-/** Ticket / sözleşme kod önizlemesi — DB trigger ile uyumlu prefix'ler */
+/** Tadilat talebi / sözleşme kod önizlemesi — DB trigger ile uyumlu prefix'ler */
 
 function maxSeq(codes: (string | undefined)[], prefix: string): number {
   let max = 0;

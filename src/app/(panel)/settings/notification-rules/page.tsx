@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useSettings } from "@/contexts/settings-context";
-import { NOTIFICATION_MODULES, NOTIFICATION_TYPES } from "@/lib/settings";
+import { NOTIFICATION_MODULES, NOTIFICATION_TYPES, notificationModuleDisabled } from "@/lib/settings";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { SettingRow, SettingsPageHeader, SettingsSection, useAutoSave } from "@/components/settings/settings-ui";
@@ -82,10 +82,28 @@ function NotificationRulesContent() {
             onSave={(days) => void run(() => updateOrgSettings({ notifications: { contractExpiryDays: days } }))}
           />
         </SettingRow>
+        <SettingRow label="Belge süresi uyarısı" description="Bitişine bu kadar gün kalan personel belge ve sertifikaları için bildirim (1–180)">
+          <DaysInput
+            label="Belge süresi uyarısı"
+            value={org.notifications.certificateExpiryDays}
+            min={1}
+            max={180}
+            onSave={(days) => void run(() => updateOrgSettings({ notifications: { certificateExpiryDays: days } }))}
+          />
+        </SettingRow>
+        <SettingRow label="Araç belgesi uyarısı" description="Sigorta, kasko ya da muayenesinin bitmesine bu kadar gün kalan araçlar için bildirim (1–180)">
+          <DaysInput
+            label="Araç belgesi uyarısı"
+            value={org.notifications.vehicleExpiryDays}
+            min={1}
+            max={180}
+            onSave={(days) => void run(() => updateOrgSettings({ notifications: { vehicleExpiryDays: days } }))}
+          />
+        </SettingRow>
       </SettingsSection>
 
       {NOTIFICATION_MODULES.map((module) => {
-        const moduleDisabled = module.key !== "stores" && !org.modules[module.key];
+        const moduleDisabled = notificationModuleDisabled(module.key, org);
         return (
           <SettingsSection
             key={module.key}

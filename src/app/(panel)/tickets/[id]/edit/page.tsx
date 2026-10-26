@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { ModuleAttachments } from "@/components/modules/module-attachments";
 import { ModuleFormShell } from "@/components/modules/module-form-shell";
+import { useAuth } from "@/contexts/auth-context";
 import { useModules } from "@/contexts/modules-context";
 import { useStores } from "@/contexts/stores-context";
 import { useT } from "@/contexts/i18n-context";
 import { usePageTitle } from "@/contexts/page-title-context";
+import { getRoleLabel } from "@/lib/roles";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -33,6 +35,7 @@ function EditTicketContent({ id }: { id: string }) {
   const router = useRouter();
   const { tickets, updateTicket, deleteTicket } = useModules();
   const { stores } = useStores();
+  const { users, organization } = useAuth();
   const { canEdit, canDelete } = usePermissions("tickets");
   const t = useT();
   const ticket = tickets.find((x) => x.id === id);
@@ -44,7 +47,10 @@ function EditTicketContent({ id }: { id: string }) {
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [status, setStatus] = useState<TicketStatus>("open");
   const [storeId, setStoreId] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [showErrors, setShowErrors] = useState(false);
 
   useEffect(() => {
     if (!ticket) return;
@@ -54,6 +60,7 @@ function EditTicketContent({ id }: { id: string }) {
     setPriority(ticket.priority);
     setStatus(ticket.status);
     setStoreId(ticket.storeId ?? "");
+    setAssigneeId(ticket.assigneeId ?? "");
   }, [ticket]);
 
   if (!ticket) {
@@ -65,19 +72,45 @@ function EditTicketContent({ id }: { id: string }) {
   }
 
   const store = stores.find((s) => s.id === ticket.storeId);
+  const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name, "tr"));
+  const invalid = {
+    code: !code.trim(),
+    title: !title.trim(),
+    store: !storeId,
+    assignee: !users.some((u) => u.id === assigneeId),
+  };
 
   const save = async () => {
     if (!canEdit) return;
+    setShowErrors(true);
+    const missing = [
+      invalid.code && "Kod",
+      invalid.title && "Başlık",
+      invalid.store && "Saha",
+      invalid.assignee && "Atanan",
+    ].filter(Boolean);
+    if (missing.length > 0) {
+      setSaveError(`Zorunlu alanları doldurun: ${missing.join(", ")}`);
+      return;
+    }
+    setSaveError("");
     setSaving(true);
-    await updateTicket(id, {
+    const assignee = users.find((u) => u.id === assigneeId);
+    const ok = await updateTicket(id, {
       title: title.trim(),
-      code: code.trim() || undefined,
+      code: code.trim(),
       description,
       priority,
       status,
-      storeId: storeId || undefined,
+      storeId,
+      assigneeId: assignee?.id,
+      assigneeName: assignee?.name,
     });
     setSaving(false);
+    if (!ok) {
+      setSaveError("Talep kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.");
+      return;
+    }
     router.push("/tickets");
   };
 
@@ -99,25 +132,31 @@ function EditTicketContent({ id }: { id: string }) {
       canSave={canEdit}
       canDelete={canDelete}
     >
+      {saveError && (
+        <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {saveError}
+        </p>
+      )}
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         {store && (
           <Link href={`/stores/${store.id}`} className="text-sm text-cyan-400 hover:underline">
             Saha: {store.name}
           </Link>
         )}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-4">
           <div>
-            <label className="text-xs text-zinc-500">Kod</label>
+            <label className="text-xs text-zinc-500">Kod *</label>
             <Input
               className="mt-1 font-mono"
               value={code}
               onChange={(e) => setCode(e.target.value)}
+              aria-invalid={showErrors && invalid.code}
               disabled={!canEdit}
             />
           </div>
-          <div>
-            <label className="text-xs text-zinc-500">Başlık</label>
-            <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit} />
+          <div className="sm:col-span-3">
+            <label className="text-xs text-zinc-500">Başlık *</label>
+            <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit} aria-invalid={showErrors && invalid.title} />
           </div>
         </div>
         <div>
@@ -126,8 +165,8 @@ function EditTicketContent({ id }: { id: string }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Saha</label>
-            <Select className="mt-1" value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={!canEdit}>
+            <label className="text-xs text-zinc-500">Saha *</label>
+            <Select className="mt-1" value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={!canEdit} aria-invalid={showErrors && invalid.store}>
               <option value="">Seçiniz</option>
               {stores.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
@@ -147,6 +186,15 @@ function EditTicketContent({ id }: { id: string }) {
             <Select className="mt-1" value={status} onChange={(e) => setStatus(e.target.value as TicketStatus)} disabled={!canEdit}>
               {Object.entries(STATUS_TR).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500">Atanan *</label>
+            <Select className="mt-1" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} disabled={!canEdit} aria-invalid={showErrors && invalid.assignee}>
+              <option value="">Seçiniz</option>
+              {sortedUsers.map((u) => (
+                <option key={u.id} value={u.id}>{u.name} — {getRoleLabel(u.role, organization)}</option>
               ))}
             </Select>
           </div>

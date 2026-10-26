@@ -23,7 +23,7 @@ const CATEGORY_LABELS: Record<ActivityCategory, string> = {
   region: "Bölge",
   store: "Konum",
   system: "Sistem",
-  ticket: "Ticket",
+  ticket: "Tadilat Talebi",
   contract: "Sözleşme",
   payment: "Hakediş",
   invoice: "Fatura",
@@ -36,6 +36,7 @@ const CATEGORY_LABELS: Record<ActivityCategory, string> = {
   material: "Keşif",
   workplan: "İş programı",
   inventory: "Envanter",
+  hr: "İnsan Kaynakları",
 };
 
 const CATEGORY_COLORS: Record<ActivityCategory, string> = {
@@ -58,6 +59,7 @@ const CATEGORY_COLORS: Record<ActivityCategory, string> = {
   material: "text-cyan-300 bg-cyan-500/10",
   workplan: "text-emerald-300 bg-emerald-500/10",
   inventory: "text-sky-300 bg-sky-500/10",
+  hr: "text-teal-300 bg-teal-500/10",
 };
 
 type SortKey =

@@ -22,6 +22,8 @@ export function LocationTypesSection() {
   const [draft, setDraft] = useState<LocationTypeOption[]>(types);
   const [newLabel, setNewLabel] = useState("");
   const [error, setError] = useState("");
+  const [invalidKeys, setInvalidKeys] = useState<Set<string>>(new Set());
+  const [newLabelInvalid, setNewLabelInvalid] = useState(false);
 
   const usage = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -33,6 +35,7 @@ export function LocationTypesSection() {
 
   const rename = (key: string, label: string) => {
     setDraft((prev) => prev.map((type) => (type.key === key ? { ...type, label } : type)));
+    setInvalidKeys(new Set());
     setError("");
   };
 
@@ -45,6 +48,7 @@ export function LocationTypesSection() {
     const label = newLabel.trim();
     if (!label) return;
     if (draft.some((type) => normalizeLabel(type.label) === normalizeLabel(label))) {
+      setNewLabelInvalid(true);
       setError(`"${label}" zaten listede.`);
       return;
     }
@@ -62,9 +66,18 @@ export function LocationTypesSection() {
   const save = () => {
     const cleaned = draft.map((type) => ({ ...type, label: type.label.trim() }));
     if (cleaned.length === 0) return setError("En az bir saha türü olmalı.");
-    if (cleaned.some((type) => !type.label)) return setError("Saha türü adı boş olamaz.");
+    const empty = cleaned.filter((type) => !type.label).map((type) => type.key);
+    if (empty.length > 0) {
+      setInvalidKeys(new Set(empty));
+      return setError("Saha türü adı boş olamaz.");
+    }
     const labels = cleaned.map((type) => normalizeLabel(type.label));
-    if (new Set(labels).size !== labels.length) return setError("Aynı adda iki saha türü olamaz.");
+    const duplicates = cleaned.filter((_, i) => labels.indexOf(labels[i]) !== labels.lastIndexOf(labels[i]));
+    if (duplicates.length > 0) {
+      setInvalidKeys(new Set(duplicates.map((type) => type.key)));
+      return setError("Aynı adda iki saha türü olamaz.");
+    }
+    setInvalidKeys(new Set());
     setError("");
     void run(async () => {
       const ok = await updateOrganization({ locationTypes: cleaned });
@@ -92,6 +105,7 @@ export function LocationTypesSection() {
                 onChange={(e) => rename(type.key, e.target.value)}
                 maxLength={40}
                 aria-label="Saha türü adı"
+                aria-invalid={invalidKeys.has(type.key)}
                 className="h-9 max-w-xs"
               />
               <span className="flex-1 text-xs text-zinc-500 tabular-nums">
@@ -117,6 +131,7 @@ export function LocationTypesSection() {
           value={newLabel}
           onChange={(e) => {
             setNewLabel(e.target.value);
+            setNewLabelInvalid(false);
             setError("");
           }}
           onKeyDown={(e) => {
@@ -128,6 +143,7 @@ export function LocationTypesSection() {
           maxLength={40}
           placeholder="Yeni saha türü (ör. Depo)"
           aria-label="Yeni saha türü"
+          aria-invalid={newLabelInvalid}
           className="h-9 max-w-xs"
         />
         <Button variant="outline" size="sm" onClick={add} disabled={!newLabel.trim()}>

@@ -112,7 +112,7 @@ function TicketsContent() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Kod, saha, başlık veya atanandan ara…"
-            aria-label="Ticketlarda ara"
+            aria-label="Tadilat taleplerinde ara"
             containerClassName="w-full max-w-sm"
             className="h-10"
           />

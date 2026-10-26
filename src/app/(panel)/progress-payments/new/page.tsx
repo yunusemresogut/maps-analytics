@@ -47,6 +47,13 @@ function NewPaymentContent() {
   const [saveError, setSaveError] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [showErrors, setShowErrors] = useState(false);
+  const invalid = {
+    contract: !contractId,
+    title: !title.trim(),
+    start: !periodStart,
+    end: !periodEnd || (!!periodStart && periodEnd < periodStart),
+  };
 
   if (!canAdd) {
     return <div className="flex h-full items-center justify-center text-sm text-zinc-500">Ekleme yetkiniz yok</div>;
@@ -62,7 +69,8 @@ function NewPaymentContent() {
 
   const save = async () => {
     if (createdId) return;
-    if (!title.trim() || !contractId || !periodStart || !periodEnd) {
+    setShowErrors(true);
+    if (invalid.contract || invalid.title || invalid.start || !periodEnd) {
       setSaveError("Başlık, sözleşme ve dönem tarihleri zorunludur.");
       return;
     }
@@ -104,7 +112,7 @@ function NewPaymentContent() {
   };
 
   return (
-    <ModuleFormShell backHref="/progress-payments" backLabel="Hakedişler" title="Yeni hakediş" onSave={save} saving={saving} saveLabel="Oluştur" canSave={!!title.trim() && !!contractId && !!periodStart && !!periodEnd && !createdId}>
+    <ModuleFormShell backHref="/progress-payments" backLabel="Hakedişler" title="Yeni hakediş" onSave={save} saving={saving} saveLabel="Oluştur" canSave={!createdId}>
       {saveError && (
         <p role="alert" className="text-sm text-red-400">
           {saveError}
@@ -118,7 +126,7 @@ function NewPaymentContent() {
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div>
           <label className="text-xs text-zinc-500">Sözleşme *</label>
-          <Select className="mt-1" value={contractId} onChange={(e) => onContractChange(e.target.value)}>
+          <Select className="mt-1" value={contractId} onChange={(e) => onContractChange(e.target.value)} aria-invalid={showErrors && invalid.contract}>
             <option value="">Seçiniz</option>
             {contracts.filter((c) => c.status === "active" || c.status === "draft").map((c) => (
               <option key={c.id} value={c.id}>{c.code ? `${c.code} — ` : ""}{c.title}</option>
@@ -127,16 +135,16 @@ function NewPaymentContent() {
         </div>
         <div>
           <label className="text-xs text-zinc-500">Başlık *</label>
-          <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} aria-invalid={showErrors && invalid.title} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="text-xs text-zinc-500">Dönem başlangıcı *</label>
-            <DatePicker className="mt-1" value={periodStart} onChange={setPeriodStart} />
+            <DatePicker className="mt-1" value={periodStart} onChange={setPeriodStart} aria-invalid={showErrors && invalid.start} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">Dönem bitişi *</label>
-            <DatePicker className="mt-1" value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} />
+            <DatePicker className="mt-1" value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} aria-invalid={showErrors && invalid.end} />
           </div>
           <div>
             <label className="text-xs text-zinc-500">Toplam hakediş</label>

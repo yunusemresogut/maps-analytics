@@ -39,6 +39,7 @@ function NewContractContent() {
   const [status, setStatus] = useState<ContractStatus>("active");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [showErrors, setShowErrors] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [createdId, setCreatedId] = useState<string | null>(null);
 
@@ -57,6 +58,7 @@ function NewContractContent() {
 
   const save = async () => {
     if (createdId) return;
+    setShowErrors(true);
     if (!contractTitle.trim()) {
       setSaveError("Başlık zorunludur.");
       return;
@@ -104,7 +106,7 @@ function NewContractContent() {
       onSave={save}
       saving={saving}
       saveLabel="Oluştur"
-      canSave={!!contractTitle.trim() && !createdId}
+      canSave={!createdId}
     >
       {saveError && (
         <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -123,6 +125,7 @@ function NewContractContent() {
             <Input
               className="mt-1"
               value={contractTitle}
+              aria-invalid={showErrors && !contractTitle.trim()}
               onChange={(e) => {
                 setTitleTouched(true);
                 setTitle(e.target.value);
