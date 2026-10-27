@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { Geist_Mono, Public_Sans } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { tr } from "@/i18n/dictionaries/tr";
@@ -63,6 +64,7 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
