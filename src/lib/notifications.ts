@@ -1,4 +1,5 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
+import { getIntlLocale, t } from "@/i18n/runtime";
 import type {
   AppNotification,
   Contract,
@@ -79,7 +80,10 @@ export function computeNotifications(input: NotificationInput): AppNotification[
         type: "opening_soon",
         storeId: store.id,
         storeName: store.name,
-        message: `${store.name}: ${until === 0 ? "Bugün açılıyor" : `${until} gün sonra açılıyor`}`,
+        message:
+          until === 0
+            ? t("system.notification.openingToday", { name: store.name })
+            : t(until === 1 ? "system.notification.openingInOne" : "system.notification.openingInOther", { name: store.name, days: until }),
         createdAt: now,
         read: false,
       });
@@ -91,7 +95,10 @@ export function computeNotifications(input: NotificationInput): AppNotification[
         type: "opening_overdue",
         storeId: store.id,
         storeName: store.name,
-        message: `${store.name}: Açılış tarihi ${alert.daysSinceOpening} gün geçti`,
+        message: t(alert.daysSinceOpening === 1 ? "system.notification.openingOverdueOne" : "system.notification.openingOverdueOther", {
+          name: store.name,
+          days: alert.daysSinceOpening,
+        }),
         createdAt: now,
         read: false,
       });
@@ -107,11 +114,11 @@ export function computeNotifications(input: NotificationInput): AppNotification[
         type: "ihale_contract_reminder",
         storeId: store.id,
         storeName: store.name,
-        message: `${store.name}: İhale durumunda — sözleşmenizi oluşturun`,
+        message: t("system.notification.tenderContract", { name: store.name }),
         createdAt: now,
         read: false,
         actionHref: `/contracts/new?storeId=${store.id}`,
-        actionLabel: "Sözleşme oluştur",
+        actionLabel: t("system.notificationAction.createContract"),
       });
     }
   }
@@ -127,11 +134,17 @@ export function computeNotifications(input: NotificationInput): AppNotification[
         type: "contract_expiring",
         storeId: contract.storeId,
         storeName: storeName(contract.storeId),
-        message: `${contract.code ?? contract.title}: ${until === 0 ? "bugün sona eriyor" : `${until} gün sonra sona eriyor`}`,
+        message:
+          until === 0
+            ? t("system.notification.contractEndsToday", { name: contract.code ?? contract.title })
+            : t(until === 1 ? "system.notification.contractEndsInOne" : "system.notification.contractEndsInOther", {
+                name: contract.code ?? contract.title,
+                days: until,
+              }),
         createdAt: contract.updatedAt ?? contract.createdAt,
         read: false,
         actionHref: `/contracts/${contract.id}/edit`,
-        actionLabel: "Sözleşmeyi aç",
+        actionLabel: t("system.notificationAction.openContract"),
       });
     }
   }
@@ -140,27 +153,28 @@ export function computeNotifications(input: NotificationInput): AppNotification[
     for (const ticket of input.tickets) {
       const active = ticket.status === "open" || ticket.status === "in_progress";
       const assignedToMe = ticket.assigneeId === user.id;
+      const ticketLabel = `${ticket.code ? `${ticket.code} · ` : ""}${ticket.title}`;
       const base = {
         storeId: ticket.storeId,
         storeName: storeName(ticket.storeId),
         createdAt: ticket.updatedAt ?? ticket.createdAt,
         read: false,
         actionHref: `/tickets/${ticket.id}`,
-        actionLabel: "Talebi aç",
+        actionLabel: t("system.notificationAction.openTicket"),
       };
       if (shown.has("ticket_assigned") && active && assignedToMe) {
         notifications.push({
           ...base,
           id: `notif-ticket-assigned-${ticket.id}`,
           type: "ticket_assigned",
-          message: `${ticket.code ? `${ticket.code} · ` : ""}${ticket.title} size atandı`,
+          message: t("system.notification.ticketAssigned", { ticket: ticketLabel }),
         });
       } else if (shown.has("ticket_high_priority") && ticket.status === "open" && ticket.priority === "high") {
         notifications.push({
           ...base,
           id: `notif-ticket-high-${ticket.id}`,
           type: "ticket_high_priority",
-          message: `${ticket.code ? `${ticket.code} · ` : ""}${ticket.title} — yüksek öncelikli, açık`,
+          message: t("system.notification.ticketHighPriority", { ticket: ticketLabel }),
         });
       }
     }
@@ -175,11 +189,11 @@ export function computeNotifications(input: NotificationInput): AppNotification[
         type: "payment_pending_approval",
         storeId: payment.storeId,
         storeName: storeName(payment.storeId),
-        message: `${payment.title} onay bekliyor`,
+        message: t("system.notification.paymentPending", { title: payment.title }),
         createdAt: payment.updatedAt ?? payment.createdAt,
         read: false,
         actionHref: `/progress-payments/${payment.id}/edit`,
-        actionLabel: "Hakedişi aç",
+        actionLabel: t("system.notificationAction.openPayment"),
       });
     }
   }
@@ -192,11 +206,11 @@ export function computeNotifications(input: NotificationInput): AppNotification[
         type: "invoice_unpaid",
         storeId: invoice.storeId,
         storeName: storeName(invoice.storeId),
-        message: `${invoice.invoiceNumber} numaralı fatura ödenmedi`,
+        message: t("system.notification.invoiceUnpaid", { number: invoice.invoiceNumber }),
         createdAt: invoice.issuedAt ?? invoice.createdAt,
         read: false,
         actionHref: `/invoices/${invoice.id}/edit`,
-        actionLabel: "Faturayı aç",
+        actionLabel: t("system.notificationAction.openInvoice"),
       });
     }
   }
@@ -212,16 +226,16 @@ export function computeNotifications(input: NotificationInput): AppNotification[
       });
     }
     for (const [senderId, { count, last }] of latestBySender) {
-      const name = input.users.find((member) => member.id === senderId)?.name ?? "Bir ekip üyesi";
+      const name = input.users.find((member) => member.id === senderId)?.name ?? t("system.notification.teamMemberFallback");
       notifications.push({
         // Yeni mesaj gelince kapatılmış bildirim yeniden görünür
         id: `notif-team-${senderId}-${last.id}`,
         type: "team_unread",
-        message: `${name}: ${count} okunmamış mesaj`,
+        message: t(count === 1 ? "system.notification.teamUnreadOne" : "system.notification.teamUnreadOther", { name, count }),
         createdAt: last.createdAt,
         read: false,
         actionHref: `/team?peer=${senderId}`,
-        actionLabel: "Sohbeti aç",
+        actionLabel: t("system.notificationAction.openChat"),
       });
     }
   }
@@ -247,14 +261,22 @@ export function computeNotifications(input: NotificationInput): AppNotification[
           type: "certificate_expiring",
           message:
             left < 0
-              ? `${certificate.personnelName} · ${label}: süresi ${-left} gün önce doldu`
+              ? t(-left === 1 ? "system.notification.certificateExpiredOne" : "system.notification.certificateExpiredOther", {
+                  person: certificate.personnelName,
+                  label,
+                  days: -left,
+                })
               : left === 0
-                ? `${certificate.personnelName} · ${label}: süresi bugün doluyor`
-                : `${certificate.personnelName} · ${label}: süresinin dolmasına ${left} gün kaldı`,
+                ? t("system.notification.certificateExpiresToday", { person: certificate.personnelName, label })
+                : t(left === 1 ? "system.notification.certificateExpiresInOne" : "system.notification.certificateExpiresInOther", {
+                    person: certificate.personnelName,
+                    label,
+                    days: left,
+                  }),
           createdAt: now,
           read: false,
           actionHref: href,
-          actionLabel: "Personeli aç",
+          actionLabel: t("system.notificationAction.openPersonnel"),
         });
       }
 
@@ -262,11 +284,11 @@ export function computeNotifications(input: NotificationInput): AppNotification[
         notifications.push({
           id: `notif-cert-pending-${certificate.id}`,
           type: "certificate_pending",
-          message: `${certificate.personnelName} · ${label} onay bekliyor`,
+          message: t("system.notification.certificatePending", { person: certificate.personnelName, label }),
           createdAt: now,
           read: false,
           actionHref: href,
-          actionLabel: "Belgeyi incele",
+          actionLabel: t("system.notificationAction.reviewDocument"),
         });
       }
     }
@@ -275,7 +297,10 @@ export function computeNotifications(input: NotificationInput): AppNotification[
     for (const leave of input.leaves) {
       if (seenLeaves.has(leave.id)) continue;
       seenLeaves.add(leave.id);
-      const period = `${LEAVE_TYPE_LABELS[leave.type]}, ${formatHours(leave.dayCount)} gün`;
+      const period = t(leave.dayCount === 1 ? "system.notification.leavePeriodOne" : "system.notification.leavePeriodOther", {
+        type: LEAVE_TYPE_LABELS[leave.type],
+        days: formatHours(leave.dayCount),
+      });
       if (
         shown.has("leave_pending") &&
         canDecide(leave, user, canModule(user, "leaves", "edit")) &&
@@ -286,22 +311,22 @@ export function computeNotifications(input: NotificationInput): AppNotification[
           // Yönetici onayından sonra İK için yeniden görünür
           id: `notif-leave-pending-${leave.id}-${leave.status}`,
           type: "leave_pending",
-          message: `${leave.personnelName} · ${period} onayınızı bekliyor`,
+          message: t("system.notification.leavePending", { person: leave.personnelName, period }),
           createdAt: leave.managerDecidedAt ?? leave.createdAt,
           read: false,
           actionHref: "/hr/leaves",
-          actionLabel: "Talebi incele",
+          actionLabel: t("system.notificationAction.reviewRequest"),
         });
       }
       if (shown.has("leave_decided") && leave.personnelUserId === user.id && (leave.status === "approved" || leave.status === "rejected")) {
         notifications.push({
           id: `notif-leave-decided-${leave.id}-${leave.status}`,
           type: "leave_decided",
-          message: `İzin talebiniz (${period}) ${leave.status === "approved" ? "onaylandı" : "reddedildi"}`,
+          message: t(leave.status === "approved" ? "system.notification.leaveApproved" : "system.notification.leaveRejected", { period }),
           createdAt: leave.hrDecidedAt ?? leave.managerDecidedAt ?? leave.createdAt,
           read: false,
           actionHref: "/hr/leaves",
-          actionLabel: "İzinlerim",
+          actionLabel: t("system.notificationAction.myLeaves"),
         });
       }
     }
@@ -311,11 +336,13 @@ export function computeNotifications(input: NotificationInput): AppNotification[
         notifications.push({
           id: `notif-announcement-${announcement.id}`,
           type: "announcement_unread",
-          message: announcement.requiresAck ? `${announcement.title} — okuyup onaylamanız gerekiyor` : announcement.title,
+          message: announcement.requiresAck
+            ? t("system.notification.announcementAck", { title: announcement.title })
+            : announcement.title,
           createdAt: announcement.publishAt,
           read: false,
           actionHref: "/hr/announcements",
-          actionLabel: "Duyuruyu oku",
+          actionLabel: t("system.notificationAction.readAnnouncement"),
         });
       }
     }
@@ -332,18 +359,18 @@ export function computeNotifications(input: NotificationInput): AppNotification[
           createdAt: request.createdAt,
           read: false,
           actionHref: "/hr/requests",
-          actionLabel: "Talebi incele",
+          actionLabel: t("system.notificationAction.reviewRequest"),
         });
       }
       if (shown.has("hr_request_decided") && own && ["approved", "rejected", "completed"].includes(request.status)) {
         notifications.push({
           id: `notif-request-decided-${request.id}-${request.status}`,
           type: "hr_request_decided",
-          message: `${label} — ${REQUEST_STATUS_LABELS[request.status].toLocaleLowerCase("tr-TR")}`,
+          message: `${label} — ${REQUEST_STATUS_LABELS[request.status].toLocaleLowerCase(getIntlLocale())}`,
           createdAt: request.completedAt ?? request.decidedAt ?? request.createdAt,
           read: false,
           actionHref: "/hr/requests",
-          actionLabel: "Taleplerim",
+          actionLabel: t("system.notificationAction.myRequests"),
         });
       }
     }
@@ -355,20 +382,29 @@ export function computeNotifications(input: NotificationInput): AppNotification[
       const left = doc ? daysUntil(doc.date) : null;
       if (!doc || left === null || left > org.notifications.vehicleExpiryDays) continue;
       const name = [vehicle.serialNo, vehicle.name].filter(Boolean).join(" · ");
+      const docLabel = doc.label.toLocaleLowerCase(getIntlLocale());
       notifications.push({
         // Belge yenilenince (tarih değişince) yeniden görünür
         id: `notif-vehicle-${vehicle.id}-${doc.label}-${doc.date}`,
         type: "vehicle_expiring",
         message:
           left < 0
-            ? `${name}: ${doc.label.toLocaleLowerCase("tr-TR")} ${-left} gün önce bitti`
+            ? t(-left === 1 ? "system.notification.vehicleExpiredOne" : "system.notification.vehicleExpiredOther", {
+                name,
+                doc: docLabel,
+                days: -left,
+              })
             : left === 0
-              ? `${name}: ${doc.label.toLocaleLowerCase("tr-TR")} bugün bitiyor`
-              : `${name}: ${doc.label.toLocaleLowerCase("tr-TR")} bitişine ${left} gün kaldı`,
+              ? t("system.notification.vehicleExpiresToday", { name, doc: docLabel })
+              : t(left === 1 ? "system.notification.vehicleExpiresInOne" : "system.notification.vehicleExpiresInOther", {
+                  name,
+                  doc: docLabel,
+                  days: left,
+                }),
         createdAt: now,
         read: false,
         actionHref: "/inventory",
-        actionLabel: "Envantere git",
+        actionLabel: t("system.notificationAction.goToInventory"),
       });
     }
   }

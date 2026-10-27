@@ -21,30 +21,26 @@ import { useI18n, useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerTable } from "@/hooks/use-server-table";
 import { formatMoney, formatMoneyTotals, parseMoneyTotals, type MoneyTotals } from "@/lib/currency";
-import { formatPaymentPeriod } from "@/lib/module-finance";
+import { formatPaymentPeriod, PAYMENT_STATUS_LABELS } from "@/lib/module-finance";
 import type { ProgressPayment } from "@/types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 
-const STATUS_TR: Record<string, string> = {
-  draft: "Taslak",
-  submitted: "Gönderildi",
-  approved: "Onaylandı",
-  paid: "Ödendi",
-};
 
 type SortKey = "title" | "storeName" | "contractTitle" | "periodLabel" | "amount" | "paid" | "progress" | "status" | "actions";
 
-const COLUMNS: DataTableColumn<SortKey>[] = [
-  { key: "title", label: "Hakediş" },
-  { key: "storeName", label: "Saha" },
-  { key: "contractTitle", label: "Sözleşme" },
-  { key: "periodLabel", label: "Dönem" },
-  { key: "amount", label: "Toplam hakediş" },
-  { key: "paid", label: "Ödenen" },
-  { key: "progress", label: "Sözleşme ilerlemesi" },
-  { key: "status", label: "Durum" },
-  { key: "actions", label: "" },
-];
+function getColumns(t: ReturnType<typeof useT>): DataTableColumn<SortKey>[] {
+  return [
+    { key: "title", label: t("finance.shared.progressPayment") },
+    { key: "storeName", label: t("finance.shared.store") },
+    { key: "contractTitle", label: t("finance.shared.contract") },
+    { key: "periodLabel", label: t("finance.payments.period") },
+    { key: "amount", label: t("finance.payments.totalAmount") },
+    { key: "paid", label: t("finance.payments.paid") },
+    { key: "progress", label: t("finance.payments.contractProgress") },
+    { key: "status", label: t("finance.shared.status") },
+    { key: "actions", label: "" },
+  ];
+}
 
 /** paid: hakedişin kendi birimindeki ödenen (sıralama); paidTotals: tüm birimlerde */
 type PaymentRow = ProgressPayment & {
@@ -107,28 +103,28 @@ function ProgressPaymentsContent() {
   });
 
   const handleDelete = async (id: string, title: string) => {
-    if (!canDelete || !confirm(`"${title}" silinsin mi?`)) return;
+    if (!canDelete || !confirm(t("finance.shared.deleteNamedConfirm", { name: title }))) return;
     await deletePayment(id);
   };
 
   return (
     <ModuleTableShell
       title={t("modules.paymentsTitle")}
-      description="Sözleşmeye bağlı hakediş dönemleri."
+      description={t("finance.payments.description")}
       headerAction={
         canAdd ? (
           <Button size="sm" onClick={() => router.push("/progress-payments/new")}>
             <Plus className="h-3.5 w-3.5" />
-            Yeni
+            {t("finance.shared.new")}
           </Button>
         ) : undefined
       }
       toolbar={
         <>
-          <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Hakediş, sözleşme…" aria-label="Hakedişlerde ara" containerClassName="w-full max-w-sm" className="h-10" />
+          <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("finance.payments.searchPlaceholder")} aria-label={t("finance.payments.searchLabel")} containerClassName="w-full max-w-sm" className="h-10" />
           <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-auto min-w-[160px]">
-            <option value="all">Tüm durumlar</option>
-            {Object.entries(STATUS_TR).map(([k, v]) => (
+            <option value="all">{t("finance.shared.allStatuses")}</option>
+            {Object.entries(PAYMENT_STATUS_LABELS).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
           </Select>
@@ -138,7 +134,7 @@ function ProgressPaymentsContent() {
         <TablePagination page={table.page} totalPages={table.totalPages} totalItems={table.totalItems} rangeStart={table.rangeStart} rangeEnd={table.rangeEnd} onPageChange={table.setPage} pageSize={table.pageSize} onPageSizeChange={table.setPageSize} />
       }
     >
-      <DataTable columns={COLUMNS} sortKey={table.sort.key} sortDirection={table.sort.direction} onSort={table.toggleSort} minWidthClassName="min-w-[960px]">
+      <DataTable columns={getColumns(t)} sortKey={table.sort.key} sortDirection={table.sort.direction} onSort={table.toggleSort} minWidthClassName="min-w-[960px]">
         {table.pageItems.map((item) => (
           <tr key={item.id} className="text-zinc-300 hover:bg-zinc-900/50">
             <td className="max-w-[240px] px-4 py-3 font-medium text-zinc-100">{item.title}</td>
@@ -159,16 +155,16 @@ function ProgressPaymentsContent() {
                 <span className="w-10 text-right text-xs tabular-nums text-zinc-400">{item.progress}%</span>
               </div>
             </td>
-            <td className="px-4 py-3"><StatusBadge value={item.status} label={STATUS_TR[item.status] ?? item.status} /></td>
+            <td className="px-4 py-3"><StatusBadge value={item.status} label={PAYMENT_STATUS_LABELS[item.status] ?? item.status} /></td>
             <td className="whitespace-nowrap px-4 py-3">
               <div className="flex gap-1">
                 {canEdit && (
-                  <Link href={`/progress-payments/${item.id}/edit`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/20 hover:text-zinc-100" aria-label="Düzenle">
+                  <Link href={`/progress-payments/${item.id}/edit`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/20 hover:text-zinc-100" aria-label={t("common.edit")}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Link>
                 )}
                 {canDelete && (
-                  <Button size="icon" variant="ghost" onClick={() => handleDelete(item.id, item.title)} aria-label="Sil">
+                  <Button size="icon" variant="ghost" onClick={() => handleDelete(item.id, item.title)} aria-label={t("common.delete")}>
                     <Trash2 className="h-3.5 w-3.5 text-red-400/80" />
                   </Button>
                 )}
@@ -177,7 +173,7 @@ function ProgressPaymentsContent() {
           </tr>
         ))}
         {!table.isLoading && table.totalItems === 0 && (
-          <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
+          <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-zinc-600">{t("finance.shared.noRecords")}</td></tr>
         )}
       </DataTable>
     </ModuleTableShell>

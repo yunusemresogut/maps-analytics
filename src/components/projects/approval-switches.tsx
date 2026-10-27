@@ -112,7 +112,7 @@ export function ApprovalSwitches({ store, compact }: Props) {
       {allApproved && (
         <p className="flex items-center gap-1.5 pt-1 text-xs text-emerald-400">
           <CheckCircle2 className="h-3.5 w-3.5" />
-          Tüm disiplin onayları tamamlandı
+          {t("site.approvals.allApproved")}
         </p>
       )}
     </div>

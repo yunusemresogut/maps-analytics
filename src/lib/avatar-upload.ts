@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { t } from "@/i18n/runtime";
 
 const BUCKET = "avatars";
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -15,10 +16,10 @@ export async function uploadAvatar(
   file: File
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return { ok: false, error: "JPEG, PNG, WebP veya GIF yükleyin" };
+    return { ok: false, error: t("site.avatar.invalidType") };
   }
   if (file.size > MAX_BYTES) {
-    return { ok: false, error: "Dosya en fazla 10 MB olabilir" };
+    return { ok: false, error: t("site.avatar.tooLarge") };
   }
 
   const ext = EXTENSIONS[file.type];

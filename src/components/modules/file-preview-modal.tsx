@@ -4,6 +4,7 @@ import { Download } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
 import type { FilePreviewKind } from "@/lib/file-types";
+import { useT } from "@/contexts/i18n-context";
 
 export type FilePreview = {
   name: string;
@@ -15,6 +16,7 @@ export type FilePreview = {
 
 /** PDF, görsel ve video dosyalarını sayfadan çıkmadan gösterir */
 export function FilePreviewModal({ preview, onClose }: { preview: FilePreview | null; onClose: () => void }) {
+  const t = useT();
   return (
     <Modal
       open={!!preview}
@@ -29,7 +31,7 @@ export function FilePreviewModal({ preview, onClose }: { preview: FilePreview | 
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-zinc-300 hover:border-cyan-500/50 hover:text-cyan-300"
           >
             <Download className="h-4 w-4" />
-            İndir
+            {t("finance.attachments.download")}
           </button>
         )
       }

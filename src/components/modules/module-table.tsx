@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from "luci
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { useT } from "@/contexts/i18n-context";
 import type { SortDirection } from "@/hooks/use-table-state";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -90,6 +91,7 @@ export function ModuleTableShell({
   demoNote?: boolean;
   children: ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="scrollbar-themed h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
@@ -113,7 +115,7 @@ export function ModuleTableShell({
       </div>
       {demoNote && (
         <p className="mt-3 text-[11px] text-zinc-600">
-          Demo veri — backend bağlantısı yok
+          {t("finance.table.demoNote")}
         </p>
       )}
     </div>
@@ -240,11 +242,12 @@ export function TablePagination({
   onPageSizeChange?: (size: number) => void;
   pageSizeOptions?: number[];
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3 border-t border-zinc-800 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-xs text-zinc-500">
         {totalItems === 0
-          ? "Kayıt yok"
+          ? t("finance.table.noRecords")
           : `${rangeStart}–${rangeEnd} / ${totalItems}`}
       </p>
       <div className="flex flex-wrap items-center gap-2">
@@ -256,7 +259,7 @@ export function TablePagination({
           >
             {pageSizeOptions.map((n) => (
               <option key={n} value={n}>
-                {n} / sayfa
+                {t("finance.table.perPage", { count: n })}
               </option>
             ))}
           </Select>
@@ -267,7 +270,7 @@ export function TablePagination({
           variant="ghost"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          aria-label="Önceki sayfa"
+          aria-label={t("finance.table.previousPage")}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -280,7 +283,7 @@ export function TablePagination({
           variant="ghost"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          aria-label="Sonraki sayfa"
+          aria-label={t("finance.table.nextPage")}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>

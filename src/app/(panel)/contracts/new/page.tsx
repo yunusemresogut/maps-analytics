@@ -7,11 +7,13 @@ import { AuthGuard } from "@/components/auth/auth-guard";
 import { ModuleFormShell } from "@/components/modules/module-form-shell";
 import { PendingAttachments } from "@/components/modules/pending-attachments";
 import { useAuth } from "@/contexts/auth-context";
+import { useT } from "@/contexts/i18n-context";
 import { uploadModuleAttachments } from "@/lib/upload-module-attachment";
 import { useModules } from "@/contexts/modules-context";
 import { useStores } from "@/contexts/stores-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { nextContractCode } from "@/lib/module-codes";
+import { CONTRACT_STATUS_LABELS } from "@/lib/module-finance";
 import { useSettings } from "@/contexts/settings-context";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -20,6 +22,7 @@ import type { CurrencyCode } from "@/lib/currency";
 import type { ContractStatus } from "@/types";
 
 function NewContractContent() {
+  const t = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { contracts, createContract } = useModules();
@@ -46,12 +49,12 @@ function NewContractContent() {
   const selectedStore = stores.find((s) => s.id === storeId);
   const contractCode = codeTouched ? code : nextContractCode(contracts, org.defaults.contractCodePrefix);
   const contractTitle =
-    titleTouched || !selectedStore ? title : `${selectedStore.name} Sözleşmesi`;
+    titleTouched || !selectedStore ? title : t("finance.contracts.defaultTitle", { store: selectedStore.name });
 
   if (!canAdd) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-zinc-500">
-        Ekleme yetkiniz yok
+        {t("finance.shared.noAddPermission")}
       </div>
     );
   }
@@ -60,7 +63,7 @@ function NewContractContent() {
     if (createdId) return;
     setShowErrors(true);
     if (!contractTitle.trim()) {
-      setSaveError("Başlık zorunludur.");
+      setSaveError(t("finance.shared.titleRequired"));
       return;
     }
     setSaveError("");
@@ -85,7 +88,7 @@ function NewContractContent() {
         });
         if (errors.length > 0) {
           setSaving(false);
-          setSaveError(`Sözleşme kaydedildi ancak bazı ekler yüklenemedi: ${errors.join(" ")}`);
+          setSaveError(t("finance.contracts.attachmentsFailed", { errors: errors.join(" ") }));
           return;
         }
       }
@@ -93,19 +96,17 @@ function NewContractContent() {
       return;
     }
     setSaving(false);
-    setSaveError(
-      "Sözleşme oluşturulamadı. Organizasyon bağlantısı veya yetkinizi kontrol edin."
-    );
+    setSaveError(t("finance.contracts.createFailed"));
   };
 
   return (
     <ModuleFormShell
       backHref="/contracts"
-      backLabel="Sözleşmeler"
-      title="Yeni sözleşme"
+      backLabel={t("finance.contracts.title")}
+      title={t("finance.contracts.newTitle")}
       onSave={save}
       saving={saving}
-      saveLabel="Oluştur"
+      saveLabel={t("finance.shared.create")}
       canSave={!createdId}
     >
       {saveError && (
@@ -113,7 +114,7 @@ function NewContractContent() {
           {saveError}
           {createdId && (
             <Link href={`/contracts/${createdId}/edit`} className="ml-2 underline underline-offset-2">
-              Sözleşmeyi aç
+              {t("finance.contracts.open")}
             </Link>
           )}
         </p>
@@ -121,7 +122,7 @@ function NewContractContent() {
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Başlık *</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.title")} *</label>
             <Input
               className="mt-1"
               value={contractTitle}
@@ -133,7 +134,7 @@ function NewContractContent() {
             />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Kod</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.code")}</label>
             <Input
               className="mt-1 font-mono"
               value={contractCode}
@@ -146,27 +147,27 @@ function NewContractContent() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Taraf</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.party")}</label>
             <Input className="mt-1" value={partyName} onChange={(e) => setPartyName(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Tutar</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.amount")}</label>
             <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Saha</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.store")}</label>
             <Select className="mt-1" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
-              <option value="">Seçiniz</option>
+              <option value="">{t("finance.shared.select")}</option>
               {stores.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </Select>
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Durum</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.status")}</label>
             <Select className="mt-1" value={status} onChange={(e) => setStatus(e.target.value as ContractStatus)}>
-              <option value="draft">Taslak</option>
-              <option value="active">Aktif</option>
+              <option value="draft">{CONTRACT_STATUS_LABELS.draft}</option>
+              <option value="active">{CONTRACT_STATUS_LABELS.active}</option>
             </Select>
           </div>
         </div>

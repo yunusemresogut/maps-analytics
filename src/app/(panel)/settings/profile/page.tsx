@@ -66,7 +66,7 @@ function ProfileContent() {
     }
     const saved = await updateProfile({ avatarUrl: result.url });
     if (!saved) {
-      setAvatarError("Fotoğraf yüklendi ancak profil güncellenemedi. Lütfen tekrar deneyin.");
+      setAvatarError(t("settings.profile.avatarProfileFailed"));
       setAvatarPreview(avatarUrl);
       URL.revokeObjectURL(localPreview);
       return;
@@ -81,7 +81,7 @@ function ProfileContent() {
     if (!user) return;
     const saved = await updateProfile({ avatarUrl: null });
     if (!saved) {
-      setAvatarError("Profil fotoğrafı kaldırılamadı. Lütfen tekrar deneyin.");
+      setAvatarError(t("settings.profile.avatarRemoveFailed"));
       return;
     }
     setAvatarUrl("");
@@ -104,7 +104,7 @@ function ProfileContent() {
     });
     setSaving(false);
     if (okUser) setMessage(t("profile.saved"));
-    else setError("Kayıt sırasında bir hata oluştu");
+    else setError(t("settings.profile.saveFailed"));
   };
 
   return (
@@ -150,7 +150,7 @@ function ProfileContent() {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Camera className="h-3.5 w-3.5" />
-                Fotoğraf seç
+                {t("settings.profile.choosePhoto")}
               </Button>
               <Button
                 type="button"
@@ -159,7 +159,7 @@ function ProfileContent() {
                 onClick={resetAvatar}
                 disabled={avatarUploading || !avatarUrl}
               >
-                Varsayılana dön
+                {t("settings.profile.resetAvatar")}
               </Button>
             </div>
           </div>

@@ -5,8 +5,18 @@ import { ImportMenu } from "@/components/map/import-menu";
 import {
   downloadWorkPlanTemplate,
   parseWorkPlanFile,
+  responsibleLabel,
   type ParsedWorkPlanRow,
 } from "@/lib/excel-work-plan";
+import { t } from "@/i18n/runtime";
+import type { TranslationKey } from "@/i18n";
+import type { WorkPlanStatus } from "@/types";
+
+const WORK_PLAN_STATUS_KEYS: Record<WorkPlanStatus, TranslationKey> = {
+  yapilacak: "site.workPlan.status.yapilacak",
+  devam_ediyor: "site.workPlan.status.devam_ediyor",
+  tamamlandi: "site.workPlan.status.tamamlandi",
+};
 
 type WorkPlanImportMenuProps = {
   existingCount: number;
@@ -20,11 +30,16 @@ async function parseWorkPlan(file: File) {
     rows: result.items,
     error: result.errors.join(" · "),
     info: [
-      columns.description && `Açıklama → ${columns.description}`,
-      columns.startDate && `Başlangıç → ${columns.startDate}`,
-      columns.endDate && `Bitiş → ${columns.endDate}`,
-      columns.responsible && `Sorumlu → ${columns.responsible}`,
-      columns.status && `Durum → ${columns.status}`,
+      columns.description &&
+        t("site.import.workPlan.mapping", { column: t("site.import.workPlan.description"), source: columns.description }),
+      columns.startDate &&
+        t("site.import.workPlan.mapping", { column: t("site.import.workPlan.start"), source: columns.startDate }),
+      columns.endDate &&
+        t("site.import.workPlan.mapping", { column: t("site.import.workPlan.end"), source: columns.endDate }),
+      columns.responsible &&
+        t("site.import.workPlan.mapping", { column: t("site.import.workPlan.responsible"), source: columns.responsible }),
+      columns.status &&
+        t("site.import.workPlan.mapping", { column: t("site.import.workPlan.status"), source: columns.status }),
     ]
       .filter(Boolean)
       .join(" · "),
@@ -32,12 +47,17 @@ async function parseWorkPlan(file: File) {
 }
 
 export function WorkPlanImportMenu({ existingCount, onImport }: WorkPlanImportMenuProps) {
+  const statusLabel = (status: string) =>
+    status in WORK_PLAN_STATUS_KEYS ? t(WORK_PLAN_STATUS_KEYS[status as WorkPlanStatus]) : status;
   return (
     <ImportMenu
       accept=".xlsx,.xls,.xer"
-      itemLabel="iş kalemi"
+      itemLabel={t("site.import.workPlan.item")}
+      countLabel={(count) =>
+        t(count === 1 ? "site.import.workPlan.countOne" : "site.import.workPlan.countOther", { count })
+      }
       existingCount={existingCount}
-      hint="Excel iş planı şablonu veya Primavera P6 .xer dosyası seçin"
+      hint={t("site.import.workPlan.hint")}
       parse={parseWorkPlan}
       onTemplate={downloadWorkPlanTemplate}
       onConfirm={onImport}
@@ -45,11 +65,11 @@ export function WorkPlanImportMenu({ existingCount, onImport }: WorkPlanImportMe
         <table className="w-full min-w-[360px] text-xs">
           <thead className="sticky top-0 bg-zinc-900 text-zinc-500">
             <tr>
-              <th className="px-2 py-1.5 text-left font-medium">Açıklama</th>
-              <th className="px-2 py-1.5 text-left font-medium">Başlangıç</th>
-              <th className="px-2 py-1.5 text-left font-medium">Bitiş</th>
-              <th className="px-2 py-1.5 text-left font-medium">Sorumlu</th>
-              <th className="px-2 py-1.5 text-left font-medium">Durum</th>
+              <th className="px-2 py-1.5 text-left font-medium">{t("site.import.workPlan.description")}</th>
+              <th className="px-2 py-1.5 text-left font-medium">{t("site.import.workPlan.start")}</th>
+              <th className="px-2 py-1.5 text-left font-medium">{t("site.import.workPlan.end")}</th>
+              <th className="px-2 py-1.5 text-left font-medium">{t("site.import.workPlan.responsible")}</th>
+              <th className="px-2 py-1.5 text-left font-medium">{t("site.import.workPlan.status")}</th>
             </tr>
           </thead>
           <tbody>
@@ -61,10 +81,10 @@ export function WorkPlanImportMenu({ existingCount, onImport }: WorkPlanImportMe
                 <td className="whitespace-nowrap px-2 py-1.5 text-zinc-400">{row.startDate || "—"}</td>
                 <td className="whitespace-nowrap px-2 py-1.5 text-zinc-400">{row.endDate || "—"}</td>
                 <td className="max-w-[90px] px-2 py-1.5 text-zinc-400">
-                  <TruncateWithTooltip text={row.responsible || "—"} />
+                  <TruncateWithTooltip text={row.responsible ? responsibleLabel(row.responsible) : "—"} />
                 </td>
                 <td className="max-w-[80px] px-2 py-1.5 text-zinc-400">
-                  <TruncateWithTooltip text={row.status || "—"} />
+                  <TruncateWithTooltip text={row.status ? statusLabel(row.status) : "—"} />
                 </td>
               </tr>
             ))}

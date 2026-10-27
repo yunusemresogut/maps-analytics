@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sameCityName } from "@/data/regions";
 import { reverseGeocode, searchAddresses, type Coords, type GeocodeResult } from "@/lib/geocode";
+import { t } from "@/i18n/runtime";
 
 /**
  * Mağaza konumu tek doğruluk kaynağıdır: pin (koordinat) ↔ şehir/ilçe/ülke ↔ adres
@@ -89,13 +90,13 @@ export function useStoreLocation(initial: StoreLocation, options: { verifyInitia
       const result = await reverseGeocode(coords);
       if (id !== requestId.current) return;
       if (!result?.city) {
-        setStatus({ kind: "error", message: "Bu noktanın şehri belirlenemedi (deniz ya da boş alan olabilir). Başka bir nokta seçin." });
+        setStatus({ kind: "error", message: t("site.location.errors.pointNoCity") });
         return;
       }
       applyResult({ ...result, ...coords });
     } catch {
       if (id !== requestId.current) return;
-      setStatus({ kind: "error", message: "Bu nokta için adres bulunamadı. Tekrar deneyin ya da adres arayın." });
+      setStatus({ kind: "error", message: t("site.location.errors.pointNoAddress") });
     }
   }, [applyResult]);
 
@@ -110,13 +111,13 @@ export function useStoreLocation(initial: StoreLocation, options: { verifyInitia
       const result = await reverseGeocode(coords);
       if (id !== requestId.current) return;
       if (!result?.city) {
-        setStatus({ kind: "error", message: "Bu konumun şehri belirlenemedi. Pini doğru yere taşıyın." });
+        setStatus({ kind: "error", message: t("site.location.errors.currentNoCity") });
         return;
       }
       applyResult({ ...result, ...coords }, keep);
     } catch {
       if (id !== requestId.current) return;
-      setStatus({ kind: "error", message: "Konumdan şehir bulunamadı. Tekrar deneyin." });
+      setStatus({ kind: "error", message: t("site.location.errors.currentFailed") });
     }
   }, [location.coords, location.address, applyResult]);
 
@@ -146,28 +147,28 @@ export function useStoreLocation(initial: StoreLocation, options: { verifyInitia
       const [best] = await searchAddresses(query);
       if (id !== requestId.current) return;
       if (!best) {
-        setStatus({ kind: "error", message: "Bu adres haritada bulunamadı. Adresi sadeleştirin ya da pini haritadan seçin." });
+        setStatus({ kind: "error", message: t("site.location.errors.addressNotFound") });
         return;
       }
       applyResult(best, text);
     } catch {
       if (id !== requestId.current) return;
-      setStatus({ kind: "error", message: "Adres araması başarısız. Tekrar deneyin." });
+      setStatus({ kind: "error", message: t("site.location.errors.searchFailed") });
     }
   }, [location.address, location.city, applyResult]);
 
   /** Kaydetmeye hazır mı; değilse nedeni */
   const blocker =
     status.kind === "resolving"
-      ? "Konum bilgisi bulunuyor, lütfen bekleyin."
+      ? t("site.location.blockers.resolving")
       : !location.coords
-        ? "Önce haritadan konum seçin veya adres arayın."
+        ? t("site.location.blockers.noCoords")
         : !location.city.trim()
-          ? "Konumun şehri belirlenemedi. Pini başka bir noktaya taşıyın."
+          ? t("site.location.blockers.noCity")
           : mismatchCity
-            ? `Kayıtlı şehir (${location.city}) pinin konumuyla uyuşmuyor. "Şehri konumdan düzelt" ile düzeltin ya da pini taşıyın.`
+            ? t("site.location.blockers.cityMismatch", { city: location.city })
             : location.address.trim().length < 5
-              ? "Adres eksik."
+              ? t("site.location.blockers.addressMissing")
               : null;
 
   return {

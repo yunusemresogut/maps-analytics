@@ -34,6 +34,8 @@ import type { MaterialStatus, StoreMaterial } from "@/types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { PERCENT_UNIT, isPercentMaterial, materialLineTotal } from "@/lib/material-totals";
 import { formatMoney, formatMoneyTotals, moneyEntries, sumMoney, type CurrencyCode } from "@/lib/currency";
+import { useT } from "@/contexts/i18n-context";
+import { getIntlLocale, localizedRecord } from "@/i18n/runtime";
 
 type MaterialsPanelProps = {
   storeId: string;
@@ -45,11 +47,11 @@ type MaterialsPanelProps = {
 const SORT_COLUMNS = { seq: "seq" };
 const INITIAL_SORT: SortState<"seq"> = { key: "seq", direction: "asc" };
 
-const statusLabels: Record<MaterialStatus, string> = {
-  bekleniyor: "Bekleniyor",
-  geldi: "Geldi",
-  gitti: "Gitti",
-};
+const statusLabels: Record<MaterialStatus, string> = localizedRecord({
+  bekleniyor: "site.materials.status.bekleniyor",
+  geldi: "site.materials.status.geldi",
+  gitti: "site.materials.status.gitti",
+});
 
 const statusColors: Record<MaterialStatus, string> = {
   bekleniyor: "bg-zinc-500 text-zinc-400 border-zinc-500/20",
@@ -98,6 +100,7 @@ function MaterialFormModal({
   onClose: () => void;
   onSubmit: (values: MaterialFormValues) => void;
 }) {
+  const t = useT();
   const formId = useId();
   // Yüzde modu: seçimle yeni ekleme ya da birimi "%" olan kalemi düzenleme
   const percentMode = !!percentBase || (!!material && isPercentMaterial(material));
@@ -106,7 +109,7 @@ function MaterialFormModal({
   const [quantity, setQuantity] = useState(
     material ? String(material.quantity) : percentMode ? "" : "1"
   );
-  const [unit, setUnit] = useState(material?.unit ?? "adet");
+  const [unit, setUnit] = useState(material?.unit ?? t("site.materials.defaultUnit"));
   const [unitPrice, setUnitPrice] = useState<number | null>(material?.unitPrice ?? null);
   const [currency, setCurrency] = useState<CurrencyCode>(material?.currency ?? defaultCurrency);
   const [status, setStatus] = useState<MaterialStatus>(material?.status || "bekleniyor");
@@ -131,11 +134,11 @@ function MaterialFormModal({
     const amount = Number(quantity);
     let invalid = false;
     if (!name.trim()) {
-      setError("Kalem adı zorunludur");
+      setError(t("site.materials.nameRequired"));
       invalid = true;
     }
     if (percentMode && !(amount > 0)) {
-      setQuantityError("Yüzde değeri girin (ör. 10)");
+      setQuantityError(t("site.materials.percentRequired"));
       invalid = true;
     }
     if (invalid || !percentReady) return;
@@ -143,7 +146,7 @@ function MaterialFormModal({
       pozNo: pozNo.trim(),
       name: name.trim(),
       quantity: percentMode ? amount : amount || 1,
-      unit: percentMode ? PERCENT_UNIT : unit.trim() || "adet",
+      unit: percentMode ? PERCENT_UNIT : unit.trim() || t("site.materials.defaultUnit"),
       unitPrice: effectiveUnitPrice,
       currency: effectiveCurrency,
       status,
@@ -157,23 +160,23 @@ function MaterialFormModal({
       className="sm:max-w-xl"
       title={
         material
-          ? "Keşif kalemini düzenle"
+          ? t("site.materials.editTitle")
           : percentMode
-            ? "Seçilenlerden yüzdelik kalem"
-            : "Yeni keşif kalemi"
+            ? t("site.materials.percentTitle")
+            : t("site.materials.newTitle")
       }
       description={
         percentMode
-          ? "Tutar, seçilen kalemlerin toplamının girdiğiniz yüzdesidir."
-          : "Miktar, birim ve fiyat bilgilerini girin."
+          ? t("site.materials.percentDescription")
+          : t("site.materials.description")
       }
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Vazgeç
+            {t("site.materials.cancel")}
           </Button>
           <Button type="submit" form={formId} disabled={!percentReady}>
-            {material ? "Değişiklikleri kaydet" : "Kalemi ekle"}
+            {material ? t("site.materials.saveChanges") : t("site.materials.addItem")}
           </Button>
         </>
       }
@@ -185,28 +188,33 @@ function MaterialFormModal({
               <span className="flex items-center gap-1.5 font-medium text-cyan-300">
                 <Percent className="h-3.5 w-3.5" />
                 {percentBase.status === "ready"
-                  ? `Seçilen ${percentBase.items.length} kalem`
-                  : "Seçilen kalemler"}
+                  ? t(
+                      percentBase.items.length === 1
+                        ? "site.materials.selectedCountOne"
+                        : "site.materials.selectedCountOther",
+                      { count: percentBase.items.length }
+                    )
+                  : t("site.materials.selectedItems")}
               </span>
               {percentBase.status === "ready" && (
                 <span className="tabular-nums text-zinc-300">
-                  Toplam <span className="font-semibold text-zinc-100">{formatMoney(percentBase.total, percentBase.currency)}</span>
+                  {t("site.materials.total")} <span className="font-semibold text-zinc-100">{formatMoney(percentBase.total, percentBase.currency)}</span>
                 </span>
               )}
             </div>
             {percentBase.status === "loading" && (
-              <p className="px-3 py-3 text-xs text-zinc-500">Seçilen kalemler yükleniyor…</p>
+              <p className="px-3 py-3 text-xs text-zinc-500">{t("site.materials.selectedLoading")}</p>
             )}
             {percentBase.status === "mixed" && (
               <p role="alert" className="px-3 py-3 text-xs text-amber-400">
-                Seçilen kalemler farklı para birimlerinde (
-                {formatMoneyTotals(sumMoney(percentBase.items, (item) => item.currency, materialLineTotal))}
-                ). Kur çevrimi yapılmadığı için yüzdelik kalem yalnızca aynı birimdeki kalemlerden eklenebilir.
+                {t("site.materials.mixedCurrencies", {
+                  totals: formatMoneyTotals(sumMoney(percentBase.items, (item) => item.currency, materialLineTotal)),
+                })}
               </p>
             )}
             {percentBase.status === "error" && (
               <p role="alert" className="px-3 py-3 text-xs text-red-400">
-                Seçilen kalemler yüklenemedi. Pencereyi kapatıp tekrar deneyin.
+                {t("site.materials.selectedLoadFailed")}
               </p>
             )}
             {percentBase.status === "ready" && (
@@ -225,17 +233,17 @@ function MaterialFormModal({
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-          <FormField label="Poz no" htmlFor={`${formId}-poz`}>
+          <FormField label={t("site.materials.pozNo")} htmlFor={`${formId}-poz`}>
             <Input
               id={`${formId}-poz`}
               value={pozNo}
               onChange={(e) => setPozNo(e.target.value)}
-              placeholder="ör. 15.150.1005"
+              placeholder={t("site.materials.pozPlaceholder")}
               autoComplete="off"
               className="font-mono"
             />
           </FormField>
-          <FormField label="Kalem adı" required error={error} htmlFor={`${formId}-name`} className="sm:col-span-3">
+          <FormField label={t("site.materials.name")} required error={error} htmlFor={`${formId}-name`} className="sm:col-span-3">
             <Input
               id={`${formId}-name`}
               value={name}
@@ -251,7 +259,7 @@ function MaterialFormModal({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           <FormField
-            label={percentMode ? "Yüzde" : "Miktar"}
+            label={percentMode ? t("site.materials.percent") : t("site.materials.quantity")}
             required={percentMode}
             error={quantityError}
             htmlFor={`${formId}-quantity`}
@@ -279,9 +287,9 @@ function MaterialFormModal({
             </div>
           </FormField>
 
-          <FormField label="Birim" htmlFor={`${formId}-unit`}>
+          <FormField label={t("site.materials.unit")} htmlFor={`${formId}-unit`}>
             {percentMode ? (
-              <ReadOnlyValue icon title="Yüzdelik kalemde birim değiştirilemez">
+              <ReadOnlyValue icon title={t("site.materials.unitLocked")}>
                 {PERCENT_UNIT}
               </ReadOnlyValue>
             ) : (
@@ -290,12 +298,12 @@ function MaterialFormModal({
           </FormField>
 
           <FormField
-            label={percentMode ? "Birim fiyat (taban)" : "Birim fiyat"}
+            label={percentMode ? t("site.materials.unitPriceBase") : t("site.materials.unitPrice")}
             htmlFor={`${formId}-price`}
             className="sm:col-span-2"
           >
             {percentMode ? (
-              <ReadOnlyValue icon title="Seçilen kalemlerin toplam tutarı">
+              <ReadOnlyValue icon title={t("site.materials.baseTotalHint")}>
                 {percentReady ? formatMoney(baseTotal, effectiveCurrency) : "…"}
               </ReadOnlyValue>
             ) : (
@@ -311,18 +319,22 @@ function MaterialFormModal({
         </div>
 
         <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2">
-          <FormField label="Durum">
-            <Select value={status} onChange={(e) => setStatus(e.target.value as MaterialStatus)} aria-label="Durum">
-              <option value="bekleniyor">Bekleniyor</option>
-              <option value="geldi">Geldi</option>
-              <option value="gitti">Gitti</option>
+          <FormField label={t("site.materials.statusColumn")}>
+            <Select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as MaterialStatus)}
+              aria-label={t("site.materials.statusColumn")}
+            >
+              <option value="bekleniyor">{statusLabels.bekleniyor}</option>
+              <option value="geldi">{statusLabels.geldi}</option>
+              <option value="gitti">{statusLabels.gitti}</option>
             </Select>
           </FormField>
-          <FormField label="Tutar">
+          <FormField label={t("site.materials.amount")}>
             <div className="flex h-10 items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 text-sm">
               <span className="truncate text-xs text-zinc-500">
                 {percentMode && Number(quantity) > 0
-                  ? `${formatMoney(baseTotal, effectiveCurrency)} × %${Number(quantity).toLocaleString("tr-TR")}`
+                  ? `${formatMoney(baseTotal, effectiveCurrency)} × %${Number(quantity).toLocaleString(getIntlLocale())}`
                   : ""}
               </span>
               <span className="shrink-0 font-semibold tabular-nums text-zinc-100">{formatMoney(lineTotal, effectiveCurrency)}</span>
@@ -340,6 +352,7 @@ export function MaterialsPanel({
   onDelete,
   onImport,
 }: MaterialsPanelProps) {
+  const t = useT();
   const { addMaterial, updateMaterial, getDetailVersion } = useStoreData();
   const { storeSummaries } = useDb();
   const { getStore } = useStores();
@@ -380,7 +393,7 @@ export function MaterialsPanel({
 
   const handleBulkDelete = async () => {
     const count = selection.selectedCount;
-    if (count === 0 || !confirm(`${count} keşif kalemi silinsin mi?`)) return;
+    if (count === 0 || !confirm(t(count === 1 ? "site.materials.confirmDeleteOne" : "site.materials.confirmDeleteOther", { count }))) return;
     setDeleting(true);
     try {
       const ids = selection.allMatching
@@ -470,7 +483,7 @@ export function MaterialsPanel({
             aria-hidden
           />
           <Package className="h-4 w-4 text-violet-400" />
-          <span className="text-sm font-medium text-zinc-200">Keşif</span>
+          <span className="text-sm font-medium text-zinc-200">{t("site.materials.title")}</span>
           <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-xs text-violet-300">
             {summary.materialCount}
           </span>
@@ -479,14 +492,14 @@ export function MaterialsPanel({
           <div className="flex items-center gap-2">
             <MaterialsImportMenu existingCount={summary.materialCount} onImport={onImport} />
             {selection.selectedCount > 0 ? (
-              <Button size="sm" onClick={() => void openPercentModal()} title="Seçilen kalemlerin toplamının yüzdesi olarak yeni kalem">
+              <Button size="sm" onClick={() => void openPercentModal()} title={t("site.materials.addPercentTitle")}>
                 <Percent className="h-3.5 w-3.5" />
-                Seçilenlerden % kalem ekle ({selection.selectedCount})
+                {t("site.materials.addPercent", { count: selection.selectedCount })}
               </Button>
             ) : (
               <Button size="sm" onClick={() => openModal(null)}>
                 <Plus className="h-3.5 w-3.5" />
-                Kalem ekle
+                {t("site.materials.add")}
               </Button>
             )}
           </div>
@@ -499,8 +512,8 @@ export function MaterialsPanel({
             <SearchInput
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Poz no, kalem, birim veya durum ara…"
-              aria-label="Keşifte ara"
+              placeholder={t("site.materials.searchPlaceholder")}
+              aria-label={t("site.materials.searchLabel")}
               containerClassName="max-w-sm"
               className="h-9"
             />
@@ -528,17 +541,17 @@ export function MaterialsPanel({
                       checked={selection.isPageSelected}
                       indeterminate={selection.isPagePartiallySelected}
                       onChange={selection.togglePage}
-                      label="Bu sayfadaki keşif kalemlerini seç"
+                      label={t("site.materials.selectPage")}
                     />
                   </th>
                 )}
-                <th className="px-4 py-3 text-left font-medium">Poz no</th>
-                <th className="px-4 py-3 text-left font-medium">Kalem</th>
-                <th className="px-4 py-3 text-right font-medium">Miktar</th>
-                <th className="px-4 py-3 text-left font-medium">Birim</th>
-                <th className="px-4 py-3 text-right font-medium">Birim fiyat</th>
-                <th className="px-4 py-3 text-right font-medium">Tutar</th>
-                <th className="px-4 py-3 text-left font-medium">Durum</th>
+                <th className="px-4 py-3 text-left font-medium">{t("site.materials.pozNo")}</th>
+                <th className="px-4 py-3 text-left font-medium">{t("site.materials.item")}</th>
+                <th className="px-4 py-3 text-right font-medium">{t("site.materials.quantity")}</th>
+                <th className="px-4 py-3 text-left font-medium">{t("site.materials.unit")}</th>
+                <th className="px-4 py-3 text-right font-medium">{t("site.materials.unitPrice")}</th>
+                <th className="px-4 py-3 text-right font-medium">{t("site.materials.amount")}</th>
+                <th className="px-4 py-3 text-left font-medium">{t("site.materials.statusColumn")}</th>
                 {isEditing && <th className="w-20 px-4 py-3" />}
               </tr>
             </thead>
@@ -547,10 +560,10 @@ export function MaterialsPanel({
                 <tr>
                   <td colSpan={isEditing ? 9 : 7} className="px-4 py-10 text-center text-sm text-zinc-500">
                     {table.isLoading
-                      ? "Yükleniyor…"
+                      ? t("site.materials.loading")
                       : summary.materialCount === 0
-                      ? <>Henüz keşif kalemi yok. Excel ile içe aktarın veya &quot;Kalem ekle&quot; ile ekleyin.</>
-                      : "Aramayla eşleşen keşif kalemi yok."}
+                      ? t("site.materials.empty")
+                      : t("site.materials.noMatch")}
                   </td>
                 </tr>
               ) : (
@@ -569,7 +582,7 @@ export function MaterialsPanel({
                           <SelectCheckbox
                             checked={selection.isSelected(m.id)}
                             onChange={() => selection.toggle(m.id)}
-                            label={`${m.name} seç`}
+                            label={t("site.materials.selectRow", { name: m.name })}
                           />
                         </td>
                       )}
@@ -606,7 +619,7 @@ export function MaterialsPanel({
                               type="button"
                               onClick={() => openModal(m)}
                               className="text-zinc-500 hover:text-cyan-400"
-                              aria-label="Düzenle"
+                              aria-label={t("common.edit")}
                             >
                               <Edit2 className="h-4 w-4" />
                             </button>
@@ -614,7 +627,7 @@ export function MaterialsPanel({
                               type="button"
                               onClick={() => void onDelete([m.id])}
                               className="text-zinc-500 hover:text-red-400"
-                              aria-label="Sil"
+                              aria-label={t("common.delete")}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -630,7 +643,7 @@ export function MaterialsPanel({
               <tfoot className="border-t border-zinc-800">
                 <tr>
                   <td colSpan={isEditing ? 6 : 5} className="px-4 py-3 text-right text-xs text-zinc-500">
-                    {table.appliedSearch ? "Tüm keşif toplamı" : "Toplam tutar"}
+                    {table.appliedSearch ? t("site.materials.grandTotal") : t("site.materials.totalAmount")}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-cyan-300">
                     {formatMoneyTotals(summary.materialTotals, defaultCurrency)}

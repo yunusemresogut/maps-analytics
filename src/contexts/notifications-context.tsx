@@ -11,6 +11,7 @@ import {
 } from "react";
 import { format, addDays } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n } from "@/contexts/i18n-context";
 import { useDb } from "@/contexts/db-context";
 import { useSettings } from "@/contexts/settings-context";
 import { useTeamChat } from "@/contexts/team-chat-context";
@@ -47,6 +48,8 @@ export function NotificationsProvider({
   children: React.ReactNode;
 }) {
   const { user } = useAuth();
+  // Bildirim metinleri çevrilir; dil değişince yeniden hesaplanır
+  const { locale } = useI18n();
   const { stores, contracts, tickets, progressPayments, invoices, users } = useDb();
   const { messages } = useTeamChat();
   const { org, prefs, prefsLoaded, dismissedIds, updateDismissed } = useSettings();
@@ -89,7 +92,8 @@ export function NotificationsProvider({
             ...hrData,
           })
         : [],
-    [user, prefsLoaded, org, prefs, stores, contracts, tickets, progressPayments, invoices, messages, users, hrData]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- locale: metinler @/i18n/runtime ile çevrilir
+    [user, prefsLoaded, org, prefs, stores, contracts, tickets, progressPayments, invoices, messages, users, hrData, locale]
   );
 
   const notifications = useMemo(() => {

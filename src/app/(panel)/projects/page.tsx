@@ -61,11 +61,12 @@ function ProjectsContent() {
           value={table.sort.key}
           onChange={(e) => onSortKeyChange(e.target.value as SortKey)}
           className="h-10 w-auto min-w-[160px]"
+          aria-label={t("site.approvals.sortLabel")}
         >
-          <option value="name">Ada göre</option>
-          <option value="city">Şehre göre</option>
-          <option value="status">Duruma göre</option>
-          <option value="approvals">Onay sayısına göre</option>
+          <option value="name">{t("site.storesPage.sort.name")}</option>
+          <option value="city">{t("site.storesPage.sort.city")}</option>
+          <option value="status">{t("site.storesPage.sort.status")}</option>
+          <option value="approvals">{t("site.storesPage.sort.approvals")}</option>
         </Select>
       </div>
 

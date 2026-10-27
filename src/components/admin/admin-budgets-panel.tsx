@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useStores } from "@/contexts/stores-context";
 import { useDb } from "@/contexts/db-context";
+import { useT } from "@/contexts/i18n-context";
 import { useTableState } from "@/hooks/use-table-state";
 import {
   addMoney,
@@ -57,6 +58,8 @@ type SortKey =
 export function AdminBudgetsPanel() {
   const { stores, updateStore } = useStores();
   const { storeSummaries } = useDb();
+  const t = useT();
+  const percent = (value: number) => t("admin.budgets.percent", { value });
   const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
   const [editBudgetValue, setEditBudgetValue] = useState<number | null>(null);
   const [editBudgetCurrency, setEditBudgetCurrency] = useState<CurrencyCode>(DEFAULT_CURRENCY);
@@ -124,10 +127,10 @@ export function AdminBudgetsPanel() {
         const spent = storesData
           .filter((s) => s.budgetCurrency === currency)
           .reduce((sum, s) => sum + s.spentAmount, 0);
-        const percent = `%${Math.round((spent / budget) * 100)}`;
-        return moneyEntries(totalBudget).length > 1 ? `${percent} (${currency})` : percent;
+        const ratio = percent(Math.round((spent / budget) * 100));
+        return moneyEntries(totalBudget).length > 1 ? `${ratio} (${currency})` : ratio;
       })
-      .join(" · ") || "%0";
+      .join(" · ") || percent(0);
 
   const startEdit = (store: BudgetRow) => {
     setEditingStoreId(store.id);
@@ -138,7 +141,7 @@ export function AdminBudgetsPanel() {
 
   const saveBudget = async (storeId: string) => {
     if (editBudgetValue === null || editBudgetValue < 0) {
-      setMessage("Geçersiz bütçe değeri");
+      setMessage(t("admin.budgets.invalidValue"));
       return;
     }
 
@@ -147,11 +150,11 @@ export function AdminBudgetsPanel() {
       budgetCurrency: editBudgetCurrency,
     });
     if (!ok) {
-      setMessage("Bütçe kaydedilemedi");
+      setMessage(t("admin.budgets.saveFailed"));
       return;
     }
     setEditingStoreId(null);
-    setMessage("Bütçe güncellendi");
+    setMessage(t("admin.budgets.updated"));
     setTimeout(() => setMessage(""), 3000);
   };
 
@@ -160,25 +163,25 @@ export function AdminBudgetsPanel() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           icon={Wallet}
-          label="Toplam Bütçe"
+          label={t("admin.budgets.totalBudget")}
           value={formatMoneyTotals(totalBudget)}
           accent="violet"
         />
         <MetricCard
           icon={TrendingUp}
-          label="Toplam Harcanan"
+          label={t("admin.budgets.totalSpent")}
           value={formatMoneyTotals(totalSpent)}
           accent="amber"
         />
         <MetricCard
           icon={TrendingDown}
-          label="Kalan Bütçe"
+          label={t("admin.budgets.remainingBudget")}
           value={formatMoneyTotals(totalRemaining)}
           accent={hasDeficit ? "red" : "emerald"}
         />
         <MetricCard
           icon={AlertTriangle}
-          label="Bütçe Aşımı Olan Şantiye"
+          label={t("admin.budgets.overrunSites")}
           value={`${totalOverrunBudgetStores} / ${stores.length}`}
           accent={totalOverrunBudgetStores > 0 ? "red" : "cyan"}
         />
@@ -187,7 +190,7 @@ export function AdminBudgetsPanel() {
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 lg:col-span-2 space-y-4">
           <h2 className="text-sm font-medium text-zinc-300">
-            Bütçe Kullanım Analizi
+            {t("admin.budgets.usageAnalysis")}
           </h2>
           <div className="space-y-3">
             {[...storesData]
@@ -208,7 +211,7 @@ export function AdminBudgetsPanel() {
                             : "text-zinc-400"
                         }
                       >
-                        %{Math.round(store.percentSpent)} (
+                        {percent(Math.round(store.percentSpent))} (
                         {formatMoney(store.spentAmount, store.budgetCurrency)})
                       </span>
                     </div>
@@ -231,18 +234,18 @@ export function AdminBudgetsPanel() {
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 flex flex-col justify-between">
           <div>
             <h2 className="text-sm font-medium text-zinc-300">
-              Genel Finansal Özet
+              {t("admin.budgets.financialSummary")}
             </h2>
             <div className="mt-4 space-y-3.5">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-zinc-500">Ortalama Bütçe</span>
+                <span className="text-zinc-500">{t("admin.budgets.averageBudget")}</span>
                 <span className="font-semibold text-zinc-300">
                   {averageBudget}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-zinc-500">
-                  Bütçe Verimliliği (Spent/Budget)
+                  {t("admin.budgets.efficiency")}
                 </span>
                 <span className="font-semibold text-zinc-300">
                   {efficiency}
@@ -250,7 +253,7 @@ export function AdminBudgetsPanel() {
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-zinc-500">
-                  Kritik Limit Şantiyeleri (&gt;%90)
+                  {t("admin.budgets.criticalSites")}
                 </span>
                 <span className="font-semibold text-zinc-300">
                   {storesData.filter((s) => s.percentSpent >= 90).length}
@@ -269,7 +272,7 @@ export function AdminBudgetsPanel() {
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
         <div className="border-b border-zinc-800 px-5 py-4 flex items-center justify-between">
           <h2 className="font-medium text-zinc-200">
-            Şantiye Bütçe Listesi ({stores.length})
+            {t("admin.budgets.listTitle", { count: stores.length })}
           </h2>
         </div>
         <div className="overflow-x-auto scrollbar-themed">
@@ -278,7 +281,7 @@ export function AdminBudgetsPanel() {
               <tr className="border-b border-zinc-800">
                 <SortableTh
                   columnKey="name"
-                  label="Saha"
+                  label={t("admin.budgets.columns.site")}
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}
@@ -286,14 +289,14 @@ export function AdminBudgetsPanel() {
                 />
                 <SortableTh
                   columnKey="city"
-                  label="Şehir"
+                  label={t("admin.budgets.columns.city")}
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}
                 />
                 <SortableTh
                   columnKey="totalBudget"
-                  label="Toplam Bütçe"
+                  label={t("admin.budgets.totalBudget")}
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}
@@ -301,7 +304,7 @@ export function AdminBudgetsPanel() {
                 />
                 <SortableTh
                   columnKey="spentAmount"
-                  label="Harcanan Tutar"
+                  label={t("admin.budgets.columns.spent")}
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}
@@ -309,7 +312,7 @@ export function AdminBudgetsPanel() {
                 />
                 <SortableTh
                   columnKey="remainingBudget"
-                  label="Kalan Tutar"
+                  label={t("admin.budgets.columns.remaining")}
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}
@@ -317,13 +320,13 @@ export function AdminBudgetsPanel() {
                 />
                 <SortableTh
                   columnKey="percentSpent"
-                  label="Bütçe Durumu"
+                  label={t("admin.budgets.columns.status")}
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}
                   className="text-center"
                 />
-                <th className="px-5 py-3 font-medium text-right">İşlemler</th>
+                <th className="px-5 py-3 font-medium text-right">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -353,7 +356,7 @@ export function AdminBudgetsPanel() {
                               if (e.key === "Enter") void saveBudget(store.id);
                               if (e.key === "Escape") setEditingStoreId(null);
                             }}
-                            aria-label={`${store.name} bütçesi`}
+                            aria-label={t("admin.budgets.budgetLabel", { name: store.name })}
                             className="w-48 bg-zinc-950"
                             autoFocus
                           />
@@ -369,7 +372,7 @@ export function AdminBudgetsPanel() {
                       {moneyEntries(store.otherSpent).length > 0 && (
                         <span
                           className="mt-0.5 block text-[10px] font-normal text-amber-400/80"
-                          title="Bütçeden farklı para birimindeki keşif; kur çevrimi olmadığı için bütçeye sayılmaz"
+                          title={t("admin.budgets.otherCurrencyHint")}
                         >
                           + {formatMoneyTotals(store.otherSpent)}
                         </span>
@@ -387,11 +390,11 @@ export function AdminBudgetsPanel() {
                     <td className="px-4 py-3.5 text-center">
                       {isOver ? (
                         <span className="inline-flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[9px] font-semibold text-red-400">
-                          Bütçe Aşımı!
+                          {t("admin.budgets.overrun")}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-semibold text-emerald-400">
-                          Normal
+                          {t("admin.budgets.normal")}
                         </span>
                       )}
                     </td>
@@ -402,7 +405,7 @@ export function AdminBudgetsPanel() {
                             type="button"
                             onClick={() => saveBudget(store.id)}
                             className="p-1 rounded bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
-                            title="Kaydet"
+                            title={t("common.save")}
                           >
                             <Check className="h-3 w-3" />
                           </button>
@@ -410,7 +413,7 @@ export function AdminBudgetsPanel() {
                             type="button"
                             onClick={() => setEditingStoreId(null)}
                             className="p-1 rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 cursor-pointer"
-                            title="İptal"
+                            title={t("common.cancel")}
                           >
                             <X className="h-3 w-3" />
                           </button>
@@ -423,7 +426,7 @@ export function AdminBudgetsPanel() {
                           onClick={() => startEdit(store)}
                         >
                           <Edit2 className="h-3 w-3 mr-1" />
-                          Düzenle
+                          {t("common.edit")}
                         </Button>
                       )}
                     </td>

@@ -65,7 +65,7 @@ export function DatePicker({
   onChange,
   min,
   max,
-  placeholder = "Tarih seçin",
+  placeholder,
   disabled,
   readOnly,
   required,
@@ -74,7 +74,7 @@ export function DatePicker({
   "aria-label": ariaLabel,
   "aria-invalid": ariaInvalid,
 }: DatePickerProps) {
-  const { dateLocale } = useI18n();
+  const { t, dateLocale } = useI18n();
   const weekStartsOn = dateLocale.options?.weekStartsOn ?? 1;
   const selected = parseDate(value);
   const minDate = parseDate(min);
@@ -227,7 +227,7 @@ export function DatePicker({
       >
         <CalendarDays className="h-4 w-4 shrink-0 text-zinc-500" />
         <span className={cn("truncate", selected ? "text-zinc-100" : "text-zinc-500")}>
-          {selected ? format(selected, "d MMMM yyyy", { locale: dateLocale }) : placeholder}
+          {selected ? format(selected, "d MMMM yyyy", { locale: dateLocale }) : (placeholder ?? t("shell.datePicker.placeholder"))}
         </span>
       </button>
       {canClear && (
@@ -235,7 +235,7 @@ export function DatePicker({
           type="button"
           onClick={() => onChange("")}
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-zinc-500 transition-colors hover:bg-zinc-800/60 hover:text-zinc-300"
-          aria-label="Tarihi temizle"
+          aria-label={t("shell.datePicker.clearDate")}
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -246,7 +246,7 @@ export function DatePicker({
           <div
             ref={popoverRef}
             role="dialog"
-            aria-label="Tarih seç"
+            aria-label={t("shell.datePicker.dialog")}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 event.stopPropagation();
@@ -267,7 +267,7 @@ export function DatePicker({
                   setFocused((date) => (view === "days" ? addMonths(date, -1) : addYears(date, -1)))
                 }
                 className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-zinc-200"
-                aria-label={view === "days" ? "Önceki ay" : "Önceki yıl"}
+                aria-label={view === "days" ? t("shell.datePicker.prevMonth") : t("shell.datePicker.prevYear")}
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -275,7 +275,7 @@ export function DatePicker({
                 type="button"
                 onClick={() => setView((current) => (current === "days" ? "months" : "days"))}
                 className="rounded-md px-2 py-1 text-sm font-medium capitalize text-zinc-100 transition-colors hover:bg-zinc-800/60"
-                aria-label="Ay ve yıl seç"
+                aria-label={t("shell.datePicker.monthYear")}
               >
                 {view === "days"
                   ? format(focused, "LLLL yyyy", { locale: dateLocale })
@@ -287,7 +287,7 @@ export function DatePicker({
                   setFocused((date) => (view === "days" ? addMonths(date, 1) : addYears(date, 1)))
                 }
                 className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-zinc-200"
-                aria-label={view === "days" ? "Sonraki ay" : "Sonraki yıl"}
+                aria-label={view === "days" ? t("shell.datePicker.nextMonth") : t("shell.datePicker.nextYear")}
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -376,7 +376,7 @@ export function DatePicker({
                 disabled={isDisabledDate(today)}
                 className="rounded-md px-2 py-1 text-xs font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10 disabled:opacity-40"
               >
-                Bugün
+                {t("shell.datePicker.today")}
               </button>
               {!required && (
                 <button
@@ -387,7 +387,7 @@ export function DatePicker({
                   }}
                   className="rounded-md px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-800/60 hover:text-zinc-300"
                 >
-                  Temizle
+                  {t("shell.datePicker.clear")}
                 </button>
               )}
             </div>

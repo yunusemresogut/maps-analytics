@@ -2,23 +2,18 @@
 
 import Link from "next/link";
 import { useDb } from "@/contexts/db-context";
+import { useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatMoney } from "@/lib/currency";
+import { CONTRACT_STATUS_LABELS } from "@/lib/module-finance";
 import { cn } from "@/lib/utils";
 import type { Store } from "@/types";
 
-const STATUS_TR: Record<string, string> = {
-  draft: "Taslak",
-  active: "Aktif",
-  expired: "Süresi doldu",
-  cancelled: "İptal",
-  terminated: "Fesih",
-  completed: "Tamamlandı",
-};
 
 export function StoreContractsList({ store }: { store: Store }) {
   const { contracts } = useDb();
   const { canAdd } = usePermissions("contracts");
+  const t = useT();
 
   const linked = contracts.filter((c) => c.storeId === store.id);
 
@@ -29,18 +24,18 @@ export function StoreContractsList({ store }: { store: Store }) {
   return (
     <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium text-zinc-200">Sözleşmeler</h3>
+        <h3 className="text-sm font-medium text-zinc-200">{t("finance.contracts.storeSection.title")}</h3>
         {canAdd && (
           <Link
             href={`/contracts/new?storeId=${store.id}`}
             className="text-xs text-cyan-400 hover:underline"
           >
-            + Yeni
+            {t("finance.contracts.storeSection.add")}
           </Link>
         )}
       </div>
       {linked.length === 0 ? (
-        <p className="text-sm text-zinc-600">Henüz sözleşme yok</p>
+        <p className="text-sm text-zinc-600">{t("finance.contracts.storeSection.empty")}</p>
       ) : (
         <ul className="space-y-2">
           {linked.map((c) => (
@@ -57,7 +52,7 @@ export function StoreContractsList({ store }: { store: Store }) {
                   {c.title}
                 </span>
                 <span className="shrink-0 text-xs text-zinc-500">
-                  {STATUS_TR[c.status] ?? c.status} · {formatMoney(c.amount, c.currency)}
+                  {CONTRACT_STATUS_LABELS[c.status] ?? c.status} · {formatMoney(c.amount, c.currency)}
                 </span>
               </Link>
             </li>

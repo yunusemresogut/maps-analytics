@@ -47,28 +47,28 @@ export function AdminDashboard() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={Users}
-          label="Kullanıcılar"
+          label={t("nav.users")}
           value={regularUsers.length}
           href="/admin/users"
           accent="cyan"
         />
         <StatCard
           icon={MapPin}
-          label="Bölgeler"
+          label={t("nav.regions")}
           value={regions.length}
           href="/admin/regions"
           accent="violet"
         />
         <StatCard
           icon={Store}
-          label="Toplam Konum"
+          label={t("admin.dashboard.totalLocations")}
           value={stores.length}
           href="/dashboard"
           accent="emerald"
         />
         <StatCard
           icon={Shield}
-          label="Aktif Bildirim"
+          label={t("admin.dashboard.activeNotifications")}
           value={notifications.length}
           href="/notifications"
           accent="amber"
@@ -78,7 +78,7 @@ export function AdminDashboard() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
           <h2 className="text-sm font-medium text-zinc-300">
-            Proje Durum Özeti
+            {t("admin.dashboard.projectStatusSummary")}
           </h2>
           <div className="mt-4 space-y-2">
             {(Object.keys(projectStatusConfig) as ProjectStatus[]).map(
@@ -121,18 +121,18 @@ export function AdminDashboard() {
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-sm font-medium text-zinc-300">
               <ScrollText className="h-4 w-4 text-violet-400" />
-              Son Aktiviteler
+              {t("admin.dashboard.recentActivity")}
             </h2>
             <Link
               href="/admin/logs"
               className="text-xs text-cyan-400 hover:text-cyan-300"
             >
-              Tümünü gör
+              {t("common.viewAll")}
             </Link>
           </div>
           <ul className="mt-4 space-y-2">
             {recentLogs.length === 0 && (
-              <li className="text-sm text-zinc-600">Henüz aktivite yok</li>
+              <li className="text-sm text-zinc-600">{t("admin.dashboard.noActivity")}</li>
             )}
             {recentLogs.map((log) => (
               <li

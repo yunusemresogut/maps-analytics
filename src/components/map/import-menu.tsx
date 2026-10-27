@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Download, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/contexts/i18n-context";
 
 export type ImportParseResult<T> = {
   rows: T[];
@@ -12,8 +13,10 @@ export type ImportParseResult<T> = {
 
 type ImportMenuProps<T> = {
   accept: string;
-  /** Örn. "malzeme", "iş kalemi" */
+  /** Örn. "Keşif kalemi", "İş kalemi" (önizleme başlığı için) */
   itemLabel: string;
+  /** Sayıyla birlikte kalem adı, örn. "5 iş kalemi" */
+  countLabel: (count: number) => string;
   existingCount: number;
   hint: string;
   parse: (file: File) => Promise<ImportParseResult<T>>;
@@ -30,6 +33,7 @@ type ImportMenuProps<T> = {
 export function ImportMenu<T>({
   accept,
   itemLabel,
+  countLabel,
   existingCount,
   hint,
   parse,
@@ -37,6 +41,7 @@ export function ImportMenu<T>({
   onConfirm,
   renderPreview,
 }: ImportMenuProps<T>) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -81,13 +86,13 @@ export function ImportMenu<T>({
     try {
       const result = await parse(file);
       if (result.rows.length === 0) {
-        setError(result.error || "Dosyada içe aktarılabilir satır bulunamadı");
+        setError(result.error || t("site.import.noRows"));
         return;
       }
       setRows(result.rows);
       setInfo(result.info ?? "");
     } catch {
-      setError("Dosya okunamadı");
+      setError(t("site.import.readFailed"));
     }
   };
 
@@ -97,10 +102,10 @@ export function ImportMenu<T>({
         size="sm"
         variant="ghost"
         onClick={onTemplate}
-        title="Excel şablonunu indir"
+        title={t("site.import.downloadTemplate")}
       >
         <Download className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">Şablon</span>
+        <span className="hidden sm:inline">{t("site.import.template")}</span>
       </Button>
       <Button
         size="sm"
@@ -109,7 +114,7 @@ export function ImportMenu<T>({
         title={hint}
       >
         <Upload className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">İçe aktar</span>
+        <span className="hidden sm:inline">{t("site.import.import")}</span>
       </Button>
       <input
         ref={inputRef}
@@ -122,7 +127,7 @@ export function ImportMenu<T>({
       {open && (
         <div
           role="dialog"
-          aria-label={`${itemLabel} içe aktarma önizlemesi`}
+          aria-label={t("site.import.previewLabel", { item: itemLabel })}
           className="absolute right-0 top-full z-30 mt-2 w-[min(560px,calc(100vw-2rem))] rounded-lg border border-zinc-700/80 bg-zinc-950 p-3 shadow-(--panel-shadow)"
         >
           <div className="mb-2 flex items-start justify-between gap-2">
@@ -132,7 +137,7 @@ export function ImportMenu<T>({
               </p>
               {rows.length > 0 && (
                 <p className="text-xs text-zinc-500">
-                  {rows.length} {itemLabel} okundu
+                  {t("site.import.readCount", { items: countLabel(rows.length) })}
                 </p>
               )}
             </div>
@@ -140,7 +145,7 @@ export function ImportMenu<T>({
               type="button"
               onClick={close}
               className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
-              aria-label="Kapat"
+              aria-label={t("common.close")}
             >
               <X className="h-4 w-4" />
             </button>
@@ -154,19 +159,19 @@ export function ImportMenu<T>({
                 {renderPreview(rows.slice(0, 10))}
                 {rows.length > 10 && (
                   <p className="border-t border-zinc-800/60 px-2 py-1 text-xs text-zinc-500">
-                    +{rows.length - 10} satır daha
+                    {t("site.import.moreRows", { count: rows.length - 10 })}
                   </p>
                 )}
               </div>
               {info && <p className="mt-2 text-[11px] text-zinc-500">{info}</p>}
               {existingCount > 0 && (
                 <p className="mt-2 text-xs text-amber-400">
-                  Mevcut {existingCount} {itemLabel} bu dosyadakilerle değiştirilecek.
+                  {t("site.import.replaceWarning", { items: countLabel(existingCount) })}
                 </p>
               )}
               <div className="mt-3 flex justify-end gap-2">
                 <Button size="sm" variant="ghost" onClick={close}>
-                  Vazgeç
+                  {t("site.import.cancel")}
                 </Button>
                 <Button
                   size="sm"
@@ -175,7 +180,7 @@ export function ImportMenu<T>({
                     close();
                   }}
                 >
-                  {rows.length} {itemLabel} içe aktar
+                  {t("site.import.confirm", { items: countLabel(rows.length) })}
                 </Button>
               </div>
             </>

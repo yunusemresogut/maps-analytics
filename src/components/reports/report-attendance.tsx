@@ -6,6 +6,7 @@ import { CalendarOff, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { useI18n } from "@/contexts/i18n-context";
 import { useSettings } from "@/contexts/settings-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
@@ -43,6 +44,8 @@ export function ReportAttendanceSection({
   /** Yeni raporda saha seçilince sahaya bağlı personel kendiliğinden eklenir */
   autoFill: boolean;
 }) {
+  const { t, locale } = useI18n();
+  const intlLocale = locale === "en" ? "en-US" : "tr-TR";
   const { canView } = usePermissions("timesheets");
   const { org, isModuleEnabled } = useSettings();
   const enabled = canView && isModuleEnabled("timesheets");
@@ -116,7 +119,7 @@ export function ReportAttendanceSection({
   if (!enabled) {
     return attendance.length > 0 ? (
       <p className="text-xs text-zinc-500">
-        Raporda {attendance.length} kişilik isimli yoklama var; görmek ve değiştirmek için puantaj görüntüleme yetkisi gerekir.
+        {t(attendance.length === 1 ? "reports.attendance.noAccessOne" : "reports.attendance.noAccessOther", { count: attendance.length })}
       </p>
     ) : null;
   }
@@ -125,20 +128,20 @@ export function ReportAttendanceSection({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-medium text-zinc-200">İsimli yoklama</h3>
+          <h3 className="text-sm font-medium text-zinc-200">{t("reports.attendance.title")}</h3>
           <p className="text-xs text-zinc-500">
             {attendance.length > 0
-              ? `${attendancePresent(attendance)} kişi sahada, ${attendance.length - attendancePresent(attendance)} kişi gelmedi`
+              ? t("reports.attendance.summary", { present: attendancePresent(attendance), absent: attendance.length - attendancePresent(attendance) })
               : storeId
-                ? "Bu sahaya bağlı personeli ekleyin ya da listeden seçin."
-                : "Önce şantiye seçin."}
+                ? t("reports.attendance.addHint")
+                : t("reports.editor.selectSiteFirstSentence")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {assigned.length > 0 && (
             <Button size="sm" variant="outline" onClick={() => addPeople(assigned)}>
               <Users className="h-3.5 w-3.5" />
-              Sahadaki personel ({assigned.length})
+              {t("reports.attendance.addAssigned", { count: assigned.length })}
             </Button>
           )}
           {available.length > 0 && (
@@ -148,14 +151,14 @@ export function ReportAttendanceSection({
                 const person = available.find((p) => p.id === e.target.value);
                 if (person) addPeople([person]);
               }}
-              placeholder="Personel ekle…"
+              placeholder={t("reports.attendance.addPersonnel")}
               className="h-8 w-48 text-xs"
-              aria-label="Yoklamaya personel ekle"
+              aria-label={t("reports.attendance.addPersonnelLabel")}
             >
               {available.map((person) => (
                 <option key={person.id} value={person.id}>
                   {person.fullName}
-                  {leaveByPerson.has(person.id) ? " (izinli)" : ""}
+                  {leaveByPerson.has(person.id) ? ` (${t("reports.attendance.onLeave")})` : ""}
                 </option>
               ))}
             </Select>
@@ -166,10 +169,10 @@ export function ReportAttendanceSection({
       {attendance.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-zinc-800">
           <div className="hidden grid-cols-[minmax(0,1fr)_150px_90px_90px_36px] gap-2 bg-zinc-950/60 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-500 sm:grid">
-            <span>Personel</span>
-            <span>Durum</span>
-            <span>Normal (sa)</span>
-            <span>Fazla mesai</span>
+            <span>{t("reports.attendance.personnel")}</span>
+            <span>{t("common.status")}</span>
+            <span>{t("reports.attendance.regularHours")}</span>
+            <span>{t("reports.attendance.overtime")}</span>
             <span />
           </div>
           <ul className="divide-y divide-zinc-800">
@@ -188,7 +191,7 @@ export function ReportAttendanceSection({
                     <p className="truncate text-xs text-zinc-500">
                       {leave ? (
                         <span className="text-amber-400">
-                          Puantajda {TIMESHEET_STATUS[leave.status].label.toLocaleLowerCase("tr-TR")}; puantaja işlenmez
+                          {t("reports.attendance.leaveInTimesheet", { status: TIMESHEET_STATUS[leave.status].label.toLocaleLowerCase(intlLocale) })}
                         </span>
                       ) : (
                         row.jobTitle || "—"
@@ -198,7 +201,7 @@ export function ReportAttendanceSection({
                   <Select
                     value={row.status}
                     onChange={(e) => updateRow(row.personnelId, { status: e.target.value as AttendanceStatus })}
-                    aria-label={`${row.name} durum`}
+                    aria-label={t("reports.attendance.statusLabel", { name: row.name })}
                     className="h-8 text-xs"
                   >
                     {Object.entries(ATTENDANCE_STATUS_LABELS).map(([value, label]) => (
@@ -215,7 +218,7 @@ export function ReportAttendanceSection({
                     value={row.status === "absent" ? "" : row.hours}
                     disabled={row.status === "absent"}
                     onChange={(e) => updateRow(row.personnelId, { hours: Math.max(0, Number(e.target.value) || 0) })}
-                    aria-label={`${row.name} normal çalışma saati`}
+                    aria-label={t("reports.attendance.regularHoursLabel", { name: row.name })}
                     className="h-8 text-xs tabular-nums"
                   />
                   <Input
@@ -226,16 +229,16 @@ export function ReportAttendanceSection({
                     value={row.status === "absent" ? "" : row.overtimeHours}
                     disabled={row.status === "absent"}
                     onChange={(e) => updateRow(row.personnelId, { overtimeHours: Math.max(0, Number(e.target.value) || 0) })}
-                    aria-label={`${row.name} fazla mesai`}
+                    aria-label={t("reports.attendance.overtimeLabel", { name: row.name })}
                     aria-invalid={total > MAX_DAILY_HOURS}
-                    title={total > MAX_DAILY_HOURS ? "Günlük çalışma 11 saati aşamaz (İş Kanunu md. 63)" : undefined}
+                    title={total > MAX_DAILY_HOURS ? t("reports.attendance.maxHours") : undefined}
                     className="h-8 text-xs tabular-nums"
                   />
                   <button
                     type="button"
                     onClick={() => onChange(attendance.filter((item) => item.personnelId !== row.personnelId))}
                     className="justify-self-end rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800/50 hover:text-red-400"
-                    aria-label={`${row.name} yoklamadan çıkar`}
+                    aria-label={t("reports.attendance.removeLabel", { name: row.name })}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -249,9 +252,9 @@ export function ReportAttendanceSection({
       {assignedOnLeave.length > 0 && (
         <p className="flex flex-wrap items-center gap-1 text-xs text-zinc-500">
           <CalendarOff className="h-3.5 w-3.5" aria-hidden />
-          Bugün izinli:{" "}
+          {t("reports.attendance.onLeaveToday")}{" "}
           {assignedOnLeave
-            .map((person) => `${person.fullName} (${TIMESHEET_STATUS[leaveByPerson.get(person.id)!.status].label.toLocaleLowerCase("tr-TR")})`)
+            .map((person) => `${person.fullName} (${TIMESHEET_STATUS[leaveByPerson.get(person.id)!.status].label.toLocaleLowerCase(intlLocale)})`)
             .join(", ")}
         </p>
       )}

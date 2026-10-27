@@ -221,10 +221,10 @@ export function StoreMap() {
       <div className="pointer-events-none absolute left-2 top-2 z-10 flex w-[min(220px,calc(100vw-1rem))] flex-col gap-2 sm:left-4 sm:top-4">
         <div className="pointer-events-auto rounded-xl border border-zinc-700/60 bg-zinc-950/80 p-4 backdrop-blur-md">
           <h2 className="text-sm font-semibold text-zinc-100">
-            Saha Haritası
+            {t("site.mapPanels.mapTitle")}
           </h2>
           <p className="mt-1 text-xs text-zinc-500">
-            {visibleStores.length} / {stores.length} görünür
+            {t("site.mapPanels.visibleCount", { visible: visibleStores.length, total: stores.length })}
           </p>
           <div className="scrollbar-themed mt-3 max-h-52 space-y-1.5 overflow-y-auto pr-1">
             {(Object.keys(projectStatusConfig) as ProjectStatus[])
@@ -265,7 +265,7 @@ export function StoreMap() {
                 className="w-full border-cyan-500/50 text-cyan-300"
               >
                 <X className="h-3.5 w-3.5" />
-                Konum Seçimini İptal Et
+                {t("site.mapPanels.cancelPick")}
               </Button>
             ) : (
               <Button
@@ -274,7 +274,7 @@ export function StoreMap() {
                 className="w-full"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Yeni Konum Ekle
+                {t("site.mapPanels.addTitle")}
               </Button>
             )}
           </div>

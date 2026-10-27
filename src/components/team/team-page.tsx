@@ -50,6 +50,7 @@ function formatFileSize(bytes = 0) {
 }
 
 function UnreadBadge({ count, className }: { count: number; className?: string }) {
+  const { t } = useI18n();
   if (count <= 0) return null;
   return (
     <span
@@ -57,7 +58,7 @@ function UnreadBadge({ count, className }: { count: number; className?: string }
         "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-semibold text-brand-on tabular-nums",
         className
       )}
-      aria-label={`${count} okunmamış mesaj`}
+      aria-label={t(count === 1 ? "team.unreadOne" : "team.unreadOther", { count })}
     >
       {count > 99 ? "99+" : count}
     </span>
@@ -66,6 +67,7 @@ function UnreadBadge({ count, className }: { count: number; className?: string }
 
 function AttachmentView({ message, mine }: { message: TeamMessage; mine: boolean }) {
   const { getAttachmentUrl } = useTeamChat();
+  const { t } = useI18n();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const isImage = message.attachmentType?.startsWith("image/") ?? false;
 
@@ -92,7 +94,7 @@ function AttachmentView({ message, mine }: { message: TeamMessage; mine: boolean
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={previewUrl}
-          alt={message.attachmentName ?? "Görsel"}
+          alt={message.attachmentName ?? t("team.image")}
           className="max-h-60 max-w-full rounded-lg object-cover"
         />
       </button>
@@ -134,28 +136,28 @@ function ProfilePanel({
   onMessage: () => void;
 }) {
   const { organization } = useAuth();
-  const { dateLocale } = useI18n();
+  const { t, dateLocale } = useI18n();
   const rows = [
-    { icon: Shield, label: "Rol", value: getRoleLabel(member.role, organization) },
+    { icon: Shield, label: t("team.profile.role"), value: getRoleLabel(member.role, organization) },
     {
       icon: Mail,
-      label: "E-posta",
+      label: t("auth.email"),
       value: member.email,
       href: member.email ? `mailto:${member.email}` : undefined,
     },
     {
       icon: Phone,
-      label: "Telefon",
-      value: member.phone || "Belirtilmemiş",
+      label: t("profile.phone"),
+      value: member.phone || t("team.profile.notSpecified"),
       href: member.phone ? `tel:${member.phone.replace(/\s+/g, "")}` : undefined,
     },
-    { icon: Users, label: "Organizasyon", value: organization?.name ?? "—" },
+    { icon: Users, label: t("team.profile.organization"), value: organization?.name ?? "—" },
     {
       icon: MessageSquare,
-      label: "Son mesaj",
+      label: t("team.profile.lastMessage"),
       value: lastMessageAt
         ? format(parseISO(lastMessageAt), "d MMMM yyyy, HH:mm", { locale: dateLocale })
-        : "Henüz mesajlaşmadınız",
+        : t("team.profile.noMessagesYet"),
     },
   ];
 
@@ -175,7 +177,7 @@ function ProfilePanel({
             )}
           >
             <span className={cn("h-1.5 w-1.5 rounded-full", member.restricted ? "bg-amber-500" : "bg-emerald-500")} />
-            {member.restricted ? "Erişimi kısıtlı" : "Aktif"}
+            {member.restricted ? t("team.profile.restricted") : t("team.profile.active")}
           </span>
         </div>
 
@@ -199,7 +201,7 @@ function ProfilePanel({
 
         <Button className="mt-6 w-full" onClick={onMessage}>
           <MessageSquare className="h-4 w-4" />
-          Mesaj yaz
+          {t("team.profile.sendMessage")}
           {unread > 0 && <UnreadBadge count={unread} className="ml-1" />}
         </Button>
       </div>
@@ -207,10 +209,10 @@ function ProfilePanel({
   );
 }
 
-function dayLabel(iso: string, locale: Parameters<typeof format>[2]) {
+function dayLabel(iso: string, locale: Parameters<typeof format>[2], t: (key: "team.today" | "team.yesterday") => string) {
   const date = parseISO(iso);
-  if (isToday(date)) return "Bugün";
-  if (isYesterday(date)) return "Dün";
+  if (isToday(date)) return t("team.today");
+  if (isYesterday(date)) return t("team.yesterday");
   return format(date, "d MMMM EEEE", locale);
 }
 
@@ -225,7 +227,7 @@ function ChatPanel({
 }) {
   const { user, organization } = useAuth();
   const { org } = useSettings();
-  const { dateLocale } = useI18n();
+  const { t, dateLocale } = useI18n();
   const { messages, unreadBySender, sendMessage, markRead, deleteMessage, clearConversation } =
     useTeamChat();
   const [text, setText] = useState("");
@@ -266,11 +268,11 @@ function ChatPanel({
     setError("");
     if (!picked) return;
     if (!isAllowedFileType(picked.name)) {
-      setError("Bu dosya türü desteklenmiyor.");
+      setError(t("team.chat.fileTypeNotSupported"));
       return;
     }
     if (picked.size > TEAM_MAX_FILE_BYTES) {
-      setError("Dosya en fazla 10 MB olabilir.");
+      setError(t("team.chat.fileTooLarge"));
       return;
     }
     setFile(picked);
@@ -308,21 +310,21 @@ function ChatPanel({
           type="button"
           onClick={onBack}
           className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300 md:hidden"
-          aria-label="Kişi listesine dön"
+          aria-label={t("team.chat.backToList")}
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <button
           type="button"
           onClick={onShowProfile}
-          title="Kişi bilgileri"
+          title={t("team.contactInfo")}
           className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-1 text-left hover:bg-zinc-800/30"
         >
           <UserAvatar name={member.name} avatarUrl={member.avatarUrl} size="sm" />
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold text-zinc-100">{member.name}</span>
             <span className="block truncate text-xs text-zinc-500">
-              {getRoleLabel(member.role, organization)} · Bilgileri görmek için tıklayın
+              {getRoleLabel(member.role, organization)} · {t("team.chat.clickForInfo")}
             </span>
           </span>
         </button>
@@ -330,8 +332,8 @@ function ChatPanel({
           type="button"
           onClick={onShowProfile}
           className="rounded-md p-2 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
-          aria-label="Kişi bilgileri"
-          title="Kişi bilgileri"
+          aria-label={t("team.contactInfo")}
+          title={t("team.contactInfo")}
         >
           <Info className="h-4 w-4" />
         </button>
@@ -340,8 +342,8 @@ function ChatPanel({
             type="button"
             onClick={() => setConfirm({ type: "conversation" })}
             className="rounded-md p-2 text-zinc-500 hover:bg-red-500/10 hover:text-red-400"
-            aria-label="Sohbeti sil"
-            title="Sohbeti sil"
+            aria-label={t("team.chat.deleteConversation")}
+            title={t("team.chat.deleteConversation")}
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -349,15 +351,24 @@ function ChatPanel({
       </header>
 
       <p className="border-b border-zinc-800/60 bg-zinc-900/30 px-4 py-1.5 text-center text-[11px] text-zinc-500">
-        Mesajlar{org.team.fileSharing ? " ve dosyalar" : ""} {org.team.retentionDays} gün sonra otomatik olarak silinir.
+        {t(
+          org.team.fileSharing
+            ? org.team.retentionDays === 1
+              ? "team.chat.retentionWithFilesOne"
+              : "team.chat.retentionWithFilesOther"
+            : org.team.retentionDays === 1
+              ? "team.chat.retentionOne"
+              : "team.chat.retentionOther",
+          { days: org.team.retentionDays }
+        )}
       </p>
 
       <div ref={scrollRef} className="scrollbar-themed flex-1 overflow-y-auto px-3 py-4 sm:px-6" aria-live="polite">
         {conversation.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <MessageSquare className="h-8 w-8 text-zinc-600" />
-            <p className="mt-3 text-sm font-medium text-zinc-300">{member.name} ile sohbete başlayın</p>
-            <p className="mt-1 text-xs text-zinc-500">Mesaj yazabilir veya dosya gönderebilirsiniz.</p>
+            <p className="mt-3 text-sm font-medium text-zinc-300">{t("team.chat.startConversation", { name: member.name })}</p>
+            <p className="mt-1 text-xs text-zinc-500">{t("team.chat.startHint")}</p>
           </div>
         ) : (
           <div className="mx-auto max-w-3xl space-y-1">
@@ -373,7 +384,7 @@ function ChatPanel({
                   {newDay && (
                     <div className="my-4 flex items-center gap-3 text-[11px] font-medium text-zinc-500">
                       <span className="h-px flex-1 bg-zinc-800" />
-                      {dayLabel(message.createdAt, { locale: dateLocale })}
+                      {dayLabel(message.createdAt, { locale: dateLocale }, t)}
                       <span className="h-px flex-1 bg-zinc-800" />
                     </div>
                   )}
@@ -383,8 +394,8 @@ function ChatPanel({
                         type="button"
                         onClick={() => setConfirm({ type: "message", id: message.id })}
                         className="mb-1 rounded-md p-1 text-zinc-600 opacity-0 transition-opacity hover:text-red-400 focus:opacity-100 group-hover:opacity-100"
-                        aria-label="Mesajı sil"
-                        title="Mesajı sil"
+                        aria-label={t("team.chat.deleteMessage")}
+                        title={t("team.chat.deleteMessage")}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -403,15 +414,15 @@ function ChatPanel({
                         {format(parseISO(message.createdAt), "HH:mm")}
                         {mine &&
                           (message.readAt ? (
-                            <CheckCheck className="h-3 w-3 text-cyan-400" aria-label="Görüldü" />
+                            <CheckCheck className="h-3 w-3 text-cyan-400" aria-label={t("team.chat.seen")} />
                           ) : (
-                            <Check className="h-3 w-3" aria-label="Gönderildi" />
+                            <Check className="h-3 w-3" aria-label={t("team.chat.sent")} />
                           ))}
                       </p>
                     </div>
                   </div>
                   {mine && message.id === lastOwn?.id && message.readAt && (
-                    <p className="mt-0.5 text-right text-[10px] text-zinc-500">Görüldü</p>
+                    <p className="mt-0.5 text-right text-[10px] text-zinc-500">{t("team.chat.seen")}</p>
                   )}
                 </div>
               );
@@ -437,7 +448,7 @@ function ChatPanel({
                 type="button"
                 onClick={() => setFile(null)}
                 className="rounded p-0.5 text-zinc-500 hover:text-zinc-300"
-                aria-label="Dosyayı kaldır"
+                aria-label={t("team.chat.removeFile")}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -454,8 +465,8 @@ function ChatPanel({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-800/60 hover:text-zinc-300"
-              aria-label="Dosya ekle"
-              title="Dosya ekle (en fazla 10 MB)"
+              aria-label={t("team.chat.attachFile")}
+              title={t("team.chat.attachFileHint")}
             >
               <Paperclip className="h-4 w-4" />
             </button>
@@ -482,15 +493,15 @@ function ChatPanel({
               }}
               rows={1}
               maxLength={4000}
-              placeholder={`${member.name.split(" ")[0]} kişisine mesaj yazın…`}
-              aria-label="Mesaj"
+              placeholder={t("team.chat.messagePlaceholder", { name: member.name.split(" ")[0] })}
+              aria-label={t("team.chat.message")}
               className="max-h-36 min-h-9 flex-1 resize-none bg-transparent py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none [field-sizing:content]"
             />
             <button
               type="submit"
               disabled={sending || (!text.trim() && !file)}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-on transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Gönder"
+              aria-label={t("team.chat.send")}
             >
               {sending ? (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -505,24 +516,24 @@ function ChatPanel({
       <Modal
         open={confirm !== null}
         onClose={() => setConfirm(null)}
-        title={confirm?.type === "conversation" ? "Sohbet silinsin mi?" : "Mesaj silinsin mi?"}
+        title={confirm?.type === "conversation" ? t("team.chat.confirmDeleteConversation") : t("team.chat.confirmDeleteMessage")}
         description={
           confirm?.type === "conversation"
-            ? `${member.name} ile tüm mesajlar ve dosyalar iki taraf için de kalıcı olarak silinir.`
-            : "Mesaj ve eki iki taraf için de kalıcı olarak silinir."
+            ? t("team.chat.deleteConversationDescription", { name: member.name })
+            : t("team.chat.deleteMessageDescription")
         }
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirm(null)} disabled={busy}>
-              Vazgeç
+              {t("team.chat.dismiss")}
             </Button>
             <Button variant="danger" onClick={() => void runConfirm()} loading={busy} data-autofocus>
-              Sil
+              {t("common.delete")}
             </Button>
           </>
         }
       >
-        <p className="text-sm text-zinc-400">Bu işlem geri alınamaz.</p>
+        <p className="text-sm text-zinc-400">{t("team.chat.irreversible")}</p>
       </Modal>
     </div>
   );
@@ -531,7 +542,8 @@ function ChatPanel({
 export function TeamPage() {
   const { user, organization } = useAuth();
   const { users } = useDb();
-  const { dateLocale } = useI18n();
+  const { t, locale, dateLocale } = useI18n();
+  const intlLocale = locale === "en" ? "en-US" : "tr-TR";
   const { messages, unreadBySender, isReady } = useTeamChat();
   const [query, setQuery] = useState("");
   // Bildirimden gelinirse (?peer=) o kişiyle sohbet açılır
@@ -554,14 +566,14 @@ export function TeamPage() {
   }, [messages, user?.id]);
 
   const members = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase("tr-TR");
+    const normalized = query.trim().toLocaleLowerCase(intlLocale);
     return users
       .filter((member) => member.id !== user?.id)
       .filter(
         (member) =>
           !normalized ||
-          member.name.toLocaleLowerCase("tr-TR").includes(normalized) ||
-          member.email.toLocaleLowerCase("tr-TR").includes(normalized)
+          member.name.toLocaleLowerCase(intlLocale).includes(normalized) ||
+          member.email.toLocaleLowerCase(intlLocale).includes(normalized)
       )
       .sort((a, b) => {
         const unreadDiff = (unreadBySender[b.id] ?? 0) - (unreadBySender[a.id] ?? 0);
@@ -569,9 +581,9 @@ export function TeamPage() {
         const lastA = lastMessageByPeer[a.id]?.createdAt ?? "";
         const lastB = lastMessageByPeer[b.id]?.createdAt ?? "";
         if (lastA !== lastB) return lastB.localeCompare(lastA);
-        return a.name.localeCompare(b.name, "tr");
+        return a.name.localeCompare(b.name, intlLocale);
       });
-  }, [users, user?.id, query, unreadBySender, lastMessageByPeer]);
+  }, [users, user?.id, query, unreadBySender, lastMessageByPeer, intlLocale]);
 
   const selected = users.find((member) => member.id === selectedId) ?? null;
   const teamSize = users.filter((member) => member.id !== user?.id).length;
@@ -583,14 +595,14 @@ export function TeamPage() {
 
   const previewText = (message?: TeamMessage) => {
     if (!message) return null;
-    const prefix = message.senderId === user?.id ? "Siz: " : "";
-    return prefix + (message.body || `📎 ${message.attachmentName ?? "Dosya"}`);
+    const prefix = message.senderId === user?.id ? `${t("team.you")}: ` : "";
+    return prefix + (message.body || `📎 ${message.attachmentName ?? t("team.file")}`);
   };
 
   const formatListTime = (iso: string) => {
     const date = parseISO(iso);
     if (isToday(date)) return format(date, "HH:mm");
-    if (isYesterday(date)) return "Dün";
+    if (isYesterday(date)) return t("team.yesterday");
     return format(date, "d MMM", { locale: dateLocale });
   };
 
@@ -605,18 +617,18 @@ export function TeamPage() {
         <div className="border-b border-zinc-800 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-base font-semibold text-zinc-100">Ekip</h1>
+              <h1 className="text-base font-semibold text-zinc-100">{t("nav.team")}</h1>
               <p className="text-xs text-zinc-500">
                 {organization?.name ? `${organization.name} · ` : ""}
-                {teamSize} kişi
+                {t(teamSize === 1 ? "team.peopleOne" : "team.peopleOther", { count: teamSize })}
               </p>
             </div>
           </div>
           <SearchInput
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Kişi ara…"
-            aria-label="Kişi ara"
+            placeholder={t("team.searchPlaceholder")}
+            aria-label={t("team.searchLabel")}
             containerClassName="mt-3"
             className="h-9"
           />
@@ -625,12 +637,11 @@ export function TeamPage() {
         <ul className="scrollbar-themed flex-1 overflow-y-auto p-2">
           {teamSize === 0 && (
             <li className="px-4 py-10 text-center text-sm text-zinc-500">
-              Organizasyonunuzda henüz başka kullanıcı yok. Yönetim → Kullanıcılar bölümünden ekip üyesi
-              ekleyebilirsiniz.
+              {t("team.emptyTeam")}
             </li>
           )}
           {teamSize > 0 && members.length === 0 && (
-            <li className="px-4 py-10 text-center text-sm text-zinc-500">Sonuç bulunamadı.</li>
+            <li className="px-4 py-10 text-center text-sm text-zinc-500">{t("team.noResults")}</li>
           )}
           {members.map((member) => {
             const unread = unreadBySender[member.id] ?? 0;
@@ -682,9 +693,9 @@ export function TeamPage() {
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500/10">
               <Users className="h-6 w-6 text-cyan-400" />
             </span>
-            <p className="mt-4 text-sm font-medium text-zinc-200">Bir ekip üyesi seçin</p>
+            <p className="mt-4 text-sm font-medium text-zinc-200">{t("team.selectMember")}</p>
             <p className="mt-1 max-w-xs text-xs text-zinc-500">
-              Kişinin bilgilerini görüntüleyin ve mesajlaşmaya başlayın. {isReady ? "" : "Mesajlar yükleniyor…"}
+              {t("team.selectMemberHint")} {isReady ? "" : t("team.loadingMessages")}
             </p>
           </div>
         ) : view === "profile" ? (
@@ -696,9 +707,9 @@ export function TeamPage() {
                 className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Sohbete dön
+                {t("team.backToChat")}
               </button>
-              <span className="ml-auto text-sm font-medium text-zinc-200">Kişi bilgileri</span>
+              <span className="ml-auto text-sm font-medium text-zinc-200">{t("team.contactInfo")}</span>
             </div>
             <div className="min-h-0 flex-1">
               <ProfilePanel

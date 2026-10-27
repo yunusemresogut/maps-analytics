@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api-client";
+import { t } from "@/i18n/runtime";
 
 export type Coords = { latitude: number; longitude: number };
 
@@ -15,7 +16,7 @@ export type GeocodeResult = Coords & {
 export async function searchAddresses(query: string, signal?: AbortSignal): Promise<GeocodeResult[]> {
   const response = await apiFetch(`/api/geocode/search?q=${encodeURIComponent(query)}`, { signal });
   const data = (await response.json().catch(() => null)) as { results?: GeocodeResult[] } | null;
-  if (!response.ok || !Array.isArray(data?.results)) throw new Error("Adres araması başarısız");
+  if (!response.ok || !Array.isArray(data?.results)) throw new Error(t("site.location.errors.searchRequestFailed"));
   return data.results;
 }
 
@@ -25,7 +26,7 @@ export async function reverseGeocode(coords: Coords, signal?: AbortSignal): Prom
     { signal }
   );
   const data = (await response.json().catch(() => null)) as { result?: GeocodeResult | null } | null;
-  if (!response.ok || !data) throw new Error("Konumdan adres bulunamadı");
+  if (!response.ok || !data) throw new Error(t("site.location.errors.reverseFailed"));
   return data.result ?? null;
 }
 

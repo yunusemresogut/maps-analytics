@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { useT } from "@/contexts/i18n-context";
 import { useStores } from "@/contexts/stores-context";
 import { useLocationTypes } from "@/hooks/use-location-types";
 import { DEFAULT_LOCATION_TYPES, newLocationTypeKey } from "@/lib/location-types";
@@ -16,6 +17,7 @@ const normalizeLabel = (label: string) => label.trim().toLocaleLowerCase("tr-TR"
 /** Kurucunun saha türlerini eklediği, adlandırdığı ve sildiği bölüm */
 export function LocationTypesSection() {
   const { updateOrganization } = useAuth();
+  const t = useT();
   const { stores } = useStores();
   const { types } = useLocationTypes();
   const { state, run } = useAutoSave();
@@ -49,7 +51,7 @@ export function LocationTypesSection() {
     if (!label) return;
     if (draft.some((type) => normalizeLabel(type.label) === normalizeLabel(label))) {
       setNewLabelInvalid(true);
-      setError(`"${label}" zaten listede.`);
+      setError(t("settings.locationTypes.duplicateNew", { name: label }));
       return;
     }
     setDraft((prev) => [...prev, { key: newLocationTypeKey(), label }]);
@@ -65,23 +67,23 @@ export function LocationTypesSection() {
 
   const save = () => {
     const cleaned = draft.map((type) => ({ ...type, label: type.label.trim() }));
-    if (cleaned.length === 0) return setError("En az bir saha türü olmalı.");
+    if (cleaned.length === 0) return setError(t("settings.locationTypes.atLeastOne"));
     const empty = cleaned.filter((type) => !type.label).map((type) => type.key);
     if (empty.length > 0) {
       setInvalidKeys(new Set(empty));
-      return setError("Saha türü adı boş olamaz.");
+      return setError(t("settings.locationTypes.emptyName"));
     }
     const labels = cleaned.map((type) => normalizeLabel(type.label));
     const duplicates = cleaned.filter((_, i) => labels.indexOf(labels[i]) !== labels.lastIndexOf(labels[i]));
     if (duplicates.length > 0) {
       setInvalidKeys(new Set(duplicates.map((type) => type.key)));
-      return setError("Aynı adda iki saha türü olamaz.");
+      return setError(t("settings.locationTypes.duplicate"));
     }
     setInvalidKeys(new Set());
     setError("");
     void run(async () => {
       const ok = await updateOrganization({ locationTypes: cleaned });
-      if (!ok) setError("Kaydedilemedi. Kullanımdaki bir tür silinmiş olabilir ya da veritabanı güncel değil.");
+      if (!ok) setError(t("settings.locationTypes.saveFailed"));
       return ok;
     });
   };
@@ -90,8 +92,8 @@ export function LocationTypesSection() {
 
   return (
     <SettingsSection
-      title="Saha türleri"
-      description="Saha eklerken ve düzenlerken seçilen türler. Sahalarda kullanılan bir tür silinemez."
+      title={t("settings.locationTypes.title")}
+      description={t("settings.locationTypes.description")}
       action={<SaveIndicator state={state} />}
     >
       <ul>
@@ -104,20 +106,20 @@ export function LocationTypesSection() {
                 value={type.label}
                 onChange={(e) => rename(type.key, e.target.value)}
                 maxLength={40}
-                aria-label="Saha türü adı"
+                aria-label={t("settings.locationTypes.nameLabel")}
                 aria-invalid={invalidKeys.has(type.key)}
                 className="h-9 max-w-xs"
               />
               <span className="flex-1 text-xs text-zinc-500 tabular-nums">
-                {count > 0 ? `${count} sahada kullanılıyor` : "Kullanılmıyor"}
+                {count > 0 ? t(count === 1 ? "settings.locationTypes.usedOne" : "settings.locationTypes.usedOther", { count }) : t("settings.locationTypes.unused")}
               </span>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => remove(type.key)}
                 disabled={count > 0 || lastOne}
-                title={count > 0 ? "Bu türdeki sahaların türünü değiştirmeden silinemez" : lastOne ? "En az bir tür kalmalı" : "Sil"}
-                aria-label={`${type.label} türünü sil`}
+                title={count > 0 ? t("settings.locationTypes.inUse") : lastOne ? t("settings.locationTypes.keepOne") : t("common.delete")}
+                aria-label={t("settings.locationTypes.deleteLabel", { name: type.label })}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -141,30 +143,30 @@ export function LocationTypesSection() {
             }
           }}
           maxLength={40}
-          placeholder="Yeni saha türü (ör. Depo)"
-          aria-label="Yeni saha türü"
+          placeholder={t("settings.locationTypes.newPlaceholder")}
+          aria-label={t("settings.locationTypes.newLabel")}
           aria-invalid={newLabelInvalid}
           className="h-9 max-w-xs"
         />
         <Button variant="outline" size="sm" onClick={add} disabled={!newLabel.trim()}>
           <Plus className="h-3.5 w-3.5" />
-          Ekle
+          {t("common.add")}
         </Button>
         {missingDefaults && (
           <Button variant="ghost" size="sm" onClick={restoreDefaults}>
             <RotateCcw className="h-3.5 w-3.5" />
-            Varsayılanları geri ekle
+            {t("settings.locationTypes.restoreDefaults")}
           </Button>
         )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 px-5 py-3.5">
         <Button onClick={save} loading={state === "saving"} disabled={!dirty}>
-          Kaydet
+          {t("common.save")}
         </Button>
         {dirty && (
           <Button variant="ghost" onClick={() => setDraft(types)}>
-            Vazgeç
+            {t("settings.locationTypes.discard")}
           </Button>
         )}
         {error && (

@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { format, parseISO, isValid } from "date-fns";
-import { tr } from "date-fns/locale";
 import { CalendarDays, Check, Clock3, HardHat, MapPin, Pencil, Ruler } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { TablePagination } from "@/components/modules/module-table";
 import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { useStores } from "@/contexts/stores-context";
-import { useT } from "@/contexts/i18n-context";
+import { useI18n, useT } from "@/contexts/i18n-context";
+import type { TranslationKey } from "@/i18n";
 import { useServerTable } from "@/hooks/use-server-table";
 import { mapStoreFromDb } from "@/lib/store-mapper";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -25,12 +25,12 @@ import { usePersistentState } from "@/hooks/use-persistent-state";
 type Tab = "all" | "pending";
 type SortKey = "name" | "city" | "status" | "approvals" | "openingDate";
 
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "name", label: "Ada göre" },
-  { key: "city", label: "Şehre göre" },
-  { key: "status", label: "Duruma göre" },
-  { key: "openingDate", label: "Açılış tarihine göre" },
-  { key: "approvals", label: "Onay sayısına göre" },
+const SORT_OPTIONS: { key: SortKey; labelKey: TranslationKey }[] = [
+  { key: "name", labelKey: "site.storesPage.sort.name" },
+  { key: "city", labelKey: "site.storesPage.sort.city" },
+  { key: "status", labelKey: "site.storesPage.sort.status" },
+  { key: "openingDate", labelKey: "site.storesPage.sort.openingDate" },
+  { key: "approvals", labelKey: "site.storesPage.sort.approvals" },
 ];
 
 const SORT_COLUMNS: Partial<Record<SortKey, string>> = {
@@ -60,16 +60,22 @@ function isPendingApproval(store: Store) {
 
 /** Açılış tarihi ve kalan gün; açılmış mağazada yalnızca tarih */
 function OpeningInfo({ store }: { store: Store }) {
+  const { t, dateLocale } = useI18n();
   const date = store.openingDate ? parseISO(store.openingDate) : null;
-  if (!date || !isValid(date)) return <span className="text-zinc-600">Açılış tarihi yok</span>;
+  if (!date || !isValid(date)) return <span className="text-zinc-600">{t("site.storesPage.noOpeningDate")}</span>;
   const alert = getOpeningAlert(store.openingDate);
   const upcoming = !alert.isOverdue && alert.daysUntilOpening >= 0;
   return (
     <span className="min-w-0 truncate">
-      {format(date, "d MMM yyyy", { locale: tr })}
+      {format(date, "d MMM yyyy", { locale: dateLocale })}
       {upcoming && (
         <span className={cn("ml-1.5", alert.isOpeningSoon ? "font-medium text-amber-400" : "text-zinc-500")}>
-          · {alert.daysUntilOpening === 0 ? "bugün" : `${alert.daysUntilOpening} gün kaldı`}
+          ·{" "}
+          {alert.daysUntilOpening === 0
+            ? t("site.storesPage.today")
+            : t(alert.daysUntilOpening === 1 ? "site.storesPage.daysLeftOne" : "site.storesPage.daysLeftOther", {
+                count: alert.daysUntilOpening,
+              })}
         </span>
       )}
     </span>
@@ -99,7 +105,7 @@ function DetailItem({
 }
 
 function StoreCard({ store, canEdit }: { store: Store; canEdit: boolean }) {
-  const t = useT();
+  const { t, locale } = useI18n();
   const { label: locationTypeLabel } = useLocationTypes();
   const status = projectStatusConfig[store.projectStatus];
   const approvals = store.approvals ?? emptyApprovals();
@@ -108,8 +114,10 @@ function StoreCard({ store, canEdit }: { store: Store; canEdit: boolean }) {
   const people = [store.contractorCompany, store.siteManager].filter(Boolean).join(" · ");
   const area = [
     locationTypeLabel(store.locationType),
-    store.grossM2 > 0 ? `${store.grossM2.toLocaleString("tr-TR")} m²` : null,
-    store.floorCount > 1 ? `${store.floorCount} kat` : null,
+    store.grossM2 > 0 ? `${store.grossM2.toLocaleString(locale === "en" ? "en-US" : "tr-TR")} m²` : null,
+    store.floorCount > 1
+      ? t(store.floorCount === 1 ? "site.storesPage.floorsOne" : "site.storesPage.floorsOther", { count: store.floorCount })
+      : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -145,14 +153,14 @@ function StoreCard({ store, canEdit }: { store: Store; canEdit: boolean }) {
 
       {/* Detaylar */}
       <dl className="grid min-w-0 flex-1 grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-3">
-        <DetailItem icon={CalendarDays} label="Açılış">
+        <DetailItem icon={CalendarDays} label={t("site.storesPage.opening")}>
           <OpeningInfo store={store} />
         </DetailItem>
-        <DetailItem icon={Ruler} label="Konum / Alan">
+        <DetailItem icon={Ruler} label={t("site.storesPage.locationArea")}>
           {area}
         </DetailItem>
-        <DetailItem icon={HardHat} label="Yüklenici / Şef" muted={!people}>
-          <span title={people || undefined}>{people || "Belirtilmedi"}</span>
+        <DetailItem icon={HardHat} label={t("site.storesPage.contractorManager")} muted={!people}>
+          <span title={people || undefined}>{people || t("site.storesPage.notSpecified")}</span>
         </DetailItem>
       </dl>
 
@@ -167,8 +175,8 @@ function StoreCard({ store, canEdit }: { store: Store; canEdit: boolean }) {
             <Link
               href={`/stores/${store.id}/edit`}
               className="relative z-10 ml-1 inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-100"
-              aria-label={`${store.name} düzenle`}
-              title="Düzenle"
+              aria-label={t("site.storesPage.editSite", { name: store.name })}
+              title={t("common.edit")}
             >
               <Pencil className="h-4 w-4" />
             </Link>
@@ -187,7 +195,7 @@ function StoreCard({ store, canEdit }: { store: Store; canEdit: boolean }) {
               >
                 {approved ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Clock3 className="h-3.5 w-3.5" aria-hidden />}
                 {t(d.labelKey)}
-                <span className="sr-only">{approved ? "onaylandı" : "bekliyor"}</span>
+                <span className="sr-only">{approved ? t("site.storesPage.approved") : t("site.storesPage.pending")}</span>
               </li>
             );
           })}
@@ -264,7 +272,7 @@ function StoresList() {
               : "text-zinc-500 hover:text-zinc-300"
           )}
         >
-          Tümü ({stores.length})
+          {t("site.storesPage.tabAll", { count: stores.length })}
         </button>
         <button
           type="button"
@@ -276,7 +284,7 @@ function StoresList() {
               : "text-zinc-500 hover:text-zinc-300"
           )}
         >
-          Onay Bekleyenler ({pendingCount})
+          {t("site.storesPage.tabPending", { count: pendingCount })}
         </button>
       </div>
 
@@ -284,8 +292,8 @@ function StoresList() {
         <SearchInput
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Saha, şehir, yüklenici…"
-          aria-label="Sahalarda ara"
+          placeholder={t("site.storesPage.searchPlaceholder")}
+          aria-label={t("site.storesPage.searchLabel")}
           containerClassName="flex-1 sm:max-w-sm"
         />
         <Select
@@ -294,11 +302,11 @@ function StoresList() {
             table.setSort({ key: e.target.value as SortKey, direction: "asc" });
           }}
           className="w-auto min-w-[190px]"
-          aria-label="Sıralama"
+          aria-label={t("site.storesPage.sortLabel")}
         >
           {SORT_OPTIONS.map((option) => (
             <option key={option.key} value={option.key}>
-              {option.label}
+              {t(option.labelKey)}
             </option>
           ))}
         </Select>
@@ -308,9 +316,11 @@ function StoresList() {
             table.setSort({ key: table.sort.key, direction: table.sort.direction === "asc" ? "desc" : "asc" })
           }
           className="h-10 rounded-lg border border-zinc-700/80 px-3 text-sm text-zinc-400 hover:border-zinc-600 hover:text-zinc-100"
-          aria-label={table.sort.direction === "asc" ? "Artan sıralama, azalana çevir" : "Azalan sıralama, artana çevir"}
+          aria-label={
+            table.sort.direction === "asc" ? t("site.storesPage.sortAscLabel") : t("site.storesPage.sortDescLabel")
+          }
         >
-          {table.sort.direction === "asc" ? "Artan ↑" : "Azalan ↓"}
+          {table.sort.direction === "asc" ? t("site.storesPage.ascending") : t("site.storesPage.descending")}
         </button>
       </div>
 
@@ -322,7 +332,7 @@ function StoresList() {
         </ul>
       ) : table.totalItems === 0 ? (
         <div className="rounded-xl border border-dashed border-zinc-800 px-4 py-12 text-center text-sm text-zinc-500">
-          {query ? "Aramayla eşleşen saha yok." : t("common.noData")}
+          {query ? t("site.storesPage.noMatch") : t("common.noData")}
         </div>
       ) : (
         <ul className={cn("flex flex-col gap-3", table.isLoading && "opacity-60")}>

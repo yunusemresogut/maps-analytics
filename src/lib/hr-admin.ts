@@ -2,6 +2,7 @@ import { subDays } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { fetchAllRows } from "@/lib/supabase-query";
 import type { UserRole } from "@/types";
+import { localizedRecord } from "@/i18n/runtime";
 
 /**
  * İK idari işler (supabase/migrations/20261029090000_hr_admin.sql):
@@ -164,30 +165,30 @@ export const REQUESTS_SOURCE = "personnel_requests_list";
 export type RequestType = "advance" | "document" | "equipment" | "training" | "other";
 export type RequestStatus = "pending" | "approved" | "rejected" | "completed" | "cancelled";
 
-export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
-  advance: "Avans",
-  document: "Belge (çalışma belgesi, SGK dökümü vb.)",
-  equipment: "Malzeme / ekipman",
-  training: "Eğitim",
-  other: "Diğer",
-};
+export const REQUEST_TYPE_LABELS: Record<RequestType, string> = localizedRecord({
+  advance: "hr.requestType.advance",
+  document: "hr.requestType.document",
+  equipment: "hr.requestType.equipment",
+  training: "hr.requestType.training",
+  other: "hr.requestType.other",
+});
 
-export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
-  pending: "Bekliyor",
-  approved: "Onaylandı",
-  rejected: "Reddedildi",
-  completed: "Tamamlandı",
-  cancelled: "İptal edildi",
-};
+export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = localizedRecord({
+  pending: "hr.requestStatus.pending",
+  approved: "hr.requestStatus.approved",
+  rejected: "hr.requestStatus.rejected",
+  completed: "hr.requestStatus.completed",
+  cancelled: "hr.requestStatus.cancelled",
+});
 
 /** Onaylanan talep tamamlanınca kullanılan ifade */
-export const REQUEST_COMPLETE_LABELS: Record<RequestType, string> = {
-  advance: "Ödendi",
-  document: "Teslim edildi",
-  equipment: "Teslim edildi",
-  training: "Tamamlandı",
-  other: "Tamamlandı",
-};
+export const REQUEST_COMPLETE_LABELS: Record<RequestType, string> = localizedRecord({
+  advance: "hr.requestComplete.advance",
+  document: "hr.requestComplete.document",
+  equipment: "hr.requestComplete.equipment",
+  training: "hr.requestComplete.training",
+  other: "hr.requestComplete.other",
+});
 
 export const REQUEST_STATUS_STYLES: Record<RequestStatus, string> = {
   pending: "bg-amber-500/10 text-amber-400 border-amber-500/25",

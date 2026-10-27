@@ -1,9 +1,9 @@
 "use client";
 
+import { inTurkish } from "@/i18n/runtime";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { addMonths, format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -29,6 +29,7 @@ import {
 } from "@/components/hr/hr-modals";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n } from "@/contexts/i18n-context";
 import { usePageTitle } from "@/contexts/page-title-context";
 import { useMyPersonnelId, resetMyPersonnelCache } from "@/hooks/use-my-personnel";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -46,6 +47,7 @@ import {
   fetchPersonnelPrivate,
   fetchTimesheet,
   fetchYearlyOvertime,
+  formatDayCount,
   formatHours,
   formatIban,
   getCertificateFileUrl,
@@ -114,6 +116,7 @@ function Field({ label, value, mono }: { label: string; value?: React.ReactNode;
 }
 
 function PersonnelDetail({ id }: { id: string }) {
+  const { t, dateLocale } = useI18n();
   const { user, users } = useAuth();
   const personnelPerms = usePermissions("personnel");
   const privatePerms = usePermissions("personnelPrivate");
@@ -247,7 +250,7 @@ function PersonnelDetail({ id }: { id: string }) {
     } catch (err) {
       popup?.close();
       console.error("Dosya açılamadı:", err);
-      flash("error", "Dosya açılamadı. Bu dosyayı görme yetkiniz olmayabilir.");
+      flash("error", t("hr.personnelDetail.fileOpenFailed"));
     }
   };
 
@@ -256,15 +259,15 @@ function PersonnelDetail({ id }: { id: string }) {
   const entryByDate = useMemo(() => new Map(entries.map((entry) => [entry.workDate, entry])), [entries]);
 
   if (person === undefined) {
-    return <div className="flex h-full items-center justify-center text-sm text-zinc-500">Yükleniyor…</div>;
+    return <div className="flex h-full items-center justify-center text-sm text-zinc-500">{t("hr.common.loading")}</div>;
   }
   if (person === null) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-zinc-500">
-        Personel bulunamadı ya da bu kartı görme yetkiniz yok.
+        {t("hr.personnelDetail.notFound")}
         {personnelPerms.canView && (
           <Link href="/hr/personnel" className="text-cyan-400 hover:underline">
-            Personel listesine dön
+            {t("hr.personnelDetail.backToList")}
           </Link>
         )}
       </div>
@@ -278,7 +281,7 @@ function PersonnelDetail({ id }: { id: string }) {
       {personnelPerms.canView && (
         <Link href="/hr/personnel" className="mb-6 inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200">
           <ArrowLeft className="h-4 w-4" />
-          Personel
+          {t("hr.personnelList.title")}
         </Link>
       )}
 
@@ -297,7 +300,9 @@ function PersonnelDetail({ id }: { id: string }) {
                 : "border-zinc-700 bg-zinc-800/60 text-zinc-400"
             )}
           >
-            {person.state === "active" ? "Çalışıyor" : `Ayrıldı · ${formatDay(person.endDate)}`}
+            {person.state === "active"
+              ? t("hr.personnelState.active")
+              : t("hr.personnelList.leftOn", { date: formatDay(person.endDate) })}
           </span>
         </div>
         {personnelPerms.canEdit && (
@@ -309,7 +314,7 @@ function PersonnelDetail({ id }: { id: string }) {
             }}
           >
             <Pencil className="h-4 w-4" />
-            Düzenle
+            {t("common.edit")}
           </Button>
         )}
       </div>
@@ -329,34 +334,34 @@ function PersonnelDetail({ id }: { id: string }) {
       )}
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <Section title="Genel bilgiler">
+        <Section title={t("hr.personnelDetail.general")}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Çalışma tipi" value={EMPLOYMENT_TYPE_LABELS[person.employmentType]} />
+            <Field label={t("hr.common.employmentType")} value={EMPLOYMENT_TYPE_LABELS[person.employmentType]} />
             {person.employmentType === "subcontractor" ? (
-              <Field label="Taşeron firma" value={person.subcontractorCompany} />
+              <Field label={t("hr.common.subcontractor")} value={person.subcontractorCompany} />
             ) : (
-              <Field label="Departman" value={person.department} />
+              <Field label={t("hr.common.department")} value={person.department} />
             )}
-            <Field label="Unvan / meslek" value={person.jobTitle} />
-            <Field label="Görev yeri" value={person.storeName ?? "Merkez"} />
-            <Field label="Telefon" value={person.phone} />
-            <Field label="E-posta" value={person.email} />
-            <Field label="İşe giriş" value={person.startDate && formatDay(person.startDate)} />
-            <Field label="İşten çıkış" value={person.endDate && formatDay(person.endDate)} />
+            <Field label={t("hr.common.jobTitle")} value={person.jobTitle} />
+            <Field label={t("hr.personnelList.location")} value={person.storeName ?? t("hr.personnelList.headOffice")} />
+            <Field label={t("hr.common.phone")} value={person.phone} />
+            <Field label={t("hr.common.email")} value={person.email} />
+            <Field label={t("hr.common.startDate")} value={person.startDate && formatDay(person.startDate)} />
+            <Field label={t("hr.common.endDate")} value={person.endDate && formatDay(person.endDate)} />
             <Field
-              label="KVKK aydınlatma tebliği"
+              label={t("hr.personnelForm.privacyNotice")}
               value={
                 person.privacyNoticeDate ? (
                   formatDay(person.privacyNoticeDate)
                 ) : (
-                  <span className="text-amber-400">Tebliğ tarihi girilmemiş</span>
+                  <span className="text-amber-400">{t("hr.personnelDetail.noPrivacyNotice")}</span>
                 )
               }
             />
-            <Field label="Uygulama hesabı" value={person.userId ? "Bağlı" : "Bağlı değil"} />
+            <Field label={t("hr.personnelDetail.appAccount")} value={person.userId ? t("hr.personnelDetail.linked") : t("hr.personnelForm.notLinked")} />
             <Field
-              label="İzin onaylayan yönetici"
-              value={person.managerId ? (users.find((u) => u.id === person.managerId)?.name ?? "—") : "Yok (doğrudan İK)"}
+              label={t("hr.personnelForm.manager")}
+              value={person.managerId ? (users.find((u) => u.id === person.managerId)?.name ?? "—") : t("hr.personnelDetail.noManager")}
             />
           </div>
           {person.notes && <p className="mt-4 whitespace-pre-wrap border-t border-zinc-800 pt-4 text-sm text-zinc-400">{person.notes}</p>}
@@ -364,8 +369,8 @@ function PersonnelDetail({ id }: { id: string }) {
 
         {canSeePrivate && (
           <Section
-            title="Özlük bilgileri"
-            description={isSelf && !privatePerms.canView ? "Bilgileriniz yanlışsa insan kaynaklarına bildirin." : "Hassas kişisel veri — yalnızca yetkililer görür"}
+            title={t("hr.privateForm.title")}
+            description={isSelf && !privatePerms.canView ? t("hr.personnelDetail.privateSelfHint") : t("hr.personnelDetail.privateHint")}
             action={
               privatePerms.canEdit && (
                 <Button
@@ -377,14 +382,14 @@ function PersonnelDetail({ id }: { id: string }) {
                   }}
                 >
                   <Pencil className="h-3.5 w-3.5" />
-                  {privateInfo ? "Düzenle" : "Bilgi ekle"}
+                  {privateInfo ? t("common.edit") : t("hr.personnelDetail.addInfo")}
                 </Button>
               )
             }
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label="T.C. kimlik no"
+                label={t("hr.privateForm.nationalId")}
                 mono
                 value={
                   nationalId && (
@@ -393,7 +398,7 @@ function PersonnelDetail({ id }: { id: string }) {
                       <button
                         type="button"
                         onClick={() => setShowNationalId((value) => !value)}
-                        aria-label={showNationalId ? "Gizle" : "Göster"}
+                        aria-label={showNationalId ? t("hr.personnelDetail.hide") : t("hr.personnelDetail.show")}
                         className="text-zinc-500 hover:text-zinc-200"
                       >
                         {showNationalId ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -402,22 +407,22 @@ function PersonnelDetail({ id }: { id: string }) {
                   )
                 }
               />
-              <Field label="Doğum tarihi" value={privateInfo?.birthDate && formatDay(privateInfo.birthDate)} />
+              <Field label={t("hr.privateForm.birthDate")} value={privateInfo?.birthDate && formatDay(privateInfo.birthDate)} />
               <Field label="IBAN" mono value={privateInfo?.iban && formatIban(privateInfo.iban)} />
               <Field
-                label="Acil durum"
+                label={t("hr.personnelDetail.emergency")}
                 value={[privateInfo?.emergencyContactName, privateInfo?.emergencyContactPhone].filter(Boolean).join(" · ")}
               />
               <div className="sm:col-span-2">
-                <Field label="Adres" value={privateInfo?.address} />
+                <Field label={t("hr.privateForm.address")} value={privateInfo?.address} />
               </div>
             </div>
           </Section>
         )}
 
         <Section
-          title="Belgeler ve sertifikalar"
-          description="İSG eğitimi, sağlık muayenesi, MYK ve diğer belgeler"
+          title={t("hr.personnelDetail.certificates")}
+          description={t("hr.personnelDetail.certificatesHint")}
           action={
             canAddCertificate && (
               <Button
@@ -428,13 +433,13 @@ function PersonnelDetail({ id }: { id: string }) {
                 }}
               >
                 <Plus className="h-3.5 w-3.5" />
-                Belge ekle
+                {t("hr.personnelDetail.addCertificate")}
               </Button>
             )
           }
         >
           {certificates.length === 0 ? (
-            <p className="text-sm text-zinc-500">Henüz belge eklenmemiş.</p>
+            <p className="text-sm text-zinc-500">{t("hr.personnelDetail.noCertificates")}</p>
           ) : (
             <ul className="divide-y divide-zinc-800">
               {certificates.map((certificate) => {
@@ -450,7 +455,7 @@ function PersonnelDetail({ id }: { id: string }) {
                         {[
                           certificate.name ? CERTIFICATE_TYPE_LABELS[certificate.type] : null,
                           certificate.issuer,
-                          certificate.documentNo && `No: ${certificate.documentNo}`,
+                          certificate.documentNo && t("hr.personnelDetail.documentNo", { no: certificate.documentNo }),
                         ]
                           .filter(Boolean)
                           .join(" · ")}
@@ -461,14 +466,14 @@ function PersonnelDetail({ id }: { id: string }) {
                           {certificate.expiresAt && ` · ${formatDay(certificate.expiresAt)}`}
                         </span>
                         {certificate.verified ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-emerald-400" title={certificate.verifiedByName ? `Onaylayan: ${certificate.verifiedByName}` : undefined}>
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-400" title={certificate.verifiedByName ? t("hr.personnelDetail.verifiedBy", { name: certificate.verifiedByName }) : undefined}>
                             <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
-                            Onaylı
+                            {t("hr.personnelDetail.verified")}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-xs text-teal-300">
                             <Clock className="h-3.5 w-3.5" aria-hidden />
-                            Onay bekliyor
+                            {t("hr.personnelDetail.pending")}
                           </span>
                         )}
                       </div>
@@ -477,7 +482,7 @@ function PersonnelDetail({ id }: { id: string }) {
                       {certificate.filePath && (
                         <Button size="sm" variant="ghost" onClick={() => void openFile(certificate)} title={certificate.fileName}>
                           <FileText className="h-3.5 w-3.5" />
-                          Dosya
+                          {t("hr.certificateForm.file")}
                         </Button>
                       )}
                       {personnelPerms.canEdit && !certificate.verified && (
@@ -487,21 +492,21 @@ function PersonnelDetail({ id }: { id: string }) {
                           onClick={() =>
                             void setCertificateVerified(certificate.id, true)
                               .then(() => {
-                                log("approve", `Belge onaylandı: ${person.fullName} · ${certificate.name || CERTIFICATE_TYPE_LABELS[certificate.type]}`);
+                                log("approve", inTurkish(() => `Belge onaylandı: ${person.fullName} · ${certificate.name || CERTIFICATE_TYPE_LABELS[certificate.type]}`));
                                 setVersion((current) => current + 1);
                               })
-                              .catch((err) => flash("error", hrErrorMessage(err, "Belge onaylanamadı.")))
+                              .catch((err) => flash("error", hrErrorMessage(err, t("hr.personnelDetail.approveFailed"))))
                           }
                         >
                           <ShieldCheck className="h-3.5 w-3.5" />
-                          Onayla
+                          {t("hr.leaveDecision.approve")}
                         </Button>
                       )}
                       {editable && (
                         <button
                           type="button"
-                          aria-label="Belgeyi düzenle"
-                          title="Düzenle"
+                          aria-label={t("hr.certificateForm.editTitle")}
+                          title={t("common.edit")}
                           onClick={() => {
                             setSubmit({ saving: false, error: "" });
                             setDialog({ kind: "certificate", certificate });
@@ -514,16 +519,16 @@ function PersonnelDetail({ id }: { id: string }) {
                       {removable && (
                         <button
                           type="button"
-                          aria-label="Belgeyi sil"
-                          title="Sil"
+                          aria-label={t("hr.personnelDetail.deleteCertificate")}
+                          title={t("common.delete")}
                           onClick={() => {
-                            if (!confirm("Belge ve dosyası silinsin mi?")) return;
+                            if (!confirm(t("hr.personnelDetail.deleteCertificateConfirm"))) return;
                             void deleteCertificate(certificate)
                               .then(() => {
-                                log("delete", `Belge silindi: ${person.fullName} · ${certificate.name || CERTIFICATE_TYPE_LABELS[certificate.type]}`);
+                                log("delete", inTurkish(() => `Belge silindi: ${person.fullName} · ${certificate.name || CERTIFICATE_TYPE_LABELS[certificate.type]}`));
                                 setVersion((current) => current + 1);
                               })
-                              .catch((err) => flash("error", hrErrorMessage(err, "Belge silinemedi.")));
+                              .catch((err) => flash("error", hrErrorMessage(err, t("hr.personnelDetail.deleteCertificateFailed"))));
                           }}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-red-500/10 hover:text-red-400"
                         >
@@ -539,13 +544,13 @@ function PersonnelDetail({ id }: { id: string }) {
         </Section>
 
         <Section
-          title="Puantaj"
-          description={format(parseISO(`${month}-01`), "MMMM yyyy", { locale: tr })}
+          title={t("hr.personnelDetail.timesheet")}
+          description={format(parseISO(`${month}-01`), "MMMM yyyy", { locale: dateLocale })}
           action={
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                aria-label="Önceki ay"
+                aria-label={t("hr.common.previousMonth")}
                 onClick={() => setMonth(format(addMonths(parseISO(`${month}-01`), -1), "yyyy-MM"))}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100"
               >
@@ -553,7 +558,7 @@ function PersonnelDetail({ id }: { id: string }) {
               </button>
               <button
                 type="button"
-                aria-label="Sonraki ay"
+                aria-label={t("hr.common.nextMonth")}
                 onClick={() => setMonth(format(addMonths(parseISO(`${month}-01`), 1), "yyyy-MM"))}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100"
               >
@@ -561,7 +566,7 @@ function PersonnelDetail({ id }: { id: string }) {
               </button>
               {(timesheetPerms.canView || isSelf) && (
                 <Link href={`/hr/timesheets?month=${month}`} className="ml-2 text-xs text-cyan-400 hover:underline">
-                  Cetveli aç
+                  {t("hr.personnelDetail.openTimesheet")}
                 </Link>
               )}
             </div>
@@ -576,7 +581,7 @@ function PersonnelDetail({ id }: { id: string }) {
                   key={day}
                   title={
                     meta
-                      ? `${formatDay(day)} · ${meta.label}${entry!.overtimeHours ? ` · ${formatHours(entry!.overtimeHours)} sa fazla mesai` : ""}`
+                      ? `${formatDay(day)} · ${meta.label}${entry!.overtimeHours ? ` · ${t("hr.personnelDetail.overtimeTitle", { hours: formatHours(entry!.overtimeHours) })}` : ""}`
                       : formatDay(day)
                   }
                   className={cn(
@@ -592,37 +597,37 @@ function PersonnelDetail({ id }: { id: string }) {
           </div>
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <div>
-              <dt className="text-xs text-zinc-500">Çalışılan gün</dt>
+              <dt className="text-xs text-zinc-500">{t("hr.lib.timesheetExport.workedDays")}</dt>
               <dd className="font-semibold tabular-nums text-zinc-100">{formatHours(summary.workedDays)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-zinc-500">Fazla mesai (ay)</dt>
-              <dd className="font-semibold tabular-nums text-zinc-100">{formatHours(summary.overtime)} sa</dd>
+              <dt className="text-xs text-zinc-500">{t("hr.personnelDetail.overtimeMonth")}</dt>
+              <dd className="font-semibold tabular-nums text-zinc-100">{t("hr.common.hoursShort", { hours: formatHours(summary.overtime) })}</dd>
             </div>
             <div>
-              <dt className="text-xs text-zinc-500">İzin / rapor</dt>
+              <dt className="text-xs text-zinc-500">{t("hr.personnelDetail.leaveSick")}</dt>
               <dd className="font-semibold tabular-nums text-zinc-100">
                 {summary.annualLeave + summary.otherLeave} / {summary.sick}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-zinc-500">Fazla mesai ({month.slice(0, 4)})</dt>
+              <dt className="text-xs text-zinc-500">{t("hr.personnelDetail.overtimeYear", { year: month.slice(0, 4) })}</dt>
               <dd className={cn("font-semibold tabular-nums", yearlyOvertime > MAX_YEARLY_OVERTIME ? "text-red-400" : "text-zinc-100")}>
-                {formatHours(yearlyOvertime)} / {MAX_YEARLY_OVERTIME} sa
+                {formatHours(yearlyOvertime)} / {t("hr.common.hoursShort", { hours: MAX_YEARLY_OVERTIME })}
               </dd>
             </div>
           </dl>
           {yearlyOvertime > MAX_YEARLY_OVERTIME && (
             <p className="mt-3 rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2 text-xs text-red-300">
-              Yıllık fazla mesai 270 saati aştı (İş Kanunu md. 41).
+              {t("hr.personnelDetail.overtimeExceeded")}
             </p>
           )}
         </Section>
 
         {(leavePerms.canView || isSelf || (!!user && person.managerId === user.id)) && (
           <Section
-            title="Yıllık izin"
-            description="İş Kanunu md. 53'e göre hizmet süresinden hesaplanır"
+            title={t("hr.leaveType.annual")}
+            description={t("hr.personnelDetail.annualLeaveHint")}
             action={
               (isSelf || leavePerms.canAdd) &&
               person.state === "active" && (
@@ -634,7 +639,7 @@ function PersonnelDetail({ id }: { id: string }) {
                   }}
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  İzin talebi
+                  {t("hr.leaveForm.newTitle")}
                 </Button>
               )
             }
@@ -643,7 +648,7 @@ function PersonnelDetail({ id }: { id: string }) {
               <LeaveBalanceSummary balance={leaves.balance} />
             ) : (
               <p className="text-sm text-zinc-500">
-                {person.startDate ? "Yükleniyor…" : "İşe giriş tarihi girilmediği için izin hakkı hesaplanamıyor."}
+                {person.startDate ? t("hr.common.loading") : t("hr.personnelDetail.noStartDate")}
               </p>
             )}
             {leaves.requests && leaves.requests.length > 0 && (
@@ -653,7 +658,7 @@ function PersonnelDetail({ id }: { id: string }) {
                     <span className="text-zinc-200">
                       {LEAVE_TYPE_LABELS[request.type]}
                       <span className="ml-2 text-xs text-zinc-500">
-                        {formatDay(request.startDate)} – {formatDay(request.endDate)} · {formatHours(request.dayCount)} gün
+                        {formatDay(request.startDate)} – {formatDay(request.endDate)} · {formatDayCount(request.dayCount)}
                       </span>
                     </span>
                     <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-xs font-medium", LEAVE_STATUS_STYLES[request.status])}>
@@ -664,15 +669,15 @@ function PersonnelDetail({ id }: { id: string }) {
               </ul>
             )}
             <Link href="/hr/leaves" className="mt-3 inline-block text-xs text-cyan-400 hover:underline">
-              Tüm izinler
+              {t("hr.personnelDetail.allLeaves")}
             </Link>
           </Section>
         )}
 
         {person.userId && (
-          <Section title="Zimmetler" description="Kişiye zimmetli ekipman ve araçlar">
+          <Section title={t("hr.personnelDetail.assignments")} description={t("hr.personnelDetail.assignmentsHint")}>
             {assignments.length === 0 ? (
-              <p className="text-sm text-zinc-500">Zimmetli eşya yok.</p>
+              <p className="text-sm text-zinc-500">{t("hr.personnelDetail.noAssignments")}</p>
             ) : (
               <ul className="divide-y divide-zinc-800">
                 {assignments.map((item) => (
@@ -705,10 +710,10 @@ function PersonnelDetail({ id }: { id: string }) {
             void run(
               async () => {
                 await createLeaveRequest(input);
-                log("create", `İzin talebi oluşturuldu: ${person.fullName} · ${LEAVE_TYPE_LABELS[input.type]}, ${formatDay(input.startDate)} – ${formatDay(input.endDate)}`);
+                log("create", inTurkish(() => `İzin talebi oluşturuldu: ${person.fullName} · ${LEAVE_TYPE_LABELS[input.type]}, ${formatDay(input.startDate)} – ${formatDay(input.endDate)}`));
               },
-              "İzin talebi oluşturuldu ve onaya gönderildi.",
-              "İzin talebi kaydedilemedi."
+              t("hr.personnelDetail.leaveCreated"),
+              t("hr.personnelDetail.leaveSaveFailed")
             )
           }
         />
@@ -725,8 +730,8 @@ function PersonnelDetail({ id }: { id: string }) {
                 resetMyPersonnelCache();
                 log("update", `Personel güncellendi: ${input.fullName}`);
               },
-              "Personel güncellendi.",
-              "Personel kaydedilemedi."
+              t("hr.personnelList.updated"),
+              t("hr.personnelList.saveFailed")
             )
           }
         />
@@ -744,8 +749,8 @@ function PersonnelDetail({ id }: { id: string }) {
                 // Hassas verinin içeriği loga yazılmaz
                 log("update", `Özlük bilgileri güncellendi: ${person.fullName}`);
               },
-              "Özlük bilgileri kaydedildi.",
-              "Özlük bilgileri kaydedilemedi."
+              t("hr.personnelDetail.privateSaved"),
+              t("hr.personnelDetail.privateSaveFailed")
             )
           }
         />
@@ -759,7 +764,7 @@ function PersonnelDetail({ id }: { id: string }) {
           onSubmit={(input, file) =>
             void run(
               async () => {
-                if (!user?.organizationId) throw new Error("Organizasyon bilgisi bulunamadı.");
+                if (!user?.organizationId) throw new Error(t("hr.personnelDetail.noOrganization"));
                 await saveCertificate({
                   id: dialog.certificate?.id,
                   personnelId: person.id,
@@ -768,11 +773,10 @@ function PersonnelDetail({ id }: { id: string }) {
                   file,
                   previousPath: dialog.certificate?.filePath,
                 });
-                const label = input.name || CERTIFICATE_TYPE_LABELS[input.type];
-                log(dialog.certificate ? "update" : "create", `Belge ${dialog.certificate ? "güncellendi" : "eklendi"}: ${person.fullName} · ${label}`);
+                log(dialog.certificate ? "update" : "create", inTurkish(() => `Belge ${dialog.certificate ? "güncellendi" : "eklendi"}: ${person.fullName} · ${input.name || CERTIFICATE_TYPE_LABELS[input.type]}`));
               },
-              dialog.certificate ? "Belge güncellendi." : "Belge eklendi.",
-              "Belge kaydedilemedi."
+              dialog.certificate ? t("hr.personnelDetail.certificateUpdated") : t("hr.personnelDetail.certificateAdded"),
+              t("hr.personnelDetail.certificateSaveFailed")
             )
           }
         />

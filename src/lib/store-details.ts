@@ -6,7 +6,7 @@ import {
   searchFilter,
   type ListFilterValue,
 } from "@/lib/supabase-query";
-import { normalizeCurrency, parseMoneyTotals } from "@/lib/currency";
+import { normalizeCurrency, parseMoneyTotals, type CurrencyCode } from "@/lib/currency";
 import type {
   StoreDetailSummary,
   StoreMaterial,
@@ -206,4 +206,44 @@ export async function fetchMatchingIds(options: {
   });
   if (error) throw error;
   return data.map((row) => row.id);
+}
+
+export type MaterialStatusRow = {
+  storeId: string;
+  status: string;
+  /** Miktar × birim fiyat */
+  amount: number;
+  currency: CurrencyCode;
+};
+
+/** Pano keşif grafiği: görülebilen bütün malzeme kalemlerinin durumu ve tutarı */
+export async function fetchMaterialStatusRows(): Promise<MaterialStatusRow[]> {
+  const { data, error } = await fetchAllRows<Record<string, unknown>>((from, to) =>
+    supabase.from(MATERIALS_SOURCE).select("id, store_id, status, quantity, unit_price, currency").order("id").range(from, to)
+  );
+  if (error) throw error;
+  return data.map((row) => ({
+    storeId: String(row.store_id ?? ""),
+    status: String(row.status ?? ""),
+    amount: Number(row.quantity ?? 0) * Number(row.unit_price ?? 0),
+    currency: normalizeCurrency(row.currency),
+  }));
+}
+
+/** Pano iş planı eğrisi: görülebilen bütün iş planı kalemlerinin tarihleri ve ilerlemesi */
+export async function fetchWorkPlanCurveRows(): Promise<
+  { storeId: string; startDate: string; endDate: string; percentComplete: number }[]
+> {
+  const { data, error } = await fetchAllRows<Record<string, unknown>>((from, to) =>
+    supabase
+      .from(WORK_PLAN_SOURCE)
+      .select("id, store_id, start_date, end_date, percent_complete, status")
+      .order("id")
+      .range(from, to)
+  );
+  if (error) throw error;
+  return data.map((row) => {
+    const item = mapWorkPlanFromDb(row);
+    return { storeId: item.storeId, startDate: item.startDate, endDate: item.endDate, percentComplete: item.percentComplete };
+  });
 }

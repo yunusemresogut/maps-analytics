@@ -1,4 +1,5 @@
 import { differenceInDays, isPast, parseISO } from "date-fns";
+import { t } from "@/i18n/runtime";
 
 const OPENING_SOON_DAYS = 7;
 
@@ -9,6 +10,10 @@ export type OpeningAlert = {
   daysSinceOpening: number;
   label: string;
 };
+
+function opensIn(days: number) {
+  return t(days === 1 ? "shell.openingAlert.opensInDaysOne" : "shell.openingAlert.opensInDaysOther", { count: days });
+}
 
 export function getOpeningAlert(openingDate: string): OpeningAlert {
   const date = parseISO(openingDate);
@@ -24,7 +29,12 @@ export function getOpeningAlert(openingDate: string): OpeningAlert {
       isOverdue: daysSince > 0,
       daysUntilOpening: daysUntil,
       daysSinceOpening: daysSince,
-      label: daysSince === 0 ? "Bugün açıldı" : `${daysSince} gün önce açıldı`,
+      label:
+        daysSince === 0
+          ? t("shell.openingAlert.openedToday")
+          : t(daysSince === 1 ? "shell.openingAlert.openedDaysAgoOne" : "shell.openingAlert.openedDaysAgoOther", {
+              count: daysSince,
+            }),
     };
   }
 
@@ -36,8 +46,8 @@ export function getOpeningAlert(openingDate: string): OpeningAlert {
       daysSinceOpening: 0,
       label:
         daysUntil === 0
-          ? "Bugün açılıyor"
-          : `${daysUntil} gün sonra açılıyor`,
+          ? t("shell.openingAlert.opensToday")
+          : opensIn(daysUntil),
     };
   }
 
@@ -46,7 +56,7 @@ export function getOpeningAlert(openingDate: string): OpeningAlert {
     isOverdue: false,
     daysUntilOpening: daysUntil,
     daysSinceOpening: 0,
-    label: `${daysUntil} gün sonra açılıyor`,
+    label: opensIn(daysUntil),
   };
 }
 

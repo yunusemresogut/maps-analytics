@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AuthGuard } from "@/components/auth/auth-guard";
+import { useI18n } from "@/contexts/i18n-context";
 import { useSettings } from "@/contexts/settings-context";
 import { NOTIFICATION_MODULES, NOTIFICATION_TYPES, notificationModuleDisabled } from "@/lib/settings";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ function DaysInput({
   max: number;
   onSave: (days: number) => void;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState(String(value));
   const days = Number(draft);
   const invalid = !Number.isInteger(days) || days < min || days > max;
@@ -42,12 +44,13 @@ function DaysInput({
         }}
         className="h-9 w-24"
       />
-      <span className="text-xs text-zinc-500">gün</span>
+      <span className="text-xs text-zinc-500">{t("settings.common.days")}</span>
     </div>
   );
 }
 
 function NotificationRulesContent() {
+  const { t } = useI18n();
   const { org, updateOrgSettings } = useSettings();
   const { state, run } = useAutoSave();
   const rules = org.notifications.rules;
@@ -58,42 +61,42 @@ function NotificationRulesContent() {
   return (
     <div className="space-y-6">
       <SettingsPageHeader
-        title="Bildirim kuralları"
-        description="Firmanızda hangi bildirimlerin üretileceğini belirleyin. Zorunlu bildirimleri kullanıcılar kapatamaz."
+        title={t("pageTitle.settingsNotificationRules")}
+        description={t("settings.rules.description")}
         status={state}
       />
 
-      <SettingsSection title="Eşikler">
-        <SettingRow label="Yaklaşan açılış uyarısı" description="Açılışına bu kadar gün kalan sahalar için bildirim (1–90)">
+      <SettingsSection title={t("settings.rules.thresholds")}>
+        <SettingRow label={t("settings.rules.openingSoon")} description={t("settings.rules.openingSoonDescription")}>
           <DaysInput
-            label="Yaklaşan açılış uyarısı"
+            label={t("settings.rules.openingSoon")}
             value={org.notifications.openingSoonDays}
             min={1}
             max={90}
             onSave={(days) => void run(() => updateOrgSettings({ notifications: { openingSoonDays: days } }))}
           />
         </SettingRow>
-        <SettingRow label="Sözleşme bitiş uyarısı" description="Bitişine bu kadar gün kalan aktif sözleşmeler için bildirim (1–180)">
+        <SettingRow label={t("settings.rules.contractExpiry")} description={t("settings.rules.contractExpiryDescription")}>
           <DaysInput
-            label="Sözleşme bitiş uyarısı"
+            label={t("settings.rules.contractExpiry")}
             value={org.notifications.contractExpiryDays}
             min={1}
             max={180}
             onSave={(days) => void run(() => updateOrgSettings({ notifications: { contractExpiryDays: days } }))}
           />
         </SettingRow>
-        <SettingRow label="Belge süresi uyarısı" description="Bitişine bu kadar gün kalan personel belge ve sertifikaları için bildirim (1–180)">
+        <SettingRow label={t("settings.rules.certificateExpiry")} description={t("settings.rules.certificateExpiryDescription")}>
           <DaysInput
-            label="Belge süresi uyarısı"
+            label={t("settings.rules.certificateExpiry")}
             value={org.notifications.certificateExpiryDays}
             min={1}
             max={180}
             onSave={(days) => void run(() => updateOrgSettings({ notifications: { certificateExpiryDays: days } }))}
           />
         </SettingRow>
-        <SettingRow label="Araç belgesi uyarısı" description="Sigorta, kasko ya da muayenesinin bitmesine bu kadar gün kalan araçlar için bildirim (1–180)">
+        <SettingRow label={t("settings.rules.vehicleExpiry")} description={t("settings.rules.vehicleExpiryDescription")}>
           <DaysInput
-            label="Araç belgesi uyarısı"
+            label={t("settings.rules.vehicleExpiry")}
             value={org.notifications.vehicleExpiryDays}
             min={1}
             max={180}
@@ -108,22 +111,22 @@ function NotificationRulesContent() {
           <SettingsSection
             key={module.key}
             title={module.label}
-            description={moduleDisabled ? "Bu modül kapalı olduğu için bildirimleri üretilmez." : undefined}
+            description={moduleDisabled ? t("settings.rules.moduleDisabled") : undefined}
           >
             {NOTIFICATION_TYPES.filter((item) => item.module === module.key).map((item) => {
               const rule = rules[item.type];
               return (
                 <SettingRow key={item.type} label={item.label} description={item.description}>
                   <Switch
-                    label="Aktif"
-                    ariaLabel={`${item.label}: aktif`}
+                    label={t("settings.rules.active")}
+                    ariaLabel={t("settings.rules.activeLabel", { name: item.label })}
                     checked={rule.enabled}
                     disabled={moduleDisabled}
                     onChange={(enabled) => setRule(item.type, enabled ? { enabled } : { enabled, mandatory: false })}
                   />
                   <Switch
-                    label="Zorunlu"
-                    ariaLabel={`${item.label}: zorunlu`}
+                    label={t("settings.rules.mandatory")}
+                    ariaLabel={t("settings.rules.mandatoryLabel", { name: item.label })}
                     checked={rule.enabled && rule.mandatory}
                     disabled={moduleDisabled || !rule.enabled}
                     onChange={(mandatory) => setRule(item.type, { mandatory })}

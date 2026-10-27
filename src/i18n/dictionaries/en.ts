@@ -1,6 +1,10 @@
 import type { Dictionary } from "@/i18n/dictionaries/tr";
+import { messages } from "@/i18n/messages";
 
 export const en: Dictionary = {
+  ...(Object.fromEntries(Object.entries(messages).map(([name, value]) => [name, value.en])) as {
+    [N in keyof typeof messages]: (typeof messages)[N]["en"];
+  }),
   language: {
     label: "Language",
     tr: "Türkçe",
@@ -8,7 +12,7 @@ export const en: Dictionary = {
   },
   nav: {
     menu: "Menu",
-    management: "Admin",
+    management: "Management",
     navigation: "Navigation",
     map: "Map",
     dashboard: "Dashboard",
@@ -26,9 +30,9 @@ export const en: Dictionary = {
     personnel: "Personnel",
     certificates: "Documents",
     timesheets: "Timesheets",
-    myRecord: "My record",
+    myRecord: "My details",
     leaves: "Leave",
-    hrRequests: "Requests",
+    hrRequests: "Employee requests",
     announcements: "Announcements",
     hrReports: "HR reports",
     profile: "Profile",
@@ -83,9 +87,9 @@ export const en: Dictionary = {
   auth: {
     userTitle: "Sign In",
     userSubtitle: "Sign in to your account",
-    registerTitle: "Register",
+    registerTitle: "Sign Up",
     registerSubtitle: "Create your account and manage your sites",
-    register: "Register",
+    register: "Sign Up",
     fullName: "Full name",
     companyName: "Company name",
     confirmPassword: "Confirm password",
@@ -95,19 +99,19 @@ export const en: Dictionary = {
     noAccount: "Don't have an account yet?",
     createAccount: "Create an account",
     haveAccount: "Already have an account?",
-    sessionReplaced: "You were signed out because this account was signed in from another place.",
+    sessionReplaced: "You were signed out because this account signed in from another location.",
     connectionError: "Could not connect. Please try again.",
     registrationError: "We couldn't complete registration. Check your details and try again.",
-    brandEyebrow: "FIELD OPERATIONS PLATFORM",
+    brandEyebrow: "SITE OPERATIONS PLATFORM",
     brandHeadline: "Manage all your sites from one place.",
-    brandDescription: "Track locations, opening schedules, and field workflows in one clear view for your teams.",
+    brandDescription: "Track locations, opening schedules, and site workflows in a single view for your teams.",
     featureMap: "Map and portfolio",
     featureMapDescription: "View site locations alongside project status.",
     featureDates: "Opening schedule",
-    featureDatesDescription: "Keep track of upcoming dates and field plans.",
+    featureDatesDescription: "Keep track of upcoming dates and site plans.",
     featureModules: "Team workflows",
     featureModulesDescription: "Organize approvals, requests, and finance processes.",
-    brandFooter: "One workspace for maps, projects, and field operations.",
+    brandFooter: "One workspace for maps, projects, and site operations.",
     adminTitle: "Founder Sign In",
     adminSubtitle: "Sign in to access the admin panel",
     email: "Email",
@@ -173,7 +177,7 @@ export const en: Dictionary = {
     storesTitle: "Sites",
     storesDescription: "Site and location list",
     orgIncomplete:
-      "To use progress payments, fill tax number, authorized person, phone and address in the company profile.",
+      "To use progress payments, fill in the tax number, authorized person, phone, and address in the company profile.",
     goToProfile: "Go to profile",
   },
   adminPages: {
@@ -185,10 +189,10 @@ export const en: Dictionary = {
     usersTitle: "Users",
     usersDescription: "Add new users and manage existing accounts",
     regionsTitle: "Regions",
-    regionsDescription: "Region definitions and city assignments",
+    regionsDescription: "Region definitions and province assignments",
     permissionsTitle: "Permissions",
     permissionsDescription:
-      "Per-module view / add / edit / delete. Apply role defaults or save a custom override per user.",
+      "View / add / edit / delete permissions per module. Apply role defaults or save user-specific overrides.",
     logsTitle: "Activity Logs",
     logsDescription: "Record of user, region, and location actions in the system",
   },

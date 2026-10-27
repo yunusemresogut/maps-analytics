@@ -28,7 +28,7 @@ export function StoreViewFields({ store }: StoreViewFieldsProps) {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <Field
-          label={store.country && store.country !== "Türkiye" ? "Şehir / semt" : "İl / ilçe"}
+          label={store.country && store.country !== "Türkiye" ? t("site.fields.cityArea") : t("site.fields.cityDistrict")}
           value={[
             [store.city, store.district].filter(Boolean).join(" / "),
             store.country && store.country !== "Türkiye" ? store.country : "",
@@ -37,14 +37,14 @@ export function StoreViewFields({ store }: StoreViewFieldsProps) {
             .join(", ")}
         />
         <Field
-          label="Durum"
+          label={t("site.fields.status")}
           value={getProjectStatusLabel(store.projectStatus, t)}
         />
       </div>
-      <Field label="Adres" value={store.address} />
+      <Field label={t("site.fields.address")} value={store.address} />
       <div className="grid grid-cols-2 gap-3">
         <Field
-          label="Açılış Tarihi"
+          label={t("site.fields.openingDate")}
           value={
             store.openingDate
               ? format(parseISO(store.openingDate), "d MMMM yyyy", {
@@ -54,7 +54,7 @@ export function StoreViewFields({ store }: StoreViewFieldsProps) {
           }
         />
         <Field
-          label="Kabul Tarihi"
+          label={t("site.fields.acceptanceDate")}
           value={
             store.acceptanceDate
               ? format(parseISO(store.acceptanceDate), "d MMMM yyyy", {
@@ -65,16 +65,16 @@ export function StoreViewFields({ store }: StoreViewFieldsProps) {
         />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Yüklenici Firma" value={store.contractorCompany} />
-        <Field label="Şantiye Şefi" value={store.siteManager} />
+        <Field label={t("site.fields.contractor")} value={store.contractorCompany} />
+        <Field label={t("site.fields.siteManager")} value={store.siteManager} />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Saha Türü" value={locationTypeLabel(store.locationType)} />
-        <Field label="Brüt m²" value={`${store.grossM2} m²`} />
+        <Field label={t("site.fields.locationType")} value={locationTypeLabel(store.locationType)} />
+        <Field label={t("site.fields.grossM2")} value={`${store.grossM2} m²`} />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Kat Sayısı" value={store.floorCount} />
-        <Field label="Telefon" value={store.phone} />
+        <Field label={t("site.fields.floorCount")} value={store.floorCount} />
+        <Field label={t("site.fields.phone")} value={store.phone} />
       </div>
     </div>
   );

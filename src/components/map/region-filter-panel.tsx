@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { MAP_PANEL_BOTTOM_CLASS } from "@/lib/map-panel-styles";
 import { cn } from "@/lib/utils";
+import { useT } from "@/contexts/i18n-context";
 
 export function RegionFilterPanel() {
+  const t = useT();
   const {
     regions,
     visibleRegions,
@@ -24,11 +26,12 @@ export function RegionFilterPanel() {
     <div className={cn(MAP_PANEL_BOTTOM_CLASS, "pointer-events-auto absolute left-4 z-20 w-full max-w-xs slide-in-from-left")}>
       <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/95 p-4 shadow-(--panel-shadow) backdrop-blur-md">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-medium text-zinc-200">Bölgeler</span>
+          <span className="text-sm font-medium text-zinc-200">{t("site.mapPanels.regions")}</span>
           <button
             type="button"
             onClick={() => setPanelOpen(false)}
             className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
+            aria-label={t("common.close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -41,7 +44,7 @@ export function RegionFilterPanel() {
             className="flex-1 text-xs"
             onClick={showAllRegions}
           >
-            Tümünü Aç
+            {t("site.mapPanels.showAll")}
           </Button>
           <Button
             size="sm"
@@ -49,7 +52,7 @@ export function RegionFilterPanel() {
             className="flex-1 text-xs"
             onClick={hideAllRegions}
           >
-            Tümünü Kapat
+            {t("site.mapPanels.hideAll")}
           </Button>
         </div>
 
@@ -69,14 +72,16 @@ export function RegionFilterPanel() {
                   <div className="min-w-0">
                     <p className="truncate text-sm text-zinc-300">{region.name}</p>
                     <p className="text-xs text-zinc-600">
-                      {region.cities.length} şehir
+                      {t(region.cities.length === 1 ? "site.mapPanels.cityCountOne" : "site.mapPanels.cityCountOther", {
+                        count: region.cities.length,
+                      })}
                     </p>
                   </div>
                 </div>
                 <Switch
                   checked={visible}
                   onChange={(checked) => setRegionVisibility(region.id, checked)}
-                  label={visible ? "Açık" : "Kapalı"}
+                  label={visible ? t("site.mapPanels.on") : t("site.mapPanels.off")}
                 />
               </li>
             );

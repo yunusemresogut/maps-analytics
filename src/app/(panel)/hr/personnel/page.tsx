@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/contexts/auth-context";
+import { useT } from "@/contexts/i18n-context";
+import type { TranslationKey } from "@/i18n";
 import { useMyPersonnelId, resetMyPersonnelCache } from "@/hooks/use-my-personnel";
 import { usePermissions } from "@/hooks/use-permissions";
 import { usePersistentState } from "@/hooks/use-persistent-state";
@@ -35,20 +37,20 @@ import { cn } from "@/lib/utils";
 
 type SortKey = "name" | "code" | "type" | "start" | "store";
 
-const SORT_OPTIONS: { key: SortKey; label: string; column: string }[] = [
-  { key: "name", label: "Ada göre", column: "full_name" },
-  { key: "code", label: "Sicil no'ya göre", column: "code" },
-  { key: "type", label: "Çalışma tipine göre", column: "employment_type" },
-  { key: "start", label: "İşe girişe göre", column: "start_date" },
-  { key: "store", label: "Görev yerine göre", column: "store_name" },
+const SORT_OPTIONS: { key: SortKey; label: TranslationKey; column: string }[] = [
+  { key: "name", label: "hr.personnelList.sortName", column: "full_name" },
+  { key: "code", label: "hr.personnelList.sortCode", column: "code" },
+  { key: "type", label: "hr.personnelList.sortType", column: "employment_type" },
+  { key: "start", label: "hr.personnelList.sortStart", column: "start_date" },
+  { key: "store", label: "hr.personnelList.sortStore", column: "store_name" },
 ];
 const SORT_COLUMNS = Object.fromEntries(SORT_OPTIONS.map((option) => [option.key, option.column])) as Record<SortKey, string>;
 
-const STAT_CARDS: { key: "active" | DocumentState; label: string; tone: string }[] = [
-  { key: "active", label: "Çalışan personel", tone: "text-zinc-100" },
-  { key: "expired", label: "Süresi geçmiş belgesi olan", tone: "text-red-400" },
-  { key: "expiring", label: "Belgesi 30 gün içinde biten", tone: "text-amber-400" },
-  { key: "pending", label: "Onay bekleyen belgesi olan", tone: "text-teal-300" },
+const STAT_CARDS: { key: "active" | DocumentState; label: TranslationKey; tone: string }[] = [
+  { key: "active", label: "hr.personnelList.statActive", tone: "text-zinc-100" },
+  { key: "expired", label: "hr.personnelList.statExpired", tone: "text-red-400" },
+  { key: "expiring", label: "hr.personnelList.statExpiring", tone: "text-amber-400" },
+  { key: "pending", label: "hr.personnelList.statPending", tone: "text-teal-300" },
 ];
 
 const DOCUMENT_BADGE: Record<Exclude<DocumentState, "ok">, string> = {
@@ -58,16 +60,21 @@ const DOCUMENT_BADGE: Record<Exclude<DocumentState, "ok">, string> = {
 };
 
 function DocumentBadges({ person }: { person: Personnel }) {
+  const t = useT();
   const badges = [
-    person.expiredCount > 0 && { key: "expired" as const, text: `${person.expiredCount} süresi geçmiş` },
-    person.expiringCount > 0 && { key: "expiring" as const, text: `${person.expiringCount} bitiyor` },
-    person.pendingCount > 0 && { key: "pending" as const, text: `${person.pendingCount} onay bekliyor` },
+    person.expiredCount > 0 && { key: "expired" as const, text: t("hr.personnelList.badgeExpired", { count: person.expiredCount }) },
+    person.expiringCount > 0 && { key: "expiring" as const, text: t("hr.personnelList.badgeExpiring", { count: person.expiringCount }) },
+    person.pendingCount > 0 && { key: "pending" as const, text: t("hr.personnelList.badgePending", { count: person.pendingCount }) },
   ].filter(Boolean) as { key: Exclude<DocumentState, "ok">; text: string }[];
 
   if (badges.length === 0) {
     return (
       <p className="mt-0.5 text-sm text-zinc-500">
-        {person.certificateCount > 0 ? `${person.certificateCount} belge, tamam` : "Belge yok"}
+        {person.certificateCount > 0
+          ? t(person.certificateCount === 1 ? "hr.personnelList.documentsOkOne" : "hr.personnelList.documentsOkOther", {
+              count: person.certificateCount,
+            })
+          : t("hr.personnelList.noDocuments")}
       </p>
     );
   }
@@ -84,6 +91,7 @@ function DocumentBadges({ person }: { person: Personnel }) {
 
 function PersonnelContent() {
   const router = useRouter();
+  const t = useT();
   const { user } = useAuth();
   const { canView, canAdd, canEdit, canDelete } = usePermissions("personnel");
   const { myPersonnelId, loaded } = useMyPersonnelId();
@@ -152,8 +160,7 @@ function PersonnelContent() {
   const remove = async (person: Personnel) => {
     if (
       !confirm(
-        `"${person.fullName}" kartı; belgeleri, özlük bilgileri ve puantajıyla birlikte kalıcı olarak silinsin mi?\n\n` +
-          "İşten ayrılan personel için silmek yerine işten çıkış tarihi girin; özlük kayıtlarının yasal saklama süresi boyunca tutulması gerekir."
+        `${t("hr.personnelList.deleteConfirm", { name: person.fullName })}\n\n${t("hr.personnelList.deleteConfirmHint")}`
       )
     )
       return;
@@ -164,14 +171,14 @@ function PersonnelContent() {
       setVersion((current) => current + 1);
     } catch (err) {
       console.error("Personel silinemedi:", err);
-      setNotice(hrErrorMessage(err, "Personel silinemedi."));
+      setNotice(hrErrorMessage(err, t("hr.personnelList.deleteFailed")));
     }
   };
 
   if (!canView) {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-sm text-zinc-500">
-        {loaded && !myPersonnelId ? "Hesabınız bir personel kartına bağlı değil. İnsan kaynaklarına başvurun." : "Yükleniyor…"}
+        {loaded && !myPersonnelId ? t("hr.personnelList.notLinked") : t("hr.common.loading")}
       </div>
     );
   }
@@ -182,8 +189,8 @@ function PersonnelContent() {
     <div className="scrollbar-themed h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-100">Personel</h1>
-          <p className="mt-1 text-sm text-zinc-500">Ofis, saha ve taşeron personeli; görev yerleri ve belge durumları.</p>
+          <h1 className="text-xl font-semibold text-zinc-100">{t("hr.personnelList.title")}</h1>
+          <p className="mt-1 text-sm text-zinc-500">{t("hr.personnelList.description")}</p>
         </div>
         {canAdd && (
           <Button
@@ -193,7 +200,7 @@ function PersonnelContent() {
             }}
           >
             <Plus className="h-4 w-4" />
-            Yeni personel
+            {t("hr.personnelForm.newTitle")}
           </Button>
         )}
       </div>
@@ -215,7 +222,7 @@ function PersonnelContent() {
                 selected ? "border-cyan-500/50" : "border-zinc-800 hover:border-zinc-700"
               )}
             >
-              <p className="text-xs text-zinc-500">{card.label}</p>
+              <p className="text-xs text-zinc-500">{t(card.label)}</p>
               <p className={cn("mt-1 text-2xl font-semibold tabular-nums", card.tone)}>{counts ? counts[card.key] : "–"}</p>
             </button>
           );
@@ -232,28 +239,28 @@ function PersonnelContent() {
         <SearchInput
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ad, sicil no, unvan, taşeron, saha…"
-          aria-label="Personelde ara"
+          placeholder={t("hr.personnelList.searchPlaceholder")}
+          aria-label={t("hr.personnelList.searchLabel")}
           containerClassName="flex-1 sm:max-w-sm"
         />
-        <Select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} className="w-auto min-w-[140px]" aria-label="Durum">
-          <option value="all">Tümü</option>
+        <Select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} className="w-auto min-w-[140px]" aria-label={t("common.status")}>
+          <option value="all">{t("common.all")}</option>
           {Object.entries(PERSONNEL_STATE_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
           ))}
         </Select>
-        <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-auto min-w-[180px]" aria-label="Çalışma tipi">
-          <option value="all">Tüm çalışma tipleri</option>
+        <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-auto min-w-[180px]" aria-label={t("hr.common.employmentType")}>
+          <option value="all">{t("hr.personnelList.allTypes")}</option>
           {Object.entries(EMPLOYMENT_TYPE_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
           ))}
         </Select>
-        <Select value={documentFilter} onChange={(e) => setDocumentFilter(e.target.value)} className="w-auto min-w-[180px]" aria-label="Belge durumu">
-          <option value="all">Tüm belge durumları</option>
+        <Select value={documentFilter} onChange={(e) => setDocumentFilter(e.target.value)} className="w-auto min-w-[180px]" aria-label={t("hr.personnelList.documentState")}>
+          <option value="all">{t("hr.personnelList.allDocumentStates")}</option>
           {Object.entries(DOCUMENT_STATE_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
@@ -264,11 +271,11 @@ function PersonnelContent() {
           value={table.sort.key}
           onChange={(e) => table.setSort({ key: e.target.value as SortKey, direction: "asc" })}
           className="w-auto min-w-[170px]"
-          aria-label="Sıralama"
+          aria-label={t("hr.personnelList.sort")}
         >
           {SORT_OPTIONS.map((option) => (
             <option key={option.key} value={option.key}>
-              {option.label}
+              {t(option.label)}
             </option>
           ))}
         </Select>
@@ -276,7 +283,7 @@ function PersonnelContent() {
 
       {table.error && (
         <p role="alert" className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
-          Personel listesi yüklenemedi. Veritabanı güncellemesi (İK migration&apos;ı) uygulanmamış olabilir.
+          {t("hr.personnelList.loadFailed")}
         </p>
       )}
 
@@ -288,7 +295,11 @@ function PersonnelContent() {
         </ul>
       ) : table.totalItems === 0 ? (
         <div className="rounded-xl border border-dashed border-zinc-800 px-4 py-12 text-center text-sm text-zinc-500">
-          {filtered ? "Filtreyle eşleşen personel yok." : canAdd ? "Henüz personel yok. “Yeni personel” ile ekleyin." : "Henüz personel yok."}
+          {filtered
+            ? t("hr.personnelList.noMatch")
+            : canAdd
+              ? t("hr.personnelList.emptyCanAdd")
+              : t("hr.personnelList.empty")}
         </div>
       ) : (
         <ul className={cn("flex flex-col gap-3", table.isLoading && "opacity-60")}>
@@ -318,37 +329,39 @@ function PersonnelContent() {
                 <div className="flex min-w-0 items-start gap-2.5">
                   <Briefcase className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
                   <div className="min-w-0">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Çalışma</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">{t("hr.personnelList.employment")}</p>
                     <p className="mt-0.5 truncate text-sm text-zinc-200">{EMPLOYMENT_TYPE_LABELS[person.employmentType]}</p>
                     <p className="mt-0.5 text-xs text-zinc-500">
-                      {person.state === "left" ? `Ayrıldı · ${formatDay(person.endDate)}` : `Giriş · ${formatDay(person.startDate)}`}
+                      {person.state === "left"
+                        ? t("hr.personnelList.leftOn", { date: formatDay(person.endDate) })
+                        : t("hr.personnelList.startedOn", { date: formatDay(person.startDate) })}
                     </p>
                   </div>
                 </div>
                 <div className="flex min-w-0 items-start gap-2.5">
                   <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
                   <div className="min-w-0">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Görev yeri</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">{t("hr.personnelList.location")}</p>
                     <p className={cn("mt-0.5 truncate text-sm", person.storeName ? "text-zinc-200" : "text-zinc-600")}>
-                      {person.storeName ?? "Merkez"}
+                      {person.storeName ?? t("hr.personnelList.headOffice")}
                     </p>
                   </div>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Belgeler</p>
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">{t("hr.personnelList.documents")}</p>
                   <DocumentBadges person={person} />
                 </div>
               </div>
 
               <div className="flex shrink-0 flex-wrap items-center gap-1.5 lg:justify-end">
                 <Button size="sm" variant="outline" onClick={() => router.push(`/hr/personnel/${person.id}`)}>
-                  Kartı aç
+                  {t("hr.personnelList.openCard")}
                 </Button>
                 {canEdit && (
                   <button
                     type="button"
-                    aria-label="Düzenle"
-                    title="Düzenle"
+                    aria-label={t("common.edit")}
+                    title={t("common.edit")}
                     onClick={() => {
                       setSubmit({ saving: false, error: "" });
                       setDialog({ person });
@@ -361,8 +374,8 @@ function PersonnelContent() {
                 {canDelete && (
                   <button
                     type="button"
-                    aria-label="Sil"
-                    title="Sil"
+                    aria-label={t("common.delete")}
+                    title={t("common.delete")}
                     onClick={() => void remove(person)}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
                   >
@@ -409,7 +422,7 @@ function PersonnelContent() {
                 setDialog(null);
                 setVersion((current) => current + 1);
                 if (existing) {
-                  setNotice("Personel güncellendi.");
+                  setNotice(t("hr.personnelList.updated"));
                   window.setTimeout(() => setNotice(""), 3000);
                 } else {
                   router.push(`/hr/personnel/${id}`);
@@ -417,7 +430,7 @@ function PersonnelContent() {
               })
               .catch((err) => {
                 console.error("Personel kaydedilemedi:", err);
-                setSubmit({ saving: false, error: hrErrorMessage(err, "Personel kaydedilemedi.") });
+                setSubmit({ saving: false, error: hrErrorMessage(err, t("hr.personnelList.saveFailed")) });
               });
           }}
         />

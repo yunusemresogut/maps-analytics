@@ -16,16 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { MoneyInput } from "@/components/ui/money-input";
 import { DEFAULT_CURRENCY, type CurrencyCode } from "@/lib/currency";
+import { CONTRACT_STATUS_LABELS } from "@/lib/module-finance";
 import type { ContractStatus } from "@/types";
-
-const STATUS_TR: Record<ContractStatus, string> = {
-  draft: "Taslak",
-  active: "Aktif",
-  expired: "Süresi doldu",
-  cancelled: "İptal",
-  terminated: "Fesih",
-  completed: "Tamamlandı",
-};
 
 function EditContractContent({ id }: { id: string }) {
   const router = useRouter();
@@ -61,7 +53,7 @@ function EditContractContent({ id }: { id: string }) {
     if (!canEdit) return;
     setShowErrors(true);
     if (!title.trim()) {
-      setSaveError("Başlık zorunludur.");
+      setSaveError(t("finance.shared.titleRequired"));
       return;
     }
     setSaveError("");
@@ -77,33 +69,33 @@ function EditContractContent({ id }: { id: string }) {
     });
     setSaving(false);
     if (ok) router.push("/contracts");
-    else setSaveError("Sözleşme kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.");
+    else setSaveError(t("finance.contracts.saveFailed"));
   };
 
   const terminate = async () => {
-    if (!canEdit || !confirm("Sözleşme feshedilsin mi?")) return;
+    if (!canEdit || !confirm(t("finance.contracts.terminateConfirm"))) return;
     const ok = await updateContract(id, { status: "terminated" });
     if (ok) setStatus("terminated");
-    else setSaveError("Fesih işlemi tamamlanamadı. Tekrar deneyin.");
+    else setSaveError(t("finance.contracts.terminateFailed"));
   };
 
   const remove = async () => {
-    if (!canDelete || !confirm("Sözleşme silinsin mi?")) return;
+    if (!canDelete || !confirm(t("finance.contracts.deleteConfirm"))) return;
     const ok = await deleteContract(id);
     if (ok) router.push("/contracts");
-    else setSaveError("Sözleşme silinemedi. Tekrar deneyin.");
+    else setSaveError(t("finance.contracts.deleteFailed"));
   };
 
   return (
     <ModuleFormShell
       backHref="/contracts"
-      backLabel="Sözleşmeler"
-      title={title || "Sözleşme düzenle"}
+      backLabel={t("finance.contracts.title")}
+      title={title || t("finance.contracts.editTitle")}
       subtitle={
         status === "terminated"
-          ? "Feshedilmiş sözleşme"
+          ? t("finance.contracts.terminated")
           : status === "completed"
-            ? "Tamamlanmış sözleşme"
+            ? t("finance.contracts.completed")
             : store?.name
       }
       onSave={save}
@@ -116,40 +108,40 @@ function EditContractContent({ id }: { id: string }) {
         {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
         {store && (
           <Link href={`/stores/${store.id}`} className="text-sm text-cyan-400 hover:underline">
-            Saha: {store.name}
+            {t("finance.shared.storeLink", { name: store.name })}
           </Link>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Kod</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.code")}</label>
             <Input className="mt-1 font-mono" value={code} onChange={(e) => setCode(e.target.value)} disabled={!canEdit} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Durum</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.status")}</label>
             <Select className="mt-1" value={status} onChange={(e) => setStatus(e.target.value as ContractStatus)} disabled={!canEdit}>
-              {Object.entries(STATUS_TR).map(([k, v]) => (
+              {Object.entries(CONTRACT_STATUS_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
             </Select>
           </div>
         </div>
         <div>
-          <label className="text-xs text-zinc-500">Başlık *</label>
+          <label className="text-xs text-zinc-500">{t("finance.shared.title")} *</label>
           <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit} aria-invalid={showErrors && !title.trim()} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Taraf</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.party")}</label>
             <Input className="mt-1" value={partyName} onChange={(e) => setPartyName(e.target.value)} disabled={!canEdit} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Tutar</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.amount")}</label>
             <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} disabled={!canEdit} />
           </div>
           <div className="sm:col-span-2">
-            <label className="text-xs text-zinc-500">Saha</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.store")}</label>
             <Select className="mt-1" value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={!canEdit}>
-              <option value="">Seçiniz</option>
+              <option value="">{t("finance.shared.select")}</option>
               {stores.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
@@ -158,7 +150,7 @@ function EditContractContent({ id }: { id: string }) {
         </div>
         {canEdit && status !== "terminated" && (
           <Button type="button" variant="danger" size="sm" onClick={terminate}>
-            Feshet
+            {t("finance.contracts.terminate")}
           </Button>
         )}
       </div>

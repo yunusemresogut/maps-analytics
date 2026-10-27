@@ -9,6 +9,8 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { StoreWorkPlanItem, WorkPlanDependency, WorkPlanStatus } from "@/types";
+import { useT } from "@/contexts/i18n-context";
+import { UNASSIGNED_RESPONSIBLE } from "@/lib/excel-work-plan";
 
 export type WorkPlanFormValues = Pick<
   StoreWorkPlanItem,
@@ -43,6 +45,7 @@ export function WorkPlanFormModal({
   onClose,
   onSubmit,
 }: WorkPlanFormModalProps) {
+  const t = useT();
   const formId = useId();
   const [description, setDescription] = useState(item?.description ?? "");
   const [activityCode, setActivityCode] = useState(item?.activityCode ?? "");
@@ -50,7 +53,7 @@ export function WorkPlanFormModal({
   const [startDate, setStartDate] = useState(item?.startDate ?? "");
   const [endDate, setEndDate] = useState(item?.endDate ?? "");
   const [responsible, setResponsible] = useState(
-    item?.responsible && item.responsible !== "Belirtilmemiş" ? item.responsible : ""
+    item?.responsible && item.responsible !== UNASSIGNED_RESPONSIBLE ? item.responsible : ""
   );
   const [status, setStatus] = useState<WorkPlanStatus>(
     (item?.status as WorkPlanStatus) || "yapilacak"
@@ -84,10 +87,10 @@ export function WorkPlanFormModal({
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const nextErrors: Record<string, string> = {};
-    if (!description.trim()) nextErrors.description = "İş tanımı zorunludur";
-    if (!startDate) nextErrors.startDate = "Başlangıç tarihi zorunludur";
+    if (!description.trim()) nextErrors.description = t("site.workPlanForm.descriptionRequired");
+    if (!startDate) nextErrors.startDate = t("site.workPlanForm.startRequired");
     if (startDate && endDate && endDate < startDate)
-      nextErrors.endDate = "Bitiş tarihi başlangıçtan önce olamaz";
+      nextErrors.endDate = t("site.workPlanForm.endBeforeStart");
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -104,7 +107,7 @@ export function WorkPlanFormModal({
       wbsCode: wbsCode.trim() || undefined,
       startDate,
       endDate,
-      responsible: responsible.trim() || "Belirtilmemiş",
+      responsible: responsible.trim() || UNASSIGNED_RESPONSIBLE,
       status,
       percentComplete: Math.min(100, Math.max(0, Number(percent) || 0)),
       predecessors,
@@ -115,23 +118,23 @@ export function WorkPlanFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={item ? "İş kalemini düzenle" : "Yeni iş kalemi"}
-      description="Tarih, sorumlu ve ilerleme bilgilerini girin."
+      title={item ? t("site.workPlanForm.editTitle") : t("site.workPlanForm.newTitle")}
+      description={t("site.workPlanForm.description")}
       className="sm:max-w-2xl"
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Vazgeç
+            {t("site.workPlanForm.cancel")}
           </Button>
           <Button type="submit" form={formId}>
-            {item ? "Değişiklikleri kaydet" : "İş kalemini ekle"}
+            {item ? t("site.workPlanForm.saveChanges") : t("site.workPlanForm.addItem")}
           </Button>
         </>
       }
     >
       <form id={formId} onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         <FormField
-          label="İş tanımı"
+          label={t("site.workPlanForm.task")}
           required
           error={errors.description}
           htmlFor={`${formId}-description`}
@@ -141,68 +144,68 @@ export function WorkPlanFormModal({
             id={`${formId}-description`}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="Örn. Elektrik tesisatı"
+            placeholder={t("site.workPlanForm.taskPlaceholder")}
             aria-invalid={!!errors.description}
           />
         </FormField>
 
-        <FormField label="Aktivite kodu" htmlFor={`${formId}-activity`}>
+        <FormField label={t("site.workPlanForm.activityCode")} htmlFor={`${formId}-activity`}>
           <Input
             id={`${formId}-activity`}
             value={activityCode}
             onChange={(event) => setActivityCode(event.target.value)}
-            placeholder="Örn. A1010"
+            placeholder={t("site.workPlanForm.activityPlaceholder")}
           />
         </FormField>
-        <FormField label="WBS" htmlFor={`${formId}-wbs`}>
+        <FormField label={t("site.workPlanForm.wbs")} htmlFor={`${formId}-wbs`}>
           <Input
             id={`${formId}-wbs`}
             value={wbsCode}
             onChange={(event) => setWbsCode(event.target.value)}
-            placeholder="Örn. 1.2.3"
+            placeholder={t("site.workPlanForm.wbsPlaceholder")}
           />
         </FormField>
 
-        <FormField label="Başlangıç tarihi" required error={errors.startDate}>
+        <FormField label={t("site.workPlanForm.startDate")} required error={errors.startDate}>
           <DatePicker
             value={startDate}
             onChange={setStartDate}
             required
-            aria-label="Başlangıç tarihi"
+            aria-label={t("site.workPlanForm.startDate")}
             aria-invalid={!!errors.startDate}
           />
         </FormField>
-        <FormField label="Bitiş tarihi" error={errors.endDate}>
+        <FormField label={t("site.workPlanForm.endDate")} error={errors.endDate}>
           <DatePicker
             value={endDate}
             onChange={setEndDate}
             min={startDate || undefined}
-            aria-label="Bitiş tarihi"
+            aria-label={t("site.workPlanForm.endDate")}
             aria-invalid={!!errors.endDate}
           />
         </FormField>
 
-        <FormField label="Sorumlu" htmlFor={`${formId}-responsible`}>
+        <FormField label={t("site.workPlanForm.responsible")} htmlFor={`${formId}-responsible`}>
           <Input
             id={`${formId}-responsible`}
             value={responsible}
             onChange={(event) => setResponsible(event.target.value)}
-            placeholder="Kişi veya ekip"
+            placeholder={t("site.workPlanForm.responsiblePlaceholder")}
           />
         </FormField>
-        <FormField label="Durum" htmlFor={`${formId}-status`}>
+        <FormField label={t("site.workPlanForm.status")} htmlFor={`${formId}-status`}>
           <Select
             id={`${formId}-status`}
             value={status}
             onChange={(event) => handleStatusChange(event.target.value as WorkPlanStatus)}
           >
-            <option value="yapilacak">Yapılacak</option>
-            <option value="devam_ediyor">Devam ediyor</option>
-            <option value="tamamlandi">Tamamlandı</option>
+            <option value="yapilacak">{t("site.workPlan.status.yapilacak")}</option>
+            <option value="devam_ediyor">{t("site.workPlan.status.devam_ediyor")}</option>
+            <option value="tamamlandi">{t("site.workPlan.status.tamamlandi")}</option>
           </Select>
         </FormField>
 
-        <FormField label="Tamamlanma" htmlFor={`${formId}-percent`} className="sm:col-span-2">
+        <FormField label={t("site.workPlanForm.completion")} htmlFor={`${formId}-percent`} className="sm:col-span-2">
           <div className="flex items-center gap-3">
             <input
               type="range"
@@ -212,7 +215,7 @@ export function WorkPlanFormModal({
               value={Number(percent) || 0}
               onChange={(event) => handlePercentChange(event.target.value)}
               className="h-1.5 flex-1 cursor-pointer accent-cyan-500"
-              aria-label="Tamamlanma yüzdesi"
+              aria-label={t("site.workPlanForm.completionPercent")}
             />
             <div className="relative w-24">
               <Input
@@ -233,8 +236,8 @@ export function WorkPlanFormModal({
         </FormField>
 
         <FormField
-          label="Öncül görevler"
-          hint={options.length === 0 ? "Öncül seçmek için önce başka iş kalemi ekleyin." : "Bu iş, seçilen görevler bittikten sonra başlar."}
+          label={t("site.workPlanForm.predecessors")}
+          hint={options.length === 0 ? t("site.workPlanForm.predecessorsEmpty") : t("site.workPlanForm.predecessorsHint")}
           className="sm:col-span-2"
         >
           {options.length > 0 && (

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 
 type PasswordInputProps = Omit<
@@ -15,10 +16,13 @@ type PasswordInputProps = Omit<
 
 export function PasswordInput({
   className,
-  showPasswordLabel = "Şifreyi göster",
-  hidePasswordLabel = "Şifreyi gizle",
+  showPasswordLabel: showLabel,
+  hidePasswordLabel: hideLabel,
   ...props
 }: PasswordInputProps) {
+  const t = useT();
+  const showPasswordLabel = showLabel ?? t("auth.showPassword");
+  const hidePasswordLabel = hideLabel ?? t("auth.hidePassword");
   const [visible, setVisible] = useState(false);
 
   return (

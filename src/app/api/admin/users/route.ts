@@ -5,6 +5,7 @@ import { isCustomRole, normalizeCustomRoles, normalizeRole } from "@/lib/roles";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { getRequestCaller, type RequestCaller } from "@/lib/server-auth";
 import { isValidEmail, isValidPassword, isValidUrl } from "@/lib/validation";
+import { localeFromRequest, serverTranslator } from "@/i18n/server";
 
 /**
  * Kullanıcı yönetimi (service role ile çalışır, RLS'i atlar). Bu yüzden her
@@ -19,8 +20,8 @@ function error(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
 
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : "Beklenmeyen bir sunucu hatası";
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback;
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -56,7 +57,8 @@ export async function POST(request: Request) {
   const auth = await getRequestCaller(request);
   if (!auth.ok) return auth.response;
   const { caller } = auth;
-  if (!caller.isAdmin) return error("Bu işlem için yetkiniz yok.", 403);
+  const t = serverTranslator(localeFromRequest(request));
+  if (!caller.isAdmin) return error(t("api.common.forbidden"), 403);
 
   try {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
@@ -64,13 +66,13 @@ export async function POST(request: Request) {
     const name = optionalString(body?.name) ?? "";
     const password = typeof body?.password === "string" ? body.password : "";
 
-    if (!email || !password || !name) return error("E-posta, şifre ve isim zorunludur", 400);
-    if (!isValidEmail(email)) return error("Geçerli bir e-posta adresi girin", 400);
-    if (!isValidPassword(password)) return error("Şifre en az 6 karakter olmalıdır", 400);
+    if (!email || !password || !name) return error(t("api.users.requiredFields"), 400);
+    if (!isValidEmail(email)) return error(t("api.validation.invalidEmail"), 400);
+    if (!isValidPassword(password)) return error(t("api.validation.passwordTooShort"), 400);
 
     const role = normalizeRole(typeof body?.role === "string" ? body.role : "manager");
-    if (role === "admin") return error("Admin rolü yalnızca kayıt ile oluşturulabilir", 400);
-    if (!(await isRoleAvailable(caller, role))) return error("Seçilen rol bu firmada tanımlı değil", 400);
+    if (role === "admin") return error(t("api.users.adminOnlyViaRegister"), 400);
+    if (!(await isRoleAvailable(caller, role))) return error(t("api.users.roleNotDefined"), 400);
     const permissions =
       body?.permissions !== undefined ? normalizePermissions(role, body.permissions) : defaultMatrixForRole(role);
 
@@ -86,7 +88,7 @@ export async function POST(request: Request) {
     if (createError) {
       console.error("Admin: auth kullanıcısı oluşturulamadı", createError);
       const status = createError.status && createError.status < 500 ? 400 : 500;
-      return error(authErrorMessage(createError, "Kullanıcı oluşturulamadı. Lütfen tekrar deneyin."), status);
+      return error(authErrorMessage(createError, t("api.users.createFailed"), t), status);
     }
 
     const userId = userData.user.id;
@@ -107,7 +109,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, user: { id: userId, email, name, role } });
   } catch (err: unknown) {
-    return error(errorMessage(err), 500);
+    return error(errorMessage(err, t("api.common.unexpectedServerError")), 500);
   }
 }
 
@@ -115,10 +117,11 @@ export async function PUT(request: Request) {
   const auth = await getRequestCaller(request);
   if (!auth.ok) return auth.response;
   const { caller } = auth;
+  const t = serverTranslator(localeFromRequest(request));
 
   try {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-    if (!body || typeof body.id !== "string" || !body.id) return error("Kullanıcı ID zorunludur", 400);
+    if (!body || typeof body.id !== "string" || !body.id) return error(t("api.users.idRequired"), 400);
 
     const isSelf = body.id === caller.id;
     const adminFields = ["email", "password", "permissions", "restricted", "role"].filter(
@@ -127,16 +130,16 @@ export async function PUT(request: Request) {
 
     // Admin olmayan kullanıcı yalnızca kendi ad/telefon/fotoğrafını değiştirebilir
     if (!caller.isAdmin && (!isSelf || adminFields.length > 0)) {
-      return error("Bu işlem için yetkiniz yok.", 403);
+      return error(t("api.common.forbidden"), 403);
     }
 
     const target = await loadTarget(caller, body.id);
-    if (!target) return error("Kullanıcı bulunamadı.", 404);
+    if (!target) return error(t("api.users.notFound"), 404);
 
     if (adminFields.length > 0) {
       // Admin kendi rolünü/yetkisini değiştirip kendini kilitleyemez; başka admin düzenlenemez
-      if (isSelf) return error("Kendi rolünüzü, yetkinizi veya giriş bilgilerinizi buradan değiştiremezsiniz.", 403);
-      if (normalizeRole(target.role) === "admin") return error("Admin kullanıcılar düzenlenemez.", 403);
+      if (isSelf) return error(t("api.users.cannotEditSelf"), 403);
+      if (normalizeRole(target.role) === "admin") return error(t("api.users.adminNotEditable"), 403);
     }
 
     const name = optionalString(body.name);
@@ -146,14 +149,14 @@ export async function PUT(request: Request) {
     const role = typeof body.role === "string" && body.role ? normalizeRole(body.role) : undefined;
     const avatarUrl = body.avatarUrl === null ? null : optionalString(body.avatarUrl);
 
-    if (name !== undefined && !name) return error("İsim boş olamaz", 400);
-    if (email && !isValidEmail(email)) return error("Geçerli bir e-posta adresi girin", 400);
-    if (password && !isValidPassword(password)) return error("Şifre en az 6 karakter olmalıdır", 400);
-    if (role === "admin") return error("Admin rolü bu ekrandan verilemez", 400);
-    if (role && !(await isRoleAvailable(caller, role))) return error("Seçilen rol bu firmada tanımlı değil", 400);
-    if (avatarUrl && !isValidUrl(avatarUrl)) return error("Geçersiz profil fotoğrafı adresi", 400);
+    if (name !== undefined && !name) return error(t("api.users.nameEmpty"), 400);
+    if (email && !isValidEmail(email)) return error(t("api.validation.invalidEmail"), 400);
+    if (password && !isValidPassword(password)) return error(t("api.validation.passwordTooShort"), 400);
+    if (role === "admin") return error(t("api.users.adminRoleNotAssignable"), 400);
+    if (role && !(await isRoleAvailable(caller, role))) return error(t("api.users.roleNotDefined"), 400);
+    if (avatarUrl && !isValidUrl(avatarUrl)) return error(t("api.users.invalidAvatarUrl"), 400);
     if (body.restricted !== undefined && typeof body.restricted !== "boolean") {
-      return error("Geçersiz kısıt değeri", 400);
+      return error(t("api.users.invalidRestricted"), 400);
     }
 
     const adminClient = getSupabaseAdmin();
@@ -201,7 +204,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    return error(errorMessage(err), 500);
+    return error(errorMessage(err, t("api.common.unexpectedServerError")), 500);
   }
 }
 
@@ -209,23 +212,24 @@ export async function DELETE(request: Request) {
   const auth = await getRequestCaller(request);
   if (!auth.ok) return auth.response;
   const { caller } = auth;
-  if (!caller.isAdmin) return error("Bu işlem için yetkiniz yok.", 403);
+  const t = serverTranslator(localeFromRequest(request));
+  if (!caller.isAdmin) return error(t("api.common.forbidden"), 403);
 
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
-    if (!id) return error("Kullanıcı ID zorunludur", 400);
-    if (id === caller.id) return error("Kendi hesabınızı silemezsiniz.", 403);
+    if (!id) return error(t("api.users.idRequired"), 400);
+    if (id === caller.id) return error(t("api.users.cannotDeleteSelf"), 403);
 
     const target = await loadTarget(caller, id);
-    if (!target) return error("Kullanıcı bulunamadı.", 404);
-    if (normalizeRole(target.role) === "admin") return error("Admin kullanıcılar silinemez.", 403);
+    if (!target) return error(t("api.users.notFound"), 404);
+    if (normalizeRole(target.role) === "admin") return error(t("api.users.adminNotDeletable"), 403);
 
     const { error: deleteError } = await getSupabaseAdmin().auth.admin.deleteUser(target.id);
     if (deleteError) return error(deleteError.message, 400);
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    return error(errorMessage(err), 500);
+    return error(errorMessage(err, t("api.common.unexpectedServerError")), 500);
   }
 }

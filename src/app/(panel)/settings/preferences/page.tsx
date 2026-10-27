@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useSettings } from "@/contexts/settings-context";
 import { useI18n } from "@/contexts/i18n-context";
 import { useTheme, type ThemeMode } from "@/contexts/theme-context";
-import { LOCALES, type Locale } from "@/i18n";
+import { LOCALES, type Locale, type TranslationKey } from "@/i18n";
 import { canAccessRoute } from "@/lib/permissions";
 import { PAGE_SIZE_OPTIONS, START_PAGES } from "@/lib/settings";
 import { getHiddenRegionsKey, getMapViewKey } from "@/lib/storage-keys";
@@ -20,19 +20,20 @@ import {
   useAutoSave,
 } from "@/components/settings/settings-ui";
 
-const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
-  { value: "dark", label: "Koyu" },
-  { value: "light", label: "Açık" },
-  { value: "system", label: "Sistem" },
+const THEME_OPTIONS: { value: ThemeMode; labelKey: TranslationKey }[] = [
+  { value: "dark", labelKey: "settings.preferences.themeDark" },
+  { value: "light", labelKey: "settings.preferences.themeLight" },
+  { value: "system", labelKey: "settings.preferences.themeSystem" },
 ];
 
+/** Diller kendi adlarıyla gösterilir (seçili dilden bağımsız) */
 const LOCALE_LABELS: Record<Locale, string> = { tr: "Türkçe", en: "English" };
 
 export default function PreferencesPage() {
   const { user } = useAuth();
   const { org, prefs, updatePreferences, isModuleEnabled } = useSettings();
   const { mode, setMode } = useTheme();
-  const { locale, setLocale } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   const { state, run } = useAutoSave();
   const [cleared, setCleared] = useState<"tables" | "map" | null>(null);
 
@@ -55,29 +56,29 @@ export default function PreferencesPage() {
   return (
     <div className="space-y-6">
       <SettingsPageHeader
-        title="Tercihler"
-        description="Uygulamanın size nasıl görüneceğini ve nasıl davranacağını ayarlayın."
+        title={t("pageTitle.settingsPreferences")}
+        description={t("settings.preferences.description")}
         status={state}
       />
 
-      <SettingsSection title="Görünüm" description="Tema ve dil bu cihazda saklanır.">
-        <SettingRow label="Tema">
+      <SettingsSection title={t("settings.preferences.appearance")} description={t("settings.preferences.appearanceDescription")}>
+        <SettingRow label={t("settings.preferences.theme")}>
           <Select
-            aria-label="Tema"
+            aria-label={t("settings.preferences.theme")}
             value={mode}
             onChange={(e) => setMode(e.target.value as ThemeMode)}
             className="h-9 w-40"
           >
             {THEME_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey)}
               </option>
             ))}
           </Select>
         </SettingRow>
-        <SettingRow label="Dil">
+        <SettingRow label={t("language.label")}>
           <Select
-            aria-label="Dil"
+            aria-label={t("language.label")}
             value={locale}
             onChange={(e) => setLocale(e.target.value as Locale)}
             className="h-9 w-40"
@@ -89,9 +90,9 @@ export default function PreferencesPage() {
             ))}
           </Select>
         </SettingRow>
-        <SettingRow label="Açılış sayfası" description="Giriş yaptığınızda ve logoya tıkladığınızda açılan sayfa">
+        <SettingRow label={t("settings.preferences.startPage")} description={t("settings.preferences.startPageDescription")}>
           <Select
-            aria-label="Açılış sayfası"
+            aria-label={t("settings.preferences.startPage")}
             value={prefs.startPage}
             onChange={(e) => void run(() => updatePreferences({ startPage: e.target.value }))}
             className="h-9 w-40"
@@ -105,10 +106,10 @@ export default function PreferencesPage() {
         </SettingRow>
       </SettingsSection>
 
-      <SettingsSection title="Tablolar">
-        <SettingRow label="Sayfa başına satır" description="Tablolarda varsayılan olarak gösterilen satır sayısı">
+      <SettingsSection title={t("settings.preferences.tables")}>
+        <SettingRow label={t("settings.preferences.pageSize")} description={t("settings.preferences.pageSizeDescription")}>
           <Select
-            aria-label="Sayfa başına satır"
+            aria-label={t("settings.preferences.pageSize")}
             value={prefs.pageSize}
             onChange={(e) => void run(() => updatePreferences({ pageSize: Number(e.target.value) }))}
             className="h-9 w-40"
@@ -121,14 +122,14 @@ export default function PreferencesPage() {
           </Select>
         </SettingRow>
         <SwitchRow
-          label="Tablo hafızası"
-          description="Tablolardaki arama, filtre, sıralama ve sayfa konumu siz başka sayfaya geçip döndüğünüzde korunur. Sekme kapanınca sıfırlanır."
+          label={t("settings.preferences.tableMemory")}
+          description={t("settings.preferences.tableMemoryDescription")}
           checked={prefs.tableMemory}
           onChange={(enabled) => void run(() => updatePreferences({ tableMemory: enabled }))}
         />
         {prefs.tableMemory && (
-          <SettingRow label="Hafızayı temizle" description="Tüm tabloları varsayılan görünümüne döndürür" indent>
-            {cleared === "tables" && <span className="text-xs text-emerald-400">Temizlendi</span>}
+          <SettingRow label={t("settings.preferences.clearMemory")} description={t("settings.preferences.clearMemoryDescription")} indent>
+            {cleared === "tables" && <span className="text-xs text-emerald-400">{t("settings.preferences.cleared")}</span>}
             <Button
               size="sm"
               variant="outline"
@@ -137,43 +138,43 @@ export default function PreferencesPage() {
                 setCleared("tables");
               }}
             >
-              Temizle
+              {t("settings.preferences.clear")}
             </Button>
           </SettingRow>
         )}
       </SettingsSection>
 
-      <SettingsSection title="Harita" description="Harita konumu ve bölge seçimi bu cihazda saklanır.">
+      <SettingsSection title={t("nav.map")} description={t("settings.preferences.mapDescription")}>
         <SwitchRow
-          label="Son harita konumunu hatırla"
-          description="Harita açıldığında en son baktığınız yer ve yakınlaştırmadan başlar"
+          label={t("settings.preferences.rememberView")}
+          description={t("settings.preferences.rememberViewDescription")}
           checked={prefs.map.rememberView}
           onChange={(enabled) => void run(() => updatePreferences({ map: { rememberView: enabled } }))}
         />
         <SwitchRow
-          label="Bölge filtresini hatırla"
-          description="Haritada gizlediğiniz bölgeler bir sonraki açılışta da gizli kalır"
+          label={t("settings.preferences.rememberRegions")}
+          description={t("settings.preferences.rememberRegionsDescription")}
           checked={prefs.map.rememberRegions}
           onChange={(enabled) => void run(() => updatePreferences({ map: { rememberRegions: enabled } }))}
         />
-        <SettingRow label="Kayıtlı harita durumunu sıfırla">
-          {cleared === "map" && <span className="text-xs text-emerald-400">Sıfırlandı</span>}
+        <SettingRow label={t("settings.preferences.resetMap")}>
+          {cleared === "map" && <span className="text-xs text-emerald-400">{t("settings.preferences.reset")}</span>}
           <Button size="sm" variant="outline" onClick={clearMap}>
-            Sıfırla
+            {t("settings.preferences.resetButton")}
           </Button>
         </SettingRow>
       </SettingsSection>
 
       {org.assistant.enabled && (
-        <SettingsSection title="Asistan" description="Sayfanın altındaki “Maps'e Sor” asistanı">
+        <SettingsSection title={t("settings.modules.assistant")} description={t("settings.preferences.assistantDescription")}>
           <SwitchRow
-            label="Asistanı göster"
+            label={t("settings.preferences.showAssistant")}
             checked={prefs.assistant.visible}
             onChange={(enabled) => void run(() => updatePreferences({ assistant: { visible: enabled } }))}
           />
           <SwitchRow
-            label="Sohbet geçmişini sakla"
-            description="Sayfayı yenilediğinizde son sohbet kaldığı yerden devam eder (bu cihazda, son 40 mesaj)"
+            label={t("settings.preferences.keepHistory")}
+            description={t("settings.preferences.keepHistoryDescription")}
             checked={prefs.assistant.keepHistory}
             onChange={(enabled) => void run(() => updatePreferences({ assistant: { keepHistory: enabled } }))}
           />

@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { deleteTeamMessages, getTeamRequestUser } from "@/lib/team-server";
+import { localeFromRequest, serverTranslator } from "@/i18n/server";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -9,8 +10,9 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
  * - { peerId }    → iki kişi arasındaki tüm sohbet (iki taraf için de silinir)
  */
 export async function DELETE(request: Request) {
+  const t = serverTranslator(localeFromRequest(request));
   const user = await getTeamRequestUser(request);
-  if (!user) return Response.json({ error: "Oturum geçersiz." }, { status: 401 });
+  if (!user) return Response.json({ error: t("api.session.invalid") }, { status: 401 });
 
   const body = (await request.json().catch(() => null)) as
     | { messageId?: unknown; peerId?: unknown }
@@ -28,19 +30,19 @@ export async function DELETE(request: Request) {
       `and(sender_id.eq.${user.userId},recipient_id.eq.${body.peerId}),and(sender_id.eq.${body.peerId},recipient_id.eq.${user.userId})`
     );
   } else {
-    return Response.json({ error: "Silinecek mesaj belirtilmedi." }, { status: 400 });
+    return Response.json({ error: t("api.team.noMessageSpecified") }, { status: 400 });
   }
 
   const { data, error } = await query;
   if (error) {
     console.error("Ekip mesajları okunamadı", error);
-    return Response.json({ error: "Mesajlar silinemedi." }, { status: 500 });
+    return Response.json({ error: t("api.team.deleteFailed") }, { status: 500 });
   }
   try {
     const deleted = await deleteTeamMessages(admin, data ?? []);
     return Response.json({ deleted });
   } catch (deleteError) {
     console.error("Ekip mesajları silinemedi", deleteError);
-    return Response.json({ error: "Mesajlar silinemedi." }, { status: 500 });
+    return Response.json({ error: t("api.team.deleteFailed") }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { normalizeRole } from "@/lib/roles";
 import type { UserRole } from "@/types";
+import { localeFromRequest, serverTranslator } from "@/i18n/server";
 
 /** API isteğini yapan, doğrulanmış kullanıcı */
 export type RequestCaller = {
@@ -29,8 +30,9 @@ function deny(message: string, status: number): CallerResult {
  * Service role ile çalışan route'lar işlem yapmadan önce bunu çağırmalıdır.
  */
 export async function getRequestCaller(request: Request): Promise<CallerResult> {
+  const t = serverTranslator(localeFromRequest(request));
   const token = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
-  if (!token) return deny("Oturum bulunamadı.", 401);
+  if (!token) return deny(t("api.session.notFound"), 401);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -38,7 +40,7 @@ export async function getRequestCaller(request: Request): Promise<CallerResult> 
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data: userData, error: userError } = await authClient.auth.getUser(token);
-  if (userError || !userData.user) return deny("Oturum geçersiz.", 401);
+  if (userError || !userData.user) return deny(t("api.session.invalid"), 401);
 
   const userClient = createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -52,10 +54,10 @@ export async function getRequestCaller(request: Request): Promise<CallerResult> 
 
   if (profileError) {
     // Başka cihazdan giriş yapılınca eski oturumun istekleri reddedilir
-    return deny("Oturum sonlandırılmış. Lütfen tekrar giriş yapın.", 401);
+    return deny(t("api.session.ended"), 401);
   }
-  if (!profile?.organization_id) return deny("Kullanıcı profili bulunamadı.", 403);
-  if (profile.restricted) return deny("Hesabınız kısıtlanmış.", 403);
+  if (!profile?.organization_id) return deny(t("api.session.profileNotFound"), 403);
+  if (profile.restricted) return deny(t("api.session.restricted"), 403);
 
   const role = normalizeRole(typeof profile.role === "string" ? profile.role : undefined);
   return {

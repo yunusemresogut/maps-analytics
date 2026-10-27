@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { AlertTriangle, FileSignature } from "lucide-react";
+import { useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { needsContractWarning } from "@/lib/module-finance";
 import type { Contract, Store } from "@/types";
@@ -18,6 +19,7 @@ export function ContractIhaleWarning({
   compact = false,
 }: ContractIhaleWarningProps) {
   const { canAdd } = usePermissions("contracts");
+  const t = useT();
 
   if (!needsContractWarning(store.projectStatus, store.id, contracts)) {
     return null;
@@ -30,7 +32,7 @@ export function ContractIhaleWarning({
         className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 hover:bg-amber-500/15"
       >
         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">Sözleşme oluşturun</span>
+        <span className="truncate">{t("finance.contracts.tenderWarning.compact")}</span>
       </Link>
     );
   }
@@ -41,10 +43,10 @@ export function ContractIhaleWarning({
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         <div>
           <p className="font-medium">
-            {store.name} — ihale durumunda sözleşme gerekli
+            {t("finance.contracts.tenderWarning.title", { store: store.name })}
           </p>
           <p className="mt-0.5 text-xs text-amber-200/80">
-            Bu saha için sözleşme oluşturulduğunda uyarı kalkar.
+            {t("finance.contracts.tenderWarning.description")}
           </p>
         </div>
       </div>
@@ -54,11 +56,11 @@ export function ContractIhaleWarning({
           className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/20 px-3 py-2 text-xs font-medium text-amber-100 hover:bg-amber-500/30"
         >
           <FileSignature className="h-3.5 w-3.5" />
-          Sözleşme oluştur
+          {t("finance.contracts.tenderWarning.create")}
         </Link>
       ) : (
         <span className="text-xs text-amber-200/60">
-          Sözleşme oluşturma yetkiniz yok
+          {t("finance.contracts.tenderWarning.noPermission")}
         </span>
       )}
     </div>

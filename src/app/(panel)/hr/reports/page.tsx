@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { addMonths, format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { formatDay } from "@/components/hr/hr-modals";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/contexts/i18n-context";
 import { useSettings } from "@/contexts/settings-context";
 import { useStores } from "@/contexts/stores-context";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -104,6 +104,7 @@ async function exportTables(tables: Table[], fileName: string) {
 }
 
 function HrReportsContent() {
+  const { t, dateLocale } = useI18n();
   const { stores } = useStores();
   const { isModuleEnabled } = useSettings();
   const { canView: canPersonnel } = usePermissions("personnel");
@@ -118,7 +119,7 @@ function HrReportsContent() {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [entries, setEntries] = useState<{ month: string; rows: TimesheetEntry[]; overtime: Record<string, number> } | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,7 +136,7 @@ function HrReportsContent() {
       })
       .catch((err) => {
         console.error("İK raporu yüklenemedi:", err);
-        if (!cancelled) setError("Rapor verisi yüklenemedi. İK migration'ları uygulanmamış olabilir.");
+        if (!cancelled) setError(true);
       });
     return () => {
       cancelled = true;
@@ -154,22 +155,22 @@ function HrReportsContent() {
     };
   }, [month, showTimesheets]);
 
-  const storeName = (id?: string) => (id ? (stores.find((s) => s.id === id)?.name ?? "—") : "Merkez");
+  const storeName = (id?: string) => (id ? (stores.find((s) => s.id === id)?.name ?? "—") : t("hr.personnelList.headOffice"));
 
   // ---- Personel ----
   const active = useMemo(() => (personnel ?? []).filter((p) => p.state === "active"), [personnel]);
   const hiredThisYear = (personnel ?? []).filter((p) => p.startDate.startsWith(String(year))).length;
   const leftThisYear = (personnel ?? []).filter((p) => p.endDate.startsWith(String(year)) && p.state === "left").length;
   const byType: Table = {
-    title: "Çalışma tipine göre",
-    header: ["Çalışma tipi", "Personel"],
+    title: t("hr.reports.byType"),
+    header: [t("hr.common.employmentType"), t("hr.leaveForm.personnel")],
     rows: (Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[])
       .map((type) => [EMPLOYMENT_TYPE_LABELS[type], active.filter((p) => p.employmentType === type).length] as (string | number)[])
       .filter((row) => (row[1] as number) > 0),
   };
   const byStore: Table = {
-    title: "Görev yerine göre",
-    header: ["Görev yeri", "Personel", "Taşeron"],
+    title: t("hr.reports.byLocation"),
+    header: [t("hr.personnelList.location"), t("hr.leaveForm.personnel"), t("hr.reports.colSubcontractor")],
     rows: [...new Set(active.map((p) => p.storeId ?? ""))]
       .map((id) => {
         const group = active.filter((p) => (p.storeId ?? "") === id);
@@ -180,8 +181,14 @@ function HrReportsContent() {
 
   // ---- Belgeler ----
   const certTable: Table = {
-    title: "Belge uyumu",
-    header: ["Belge türü", "Geçerli", "30 günde bitiyor", "Süresi geçmiş", "Onay bekliyor"],
+    title: t("hr.reports.compliance"),
+    header: [
+      t("hr.certificateForm.type"),
+      t("hr.validity.valid"),
+      t("hr.reports.colExpiring"),
+      t("hr.certificateList.statExpired"),
+      t("hr.personnelDetail.pending"),
+    ],
     rows: (Object.keys(CERTIFICATE_TYPE_LABELS) as CertificateType[])
       .map((type) => {
         const group = certificates.filter((c) => c.type === type);
@@ -196,8 +203,8 @@ function HrReportsContent() {
       .filter((row) => row.slice(1).some((cell) => (cell as number) > 0)),
   };
   const expiredTable: Table = {
-    title: "Süresi geçmiş belgeler",
-    header: ["Personel", "Belge", "Bitiş"],
+    title: t("hr.reports.expiredDocuments"),
+    header: [t("hr.leaveForm.personnel"), t("hr.reports.colDocument"), t("hr.reports.colExpiry")],
     rows: certificates
       .filter((c) => c.validity === "expired")
       .sort((a, b) => a.expiresAt.localeCompare(b.expiresAt))
@@ -206,8 +213,15 @@ function HrReportsContent() {
 
   // ---- İzin ----
   const leaveTable: Table = {
-    title: "Yıllık izin durumu",
-    header: ["Personel", "Hizmet yılı", "Hak edilen", "Kullanılan", "Bekleyen", "Kalan"],
+    title: t("hr.reports.annualLeave"),
+    header: [
+      t("hr.leaveForm.personnel"),
+      t("hr.reports.colServiceYears"),
+      t("hr.leaveBalance.earned"),
+      t("hr.leaveBalance.used"),
+      t("hr.reports.colPending"),
+      t("hr.leaveBalance.remaining"),
+    ],
     rows: active
       .filter((p) => p.employmentType !== "subcontractor" && p.startDate)
       .flatMap((p) => {
@@ -226,8 +240,16 @@ function HrReportsContent() {
   // ---- Puantaj ----
   const monthEntries = entries?.month === month ? entries.rows : [];
   const timesheetByStore: Table = {
-    title: `Puantaj ${month}`,
-    header: ["Saha", "Kişi", "Çalışılan gün", "Fazla mesai (sa)", "İzin", "Rapor", "Devamsız"],
+    title: t("hr.lib.timesheetExport.sheetName", { month }),
+    header: [
+      t("hr.reports.colSite"),
+      t("hr.reports.colPeople"),
+      t("hr.lib.timesheetExport.workedDays"),
+      t("hr.reports.colOvertime"),
+      t("hr.timesheets.colLeave"),
+      t("hr.lib.timesheetExport.sick"),
+      t("hr.lib.timesheetExport.absent"),
+    ],
     rows: [...new Set(monthEntries.map((e) => e.storeId ?? ""))]
       .map((id) => {
         const group = monthEntries.filter((e) => (e.storeId ?? "") === id);
@@ -245,8 +267,8 @@ function HrReportsContent() {
       .sort((a, b) => (b[2] as number) - (a[2] as number)),
   };
   const overtimeTable: Table = {
-    title: `Fazla mesai ${month.slice(0, 4)}`,
-    header: ["Personel", "Yıllık fazla mesai (sa)", "Sınıra kalan (sa)"],
+    title: t("hr.reports.overtimeSheet", { year: month.slice(0, 4) }),
+    header: [t("hr.leaveForm.personnel"), t("hr.reports.colYearlyOvertime"), t("hr.reports.colRemainingToLimit")],
     rows: Object.entries(entries?.month === month ? entries.overtime : {})
       .filter(([, hours]) => hours >= OVERTIME_WARNING)
       .sort((a, b) => b[1] - a[1])
@@ -267,17 +289,17 @@ function HrReportsContent() {
   ];
 
   if (!canPersonnel) {
-    return <div className="flex h-full items-center justify-center text-sm text-zinc-500">İK raporları için personel görüntüleme yetkisi gerekir.</div>;
+    return <div className="flex h-full items-center justify-center text-sm text-zinc-500">{t("hr.reports.forbidden")}</div>;
   }
 
   return (
     <div className="scrollbar-themed h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-100">İK raporları</h1>
-          <p className="mt-1 text-sm text-zinc-500">Personel dağılımı, belge uyumu, izin kullanımı ve puantaj özeti.</p>
+          <h1 className="text-xl font-semibold text-zinc-100">{t("hr.reports.title")}</h1>
+          <p className="mt-1 text-sm text-zinc-500">{t("hr.reports.description")}</p>
         </div>
-        <Button variant="outline" disabled={!personnel} onClick={() => void exportTables(tables, `ik_raporu_${month}.xlsx`)}>
+        <Button variant="outline" disabled={!personnel} onClick={() => void exportTables(tables, t("hr.reports.fileName", { month }))}>
           <Download className="h-4 w-4" />
           Excel
         </Button>
@@ -285,7 +307,7 @@ function HrReportsContent() {
 
       {error && (
         <p role="alert" className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
-          {error}
+          {t("hr.reports.loadFailed")}
         </p>
       )}
 
@@ -294,34 +316,34 @@ function HrReportsContent() {
       ) : (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Stat label="Çalışan personel" value={active.length} />
-            <Stat label={`${year} işe giriş`} value={hiredThisYear} tone="text-emerald-400" />
-            <Stat label={`${year} ayrılış`} value={leftThisYear} tone="text-amber-400" />
+            <Stat label={t("hr.personnelList.statActive")} value={active.length} />
+            <Stat label={t("hr.reports.hired", { year })} value={hiredThisYear} tone="text-emerald-400" />
+            <Stat label={t("hr.reports.left", { year })} value={leftThisYear} tone="text-amber-400" />
             <Stat
-              label="Süresi geçmiş belge"
+              label={t("hr.documentState.expired")}
               value={expiredTable.rows.length}
               tone={expiredTable.rows.length > 0 ? "text-red-400" : undefined}
             />
           </div>
 
           <div className="grid gap-5 xl:grid-cols-2">
-            <Section title="Çalışma tipine göre">
-              <DataTable table={byType} empty="Personel yok." />
+            <Section title={t("hr.reports.byType")}>
+              <DataTable table={byType} empty={t("hr.reports.noPersonnel")} />
             </Section>
-            <Section title="Görev yerine göre">
-              <DataTable table={byStore} empty="Personel yok." />
+            <Section title={t("hr.reports.byLocation")}>
+              <DataTable table={byStore} empty={t("hr.reports.noPersonnel")} />
             </Section>
           </div>
 
           <div className="grid gap-5 xl:grid-cols-2">
-            <Section title="Belge uyumu" description="Çalışan personelin belgeleri, türe göre">
-              <DataTable table={certTable} empty="Belge kaydı yok." />
+            <Section title={t("hr.reports.compliance")} description={t("hr.reports.complianceHint")}>
+              <DataTable table={certTable} empty={t("hr.reports.noCertificates")} />
             </Section>
-            <Section title="Süresi geçmiş belgeler">
-              <DataTable table={expiredTable} empty="Süresi geçmiş belge yok." />
+            <Section title={t("hr.reports.expiredDocuments")}>
+              <DataTable table={expiredTable} empty={t("hr.reports.noExpired")} />
               {expiredTable.rows.length > 0 && (
                 <Link href="/hr/certificates" className="mt-3 inline-block text-xs text-cyan-400 hover:underline">
-                  Belgelere git
+                  {t("hr.reports.goToCertificates")}
                 </Link>
               )}
             </Section>
@@ -329,44 +351,44 @@ function HrReportsContent() {
 
           {showLeaves && (
             <Section
-              title="Yıllık izin durumu"
-              description="İş Kanunu md. 53'e göre; yaş kuralı (18 yaş altı / 50 yaş üstü en az 20 gün) bu tabloda uygulanmaz, personel kartına bakın"
+              title={t("hr.reports.annualLeave")}
+              description={t("hr.reports.annualLeaveHint")}
             >
-              <DataTable table={leaveTable} empty="İşe giriş tarihi girilmiş personel yok." />
+              <DataTable table={leaveTable} empty={t("hr.reports.noStartDates")} />
             </Section>
           )}
 
           {showTimesheets && (
             <div className="grid gap-5 xl:grid-cols-2">
-              <Section title="Puantaj özeti" description="Sahaya göre, seçili ay">
+              <Section title={t("hr.reports.timesheetSummary")} description={t("hr.reports.timesheetSummaryHint")}>
                 <div className="mb-3 flex items-center gap-1">
                   <button
                     type="button"
-                    aria-label="Önceki ay"
+                    aria-label={t("hr.common.previousMonth")}
                     onClick={() => setMonth(format(addMonths(parseISO(`${month}-01`), -1), "yyyy-MM"))}
                     className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
                   <span className="min-w-[120px] text-center text-sm capitalize text-zinc-200">
-                    {format(parseISO(`${month}-01`), "MMMM yyyy", { locale: tr })}
+                    {format(parseISO(`${month}-01`), "MMMM yyyy", { locale: dateLocale })}
                   </span>
                   <button
                     type="button"
-                    aria-label="Sonraki ay"
+                    aria-label={t("hr.common.nextMonth")}
                     onClick={() => setMonth(format(addMonths(parseISO(`${month}-01`), 1), "yyyy-MM"))}
                     className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
-                <DataTable table={timesheetByStore} empty="Bu ay puantaj kaydı yok." />
+                <DataTable table={timesheetByStore} empty={t("hr.reports.noTimesheet")} />
               </Section>
               <Section
-                title="Fazla mesai riski"
-                description={`Yıllık fazla mesaisi ${OVERTIME_WARNING} saati geçenler (İş Kanunu md. 41: yılda en çok ${MAX_YEARLY_OVERTIME} saat)`}
+                title={t("hr.reports.overtimeRisk")}
+                description={t("hr.reports.overtimeRiskHint", { warning: OVERTIME_WARNING, max: MAX_YEARLY_OVERTIME })}
               >
-                <DataTable table={overtimeTable} empty="Sınıra yaklaşan personel yok." />
+                <DataTable table={overtimeTable} empty={t("hr.reports.noOvertimeRisk")} />
               </Section>
             </div>
           )}

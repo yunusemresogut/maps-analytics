@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { getFileMimeType, isAllowedFileType, MAX_ATTACHMENT_BYTES } from "@/lib/file-types";
+import { t } from "@/i18n/runtime";
 import type { User } from "@/types";
 
 export const MODULE_FILES_BUCKET = "module-files";
@@ -53,13 +54,13 @@ export async function uploadModuleAttachment({
   bucket = MODULE_FILES_BUCKET,
 }: UploadModuleAttachmentInput): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!user.organizationId) {
-    return { ok: false, error: "Organizasyon bilgisi bulunamadı." };
+    return { ok: false, error: t("finance.attachments.noOrganization") };
   }
   if (!isAllowedFileType(file.name)) {
-    return { ok: false, error: `"${file.name}": bu dosya türü desteklenmiyor.` };
+    return { ok: false, error: t("finance.attachments.unsupportedType", { name: file.name }) };
   }
   if (file.size > MAX_ATTACHMENT_BYTES) {
-    return { ok: false, error: `"${file.name}": dosya 50 MB sınırını aşıyor.` };
+    return { ok: false, error: t("finance.attachments.tooLarge", { name: file.name }) };
   }
 
   const contentType = getFileMimeType(file);

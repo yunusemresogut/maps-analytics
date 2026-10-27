@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { WorkPlanDependencyType } from "@/types";
+import { t } from "@/i18n/runtime";
 
 export type ParsedWorkPlanPredecessor = {
   sourceTaskId: string;
@@ -35,6 +36,16 @@ export type WorkPlanParseResult = {
   };
 };
 
+/**
+ * Sorumlusu girilmemiş kalemler için veritabanına yazılan sabit değer.
+ * Veri olarak Türkçe kalır; ekranda responsibleLabel ile seçili dile çevrilir.
+ */
+export const UNASSIGNED_RESPONSIBLE = "Belirtilmemiş";
+
+export function responsibleLabel(value: string): string {
+  return value === UNASSIGNED_RESPONSIBLE ? t("site.excel.workPlan.unassigned") : value;
+}
+
 function normalizeHeader(value: string): string {
   return value
     .toLowerCase()
@@ -65,7 +76,7 @@ export async function parseWorkPlanFromExcel(
   const sheetName = workbook.SheetNames[0];
 
   if (!sheetName) {
-    return { items: [], errors: ["Excel dosyasında sayfa bulunamadı"], matchedColumns: {} };
+    return { items: [], errors: [t("site.excel.noSheet")], matchedColumns: {} };
   }
 
   const sheet = workbook.Sheets[sheetName];
@@ -75,7 +86,7 @@ export async function parseWorkPlanFromExcel(
   });
 
   if (rows.length === 0) {
-    return { items: [], errors: ["Dosyada veri satırı yok"], matchedColumns: {} };
+    return { items: [], errors: [t("site.excel.noRows")], matchedColumns: {} };
   }
 
   const headers = Object.keys(rows[0]);
@@ -86,21 +97,25 @@ export async function parseWorkPlanFromExcel(
       h.includes("aciklama") ||
       h.includes("is tanim") ||
       h.includes("is adi") ||
-      h === "is"
+      h === "is" ||
+      // İngilizce şablon başlıkları
+      h.includes("description") ||
+      h === "task" ||
+      h.includes("task name")
   );
   const startDateCol = findColumn(
     headers,
-    (h) => h.includes("baslangic") || h.includes("baslama")
+    (h) => h.includes("baslangic") || h.includes("baslama") || h.includes("start")
   );
   const endDateCol = findColumn(
     headers,
-    (h) => h.includes("bitis") || h.includes("tamamlanma")
+    (h) => h.includes("bitis") || h.includes("tamamlanma") || h.includes("end date") || h.includes("finish")
   );
   const responsibleCol = findColumn(
     headers,
-    (h) => h.includes("sorumlu") || h.includes("yetkili")
+    (h) => h.includes("sorumlu") || h.includes("yetkili") || h.includes("responsible") || h.includes("owner")
   );
-  const statusCol = findColumn(headers, (h) => h.includes("durum"));
+  const statusCol = findColumn(headers, (h) => h.includes("durum") || h.includes("status"));
 
   const matchedColumns = {
     description: descriptionCol,
@@ -110,7 +125,7 @@ export async function parseWorkPlanFromExcel(
     status: statusCol,
   };
 
-  if (!descriptionCol) errors.push('"Açıklama" veya "İş" sütunu bulunamadı');
+  if (!descriptionCol) errors.push(t("site.excel.workPlan.missingDescription"));
 
   if (!descriptionCol) {
     return { items: [], errors, matchedColumns };
@@ -123,7 +138,7 @@ export async function parseWorkPlanFromExcel(
     if (!description) continue;
 
     const rawStatus = statusCol ? parseCell(row[statusCol]).toLowerCase() : "yapilacak";
-    const status = rawStatus.includes("tamam") || rawStatus.includes("done") || rawStatus.includes("bit")
+    const status = rawStatus.includes("tamam") || rawStatus.includes("done") || rawStatus.includes("bit") || rawStatus.includes("complete")
       ? "tamamlandi"
       : rawStatus.includes("devam") || rawStatus.includes("progress") || rawStatus.includes("sur")
         ? "devam_ediyor"
@@ -133,13 +148,13 @@ export async function parseWorkPlanFromExcel(
       description,
       startDate: startDateCol ? parseCell(row[startDateCol]) : "",
       endDate: endDateCol ? parseCell(row[endDateCol]) : "",
-      responsible: responsibleCol ? parseCell(row[responsibleCol]) : "Belirtilmemiş",
+      responsible: responsibleCol ? parseCell(row[responsibleCol]) : UNASSIGNED_RESPONSIBLE,
       status,
     });
   }
 
   if (items.length === 0) {
-    errors.push("Geçerli iş planı satırı bulunamadı");
+    errors.push(t("site.excel.workPlan.noValidRows"));
   }
 
   return { items, errors, matchedColumns };
@@ -267,7 +282,7 @@ export async function parseWorkPlanFromXer(file: File): Promise<WorkPlanParseRes
       description,
       startDate,
       endDate,
-      responsible: "Belirtilmemiş",
+      responsible: UNASSIGNED_RESPONSIBLE,
       status,
       sourceTaskId: values.task_id || undefined,
       activityCode: values.task_code || undefined,
@@ -286,7 +301,7 @@ export async function parseWorkPlanFromXer(file: File): Promise<WorkPlanParseRes
 
   const errors =
     items.length === 0
-      ? ["XER dosyasında içe aktarılabilir TASK aktivitesi bulunamadı"]
+      ? [t("site.excel.workPlan.noXerTasks")]
       : [];
   return {
     items,
@@ -310,22 +325,32 @@ export function parseWorkPlanFile(file: File): Promise<WorkPlanParseResult> {
 }
 
 export function downloadWorkPlanTemplate() {
-  const headers = [["Açıklama", "Başlangıç Tarihi", "Bitiş Tarihi", "Sorumlu", "Durum"]];
+  const headers = [
+    [
+      t("site.excel.workPlan.headers.description"),
+      t("site.excel.workPlan.headers.startDate"),
+      t("site.excel.workPlan.headers.endDate"),
+      t("site.excel.workPlan.headers.responsible"),
+      t("site.excel.workPlan.headers.status"),
+    ],
+  ];
+  const inProgress = t("site.excel.workPlan.sample.inProgress");
+  const todo = t("site.excel.workPlan.sample.todo");
   const sampleData = [
-    ["Kaba İnşaat Başlangıcı", "2026-07-10", "2026-07-25", "Ahmet Yılmaz", "devam_ediyor"],
-    ["Elektrik Kablolama", "2026-07-26", "2026-08-05", "Mehmet Kaya", "yapilacak"],
-    ["İç Cephe Boyası", "2026-08-06", "2026-08-12", "Canan Demir", "yapilacak"],
+    [t("site.excel.workPlan.sample.roughConstruction"), "2026-07-10", "2026-07-25", "Ahmet Yılmaz", inProgress],
+    [t("site.excel.workPlan.sample.wiring"), "2026-07-26", "2026-08-05", "Mehmet Kaya", todo],
+    [t("site.excel.workPlan.sample.painting"), "2026-08-06", "2026-08-12", "Canan Demir", todo],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([...headers, ...sampleData]);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "İş Planı");
+  XLSX.utils.book_append_sheet(wb, ws, t("site.excel.workPlan.sheetName"));
 
   const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
   const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "is_plani_sablonu.xlsx";
+  link.download = t("site.excel.workPlan.fileName");
   link.click();
 }

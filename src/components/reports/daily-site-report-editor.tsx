@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import { Eye, ImagePlus, ListChecks, Plus, Printer, Save, Trash2, X } from "lucide-react";
 import { ModuleFormShell } from "@/components/modules/module-form-shell";
 import { DailySiteReportDocument } from "@/components/reports/daily-site-report-document";
@@ -21,6 +20,8 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n } from "@/contexts/i18n-context";
+import { getDateLocale } from "@/i18n/runtime";
 import { useStores } from "@/contexts/stores-context";
 import { fetchStoreWorkPlan } from "@/lib/store-details";
 import {
@@ -30,6 +31,7 @@ import {
   emptyDailySiteReport,
   newRowId,
   reportFileName,
+  weatherLabel,
   workPlanLinesForDate,
   type DailySiteReport,
   type ReportPhoto,
@@ -75,7 +77,7 @@ function Panel({ title, description, action, children }: {
 const isBlobUrl = (url: string) => url.startsWith("blob:");
 
 function formatStamp(value: string): string {
-  return format(parseISO(value), "d MMM yyyy HH:mm", { locale: tr });
+  return format(parseISO(value), "d MMM yyyy HH:mm", { locale: getDateLocale() });
 }
 
 type DailySiteReportEditorProps = {
@@ -85,6 +87,7 @@ type DailySiteReportEditorProps = {
 
 export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
   const router = useRouter();
+  const { t } = useI18n();
   const { user, organization } = useAuth();
   const { stores, getStore } = useStores();
   const isClient = useIsClient();
@@ -218,7 +221,7 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
   const save = async () => {
     if (!report.storeId) {
       setStoreMissing(true);
-      setNotice({ tone: "error", text: "Kaydetmek için şantiye seçin." });
+      setNotice({ tone: "error", text: t("reports.editor.selectSiteToSave") });
       return;
     }
     setSaving(true);
@@ -242,12 +245,12 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
             date: report.date,
             attendance: report.attendance,
           });
-          timesheetNote = ` Puantaja ${sync.written} kişi işlendi.`;
-          if (sync.skipped.length > 0) timesheetNote += ` İzinli olduğu için işlenmeyen: ${sync.skipped.join(", ")}.`;
+          timesheetNote = ` ${t(sync.written === 1 ? "reports.editor.timesheetWrittenOne" : "reports.editor.timesheetWrittenOther", { count: sync.written })}`;
+          if (sync.skipped.length > 0) timesheetNote += ` ${t("reports.editor.timesheetSkipped", { names: sync.skipped.join(", ") })}`;
         } catch (err) {
           console.error("Yoklama puantaja işlenemedi:", err);
           timesheetFailed = true;
-          timesheetNote = ` Ancak yoklama puantaja işlenemedi: ${hrErrorMessage(err, "bağlantınızı kontrol edin.")}`;
+          timesheetNote = ` ${t("reports.editor.timesheetFailed", { reason: hrErrorMessage(err, t("reports.editor.checkConnection")) })}`;
         }
       }
 
@@ -268,19 +271,19 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
       setDirty(result.errors.length > 0);
       setNotice(
         result.errors.length > 0
-          ? { tone: "error", text: `Rapor kaydedildi ancak bazı fotoğraflar yüklenemedi: ${result.errors.join(" ")}${timesheetNote}` }
-          : { tone: timesheetFailed ? "error" : "success", text: `Rapor kaydedildi.${timesheetNote}` }
+          ? { tone: "error", text: `${t("reports.editor.savedWithPhotoErrors", { errors: result.errors.join(" ") })}${timesheetNote}` }
+          : { tone: timesheetFailed ? "error" : "success", text: `${t("reports.editor.saved")}${timesheetNote}` }
       );
     } catch (err) {
       console.error("Rapor kaydedilemedi:", err);
-      setNotice({ tone: "error", text: "Rapor kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin." });
+      setNotice({ tone: "error", text: t("reports.editor.saveFailed") });
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async () => {
-    if (!meta || !confirm("Rapor ve fotoğrafları silinsin mi? Bu işlem geri alınamaz.")) return;
+    if (!meta || !confirm(t("reports.editor.confirmDelete"))) return;
     setDeleting(true);
     try {
       await deleteSiteReport(meta.id);
@@ -288,7 +291,7 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
       router.push("/reports");
     } catch (err) {
       console.error("Rapor silinemedi:", err);
-      setNotice({ tone: "error", text: "Rapor silinemedi. Tekrar deneyin." });
+      setNotice({ tone: "error", text: t("reports.editor.deleteFailed") });
       setDeleting(false);
     }
   };
@@ -302,29 +305,29 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
       {canModify && (
         <Button onClick={() => void save()} loading={saving} disabled={deleting}>
           <Save className="h-4 w-4" />
-          {savedId ? "Değişiklikleri kaydet" : "Raporu kaydet"}
+          {savedId ? t("reports.editor.saveChanges") : t("reports.editor.saveReport")}
         </Button>
       )}
       <Button variant="outline" onClick={() => setPreviewOpen(true)}>
         <Eye className="h-4 w-4" />
-        Önizle
+        {t("reports.editor.preview")}
       </Button>
       <Button
         variant="outline"
         onClick={printReport}
         disabled={!report.storeId}
-        title={report.storeId ? undefined : "Önce şantiye seçin"}
+        title={report.storeId ? undefined : t("reports.editor.selectSiteFirst")}
       >
         <Printer className="h-4 w-4" />
-        PDF olarak al
+        {t("reports.editor.exportPdf")}
       </Button>
       {meta && canModify && (
         <Button variant="danger" onClick={() => void remove()} loading={deleting} disabled={saving}>
           <Trash2 className="h-4 w-4" />
-          Sil
+          {t("common.delete")}
         </Button>
       )}
-      {dirty && canModify && <span className="text-xs text-amber-400/90">Kaydedilmemiş değişiklikler var</span>}
+      {dirty && canModify && <span className="text-xs text-amber-400/90">{t("reports.editor.unsavedChanges")}</span>}
     </div>
   );
 
@@ -333,14 +336,16 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
 
   const subtitle = meta
     ? `${meta.createdByName || "—"} · ${formatStamp(meta.createdAt)}${
-        meta.updatedAt ? ` · son düzenleme ${meta.updatedByName ? `${meta.updatedByName}, ` : ""}${formatStamp(meta.updatedAt)}` : ""
+        meta.updatedAt ? ` · ${t("reports.editor.lastEdited", { value: `${meta.updatedByName ? `${meta.updatedByName}, ` : ""}${formatStamp(meta.updatedAt)}` })}` : ""
       }`
-    : "Günün özetini doldurun, kaydedin ve PDF olarak yöneticilerinizle paylaşın.";
+    : t("reports.editor.subtitle");
+
+  const totalPeople = attendancePresent(report.attendance) + crewTotal(report.crew);
 
   // Raporu düzenleme yetkisi olmayan kullanıcı yalnızca okur ve PDF alır
   if (!canModify) {
     return (
-      <ModuleFormShell backHref="/reports" backLabel="Raporlar" title="Günlük şantiye raporu" subtitle={subtitle}>
+      <ModuleFormShell backHref="/reports" backLabel={t("pageTitle.reports")} title={t("pageTitle.dailySiteReport")} subtitle={subtitle}>
         {actions}
         <div className="overflow-x-auto rounded-xl bg-neutral-200 p-3 sm:p-6">{reportDocument}</div>
         {printCopy}
@@ -351,8 +356,8 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
   return (
     <ModuleFormShell
       backHref="/reports"
-      backLabel="Raporlar"
-      title="Günlük şantiye raporu"
+      backLabel={t("pageTitle.reports")}
+      title={t("pageTitle.dailySiteReport")}
       subtitle={subtitle}
     >
       {actions}
@@ -369,10 +374,10 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
         </p>
       )}
 
-      <Panel title="Genel bilgiler">
+      <Panel title={t("reports.editor.general")}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <FormField label="Saha" required className="sm:col-span-2">
-            <Select value={report.storeId} onChange={(e) => onStoreChange(e.target.value)} placeholder="Şantiye seçin" aria-invalid={storeMissing && !report.storeId}>
+          <FormField label={t("reports.editor.site")} required className="sm:col-span-2">
+            <Select value={report.storeId} onChange={(e) => onStoreChange(e.target.value)} placeholder={t("reports.editor.selectSite")} aria-invalid={storeMissing && !report.storeId}>
               {stores.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name} ({item.city})
@@ -380,31 +385,31 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
               ))}
             </Select>
           </FormField>
-          <FormField label="Rapor tarihi" required>
+          <FormField label={t("reports.editor.reportDate")} required>
             <DatePicker value={report.date} onChange={(date) => update({ date })} />
           </FormField>
-          <FormField label="Hazırlayan">
+          <FormField label={t("reports.editor.preparedBy")}>
             <Input value={report.preparedBy} onChange={(e) => update({ preparedBy: e.target.value })} />
           </FormField>
-          <FormField label="Şantiye şefi">
+          <FormField label={t("reports.editor.siteManager")}>
             <Input value={report.siteManager} onChange={(e) => update({ siteManager: e.target.value })} />
           </FormField>
-          <FormField label="Yüklenici firma">
+          <FormField label={t("reports.editor.contractor")}>
             <Input value={report.contractor} onChange={(e) => update({ contractor: e.target.value })} />
           </FormField>
-          <FormField label="Hava durumu">
+          <FormField label={t("reports.editor.weather")}>
             <Select value={report.weather} onChange={(e) => update({ weather: e.target.value })}>
               {WEATHER_OPTIONS.map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {weatherLabel(option)}
                 </option>
               ))}
             </Select>
           </FormField>
-          <FormField label="Sıcaklık (°C)">
+          <FormField label={t("reports.editor.temperature")}>
             <Input
               inputMode="decimal"
-              placeholder="ör. 18"
+              placeholder={t("reports.editor.temperaturePlaceholder")}
               value={report.temperature}
               onChange={(e) => update({ temperature: e.target.value })}
             />
@@ -413,8 +418,8 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
       </Panel>
 
       <Panel
-        title="Sahadaki personel"
-        description={`Toplam ${attendancePresent(report.attendance) + crewTotal(report.crew)} kişi`}
+        title={t("reports.editor.personnelOnSite")}
+        description={t(totalPeople === 1 ? "reports.editor.totalPeopleOne" : "reports.editor.totalPeopleOther", { count: totalPeople })}
       >
         <ReportAttendanceSection
           storeId={report.storeId}
@@ -428,17 +433,17 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
             <Switch
               checked={syncTimesheet}
               onChange={setSyncTimesheet}
-              label="Kaydederken yoklamayı puantaja işle (izinli günler değişmez)"
+              label={t("reports.editor.syncTimesheet")}
             />
           ) : (
             <p className="text-xs text-zinc-500">
-              Yoklama raporla birlikte saklanır; puantaja insan kaynakları aktarır.
+              {t("reports.editor.attendanceStoredNote")}
             </p>
           ))}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800 pt-4">
           <div>
-            <h3 className="text-sm font-medium text-zinc-200">Ekip sayıları</h3>
-            <p className="text-xs text-zinc-500">İsim girilmeyen ekipler (ör. taşeron ekipleri) için kişi sayısı</p>
+            <h3 className="text-sm font-medium text-zinc-200">{t("reports.editor.crewCounts")}</h3>
+            <p className="text-xs text-zinc-500">{t("reports.editor.crewCountsHint")}</p>
           </div>
           <Button
             size="sm"
@@ -446,25 +451,25 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
             onClick={() => update({ crew: [...report.crew, { id: newRowId(), trade: "", count: null }] })}
           >
             <Plus className="h-3.5 w-3.5" />
-            Ekip ekle
+            {t("reports.editor.addCrew")}
           </Button>
         </div>
         <div className="space-y-2">
           {report.crew.map((row, index) => (
             <div key={row.id} className="flex items-center gap-2">
               <Input
-                aria-label={`${index + 1}. ekip`}
-                placeholder="Ekip / meslek (ör. Elektrik ekibi)"
+                aria-label={t("reports.editor.crewRow", { n: index + 1 })}
+                placeholder={t("reports.editor.crewTradePlaceholder")}
                 value={row.trade}
                 onChange={(e) =>
                   update({ crew: report.crew.map((item) => (item.id === row.id ? { ...item, trade: e.target.value } : item)) })
                 }
               />
               <Input
-                aria-label={`${index + 1}. ekip kişi sayısı`}
+                aria-label={t("reports.editor.crewRowCount", { n: index + 1 })}
                 type="number"
                 min={0}
-                placeholder="Kişi"
+                placeholder={t("reports.editor.people")}
                 className="w-24 shrink-0 tabular-nums"
                 value={row.count ?? ""}
                 onChange={(e) => {
@@ -476,7 +481,7 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
                 type="button"
                 onClick={() => update({ crew: report.crew.filter((item) => item.id !== row.id) })}
                 className="shrink-0 rounded-md p-2 text-zinc-500 hover:bg-zinc-800/50 hover:text-red-400"
-                aria-label={`${index + 1}. ekibi kaldır`}
+                aria-label={t("reports.editor.removeCrew", { n: index + 1 })}
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -485,13 +490,13 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
         </div>
       </Panel>
 
-      <Panel title="Günün özeti">
-        <FormField label="Bugün yapılan işler">
+      <Panel title={t("reports.editor.daySummary")}>
+        <FormField label={t("reports.editor.worksDone")}>
           <Textarea
             rows={6}
             value={report.worksDone}
             onChange={(e) => update({ worksDone: e.target.value })}
-            placeholder="• Zemin kat seramik döşemesi tamamlandı"
+            placeholder={t("reports.editor.worksDonePlaceholder")}
           />
         </FormField>
         <div className="-mt-2 flex flex-wrap items-center gap-3">
@@ -503,40 +508,40 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
             loading={workPlanState.status === "loading"}
           >
             <ListChecks className="h-3.5 w-3.5" />
-            İş planından getir
+            {t("reports.editor.importWorkPlan")}
           </Button>
           <span className="text-xs text-zinc-500" role="status">
             {!report.storeId
-              ? "Rapor gününe denk gelen ve devam eden iş kalemleri eklenir; önce şantiye seçin."
+              ? t("reports.editor.workPlanHintNoSite")
               : workPlanState.status === "empty"
-                ? "Bu tarihe denk gelen ya da devam eden iş kalemi yok."
+                ? t("reports.editor.workPlanEmpty")
                 : workPlanState.status === "error"
-                  ? "İş planı yüklenemedi, tekrar deneyin."
-                  : "Rapor gününe denk gelen ve devam eden iş kalemleri eklenir."}
+                  ? t("reports.editor.workPlanError")
+                  : t("reports.editor.workPlanHint")}
           </span>
         </div>
-        <FormField label="Gelen malzeme ve ekipman">
+        <FormField label={t("reports.editor.materialsReceived")}>
           <Textarea rows={3} value={report.materialsReceived} onChange={(e) => update({ materialsReceived: e.target.value })} />
         </FormField>
-        <FormField label="Sorunlar, gecikmeler ve talepler">
+        <FormField label={t("reports.editor.issues")}>
           <Textarea rows={3} value={report.issues} onChange={(e) => update({ issues: e.target.value })} />
         </FormField>
-        <FormField label="İş güvenliği">
+        <FormField label={t("reports.editor.safety")}>
           <Textarea
             rows={2}
             value={report.safetyNotes}
             onChange={(e) => update({ safetyNotes: e.target.value })}
-            placeholder="Kaza / ramak kala yok, KKD kontrolleri yapıldı"
+            placeholder={t("reports.editor.safetyPlaceholder")}
           />
         </FormField>
-        <FormField label="Yarın planlanan işler">
+        <FormField label={t("reports.editor.tomorrowPlan")}>
           <Textarea rows={3} value={report.tomorrowPlan} onChange={(e) => update({ tomorrowPlan: e.target.value })} />
         </FormField>
       </Panel>
 
       <Panel
-        title={`Fotoğraflar (${report.photos.length})`}
-        description="Raporun sonuna, açıklamalarıyla birlikte eklenir. JPG, PNG ya da WEBP."
+        title={t("reports.editor.photosTitle", { count: report.photos.length })}
+        description={t("reports.editor.photosDescription")}
         action={
           <>
             <input
@@ -558,7 +563,7 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
               disabled={report.photos.length >= MAX_PHOTOS}
             >
               <ImagePlus className="h-3.5 w-3.5" />
-              Fotoğraf ekle
+              {t("reports.editor.addPhoto")}
             </Button>
           </>
         }
@@ -575,7 +580,7 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
             className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-700 px-4 py-8 text-sm text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
           >
             <ImagePlus className="h-5 w-5" />
-            Fotoğrafları seçin ya da buraya sürükleyin
+            {t("reports.editor.dropPhotos")}
           </button>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -589,14 +594,14 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
                     type="button"
                     onClick={() => removePhoto(photo.id)}
                     className="absolute right-2 top-2 rounded-md bg-black/60 p-1 text-white hover:bg-black/80"
-                    aria-label={`${index + 1}. fotoğrafı kaldır`}
+                    aria-label={t("reports.editor.removePhoto", { n: index + 1 })}
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
                 <div className="p-2">
                   <Input
-                    aria-label={`${index + 1}. fotoğraf açıklaması`}
+                    aria-label={t("reports.editor.photoCaption", { n: index + 1 })}
                     placeholder={photo.name}
                     value={photo.caption}
                     onChange={(e) => updatePhoto(photo.id, e.target.value)}
@@ -614,17 +619,17 @@ export function DailySiteReportEditor({ initial }: DailySiteReportEditorProps) {
       <Modal
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
-        title="Rapor önizlemesi"
-        description="PDF çıktısı bu görünümle aynıdır."
+        title={t("reports.editor.previewTitle")}
+        description={t("reports.editor.previewDescription")}
         className="sm:max-w-[calc(210mm+3rem)]"
         footer={
           <>
             <Button variant="ghost" onClick={() => setPreviewOpen(false)}>
-              Kapat
+              {t("common.close")}
             </Button>
             <Button onClick={printReport} disabled={!report.storeId}>
               <Printer className="h-4 w-4" />
-              PDF olarak al
+              {t("reports.editor.exportPdf")}
             </Button>
           </>
         }

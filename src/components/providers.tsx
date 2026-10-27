@@ -9,7 +9,7 @@ import { MapUiProvider } from "@/contexts/map-ui-context";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { DbProvider } from "@/contexts/db-context";
 import { SidebarProvider } from "@/contexts/sidebar-context";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, LocaleBoundary } from "@/contexts/i18n-context";
 import { PageTitleProvider } from "@/contexts/page-title-context";
 import { ModulesProvider } from "@/contexts/modules-context";
 import { TeamChatProvider } from "@/contexts/team-chat-context";
@@ -31,7 +31,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
                         <TeamChatProvider>
                           <NotificationsProvider>
                             <MapUiProvider>
-                              <StoreDataProvider>{children}</StoreDataProvider>
+                              <StoreDataProvider>
+                                <LocaleBoundary>{children}</LocaleBoundary>
+                              </StoreDataProvider>
                             </MapUiProvider>
                           </NotificationsProvider>
                         </TeamChatProvider>

@@ -50,9 +50,9 @@ function StoreEditContent({ id }: { id: string }) {
   if (!canEdit) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-zinc-500">
-        <p>Düzenleme yetkiniz yok.</p>
+        <p>{t("site.storeDetail.noEditPermission")}</p>
         <Link href={`/stores/${id}`} className="text-cyan-400 hover:underline">
-          Detaya dön
+          {t("site.storeDetail.backToDetail")}
         </Link>
       </div>
     );
@@ -93,7 +93,7 @@ function StoreEditForm({ store }: { store: Store }) {
     setSaving(false);
 
     if (!ok) {
-      setSaveError("Kayıt başarısız. Yetkinizi veya bağlantınızı kontrol edin.");
+      setSaveError(t("site.mapPanels.saveFailed"));
       return;
     }
 
@@ -113,7 +113,7 @@ function StoreEditForm({ store }: { store: Store }) {
               className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200"
             >
               <ArrowLeft className="h-4 w-4" />
-              Detay
+              {t("site.storeDetail.detail")}
             </Link>
             <span className="text-zinc-700">·</span>
             <Link
@@ -129,11 +129,11 @@ function StoreEditForm({ store }: { store: Store }) {
               size="sm"
               onClick={() => router.push(`/stores/${store.id}`)}
             >
-              İptal
+              {t("common.cancel")}
             </Button>
             <Button size="sm" loading={saving} onClick={handleSave}>
               <Save className="h-3.5 w-3.5" />
-              {saved ? "Kaydedildi!" : "Kaydet"}
+              {saved ? t("site.storeDetail.savedBang") : t("common.save")}
             </Button>
           </div>
         </div>
@@ -141,7 +141,7 @@ function StoreEditForm({ store }: { store: Store }) {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold text-zinc-100">{store.name}</h1>
           <Badge className="border border-zinc-600/40 bg-zinc-800/60 text-zinc-400">
-            Düzenleme
+            {t("site.storeDetail.editing")}
           </Badge>
           <Badge
             className={`${config.color} border border-current/20 bg-current/10`}
@@ -164,7 +164,7 @@ function StoreEditForm({ store }: { store: Store }) {
 
         {(saveError || hasErrors(errors)) && (
           <div className="space-y-1">
-            <FormError message={saveError || "Lütfen zorunlu alanları kontrol edin."} />
+            <FormError message={saveError || t("site.form.checkRequired")} />
           </div>
         )}
 
@@ -176,7 +176,7 @@ function StoreEditForm({ store }: { store: Store }) {
         <div className="grid gap-6 lg:grid-cols-[1.35fr_0.85fr] lg:items-start">
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-sm">
             <h2 className="mb-4 text-sm font-medium uppercase tracking-wider text-zinc-500">
-              Saha bilgileri
+              {t("site.storeDetail.siteInfo")}
             </h2>
             <div className="space-y-5">
               <StoreLocationFields

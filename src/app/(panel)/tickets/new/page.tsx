@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n } from "@/contexts/i18n-context";
 import { ModuleFormShell } from "@/components/modules/module-form-shell";
 import { useModules } from "@/contexts/modules-context";
 import { useStores } from "@/contexts/stores-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { getRoleLabel } from "@/lib/roles";
 import { nextTicketCode } from "@/lib/module-codes";
+import { TICKET_PRIORITY_LABELS } from "@/lib/module-finance";
 import { useSettings } from "@/contexts/settings-context";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -19,14 +21,10 @@ import { uploadModuleAttachments } from "@/lib/upload-module-attachment";
 import { PendingAttachments } from "@/components/modules/pending-attachments";
 import type { TicketPriority } from "@/types";
 
-const PRIORITY_TR: Record<TicketPriority, string> = {
-  low: "Düşük",
-  medium: "Orta",
-  high: "Yüksek",
-};
 
 function NewTicketContent() {
   const router = useRouter();
+  const { t, locale } = useI18n();
   const { user, users, organization } = useAuth();
   const { tickets, createTicket } = useModules();
   const { stores } = useStores();
@@ -45,7 +43,7 @@ function NewTicketContent() {
   const [saveError, setSaveError] = useState("");
   const [showErrors, setShowErrors] = useState(false);
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null);
-  const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name, "tr"));
+  const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name, locale));
   const ticketCode = codeTouched ? code : nextTicketCode(tickets, org.defaults.ticketCodePrefix);
   const invalid = {
     code: !ticketCode.trim(),
@@ -57,7 +55,7 @@ function NewTicketContent() {
   if (!canAdd) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-zinc-500">
-        Ekleme yetkiniz yok
+        {t("finance.shared.noAddPermission")}
       </div>
     );
   }
@@ -66,13 +64,13 @@ function NewTicketContent() {
     if (createdTicketId) return;
     setShowErrors(true);
     const missing = [
-      invalid.code && "Kod",
-      invalid.title && "Başlık",
-      invalid.store && "Saha",
-      invalid.assignee && "Atanan",
+      invalid.code && t("finance.shared.code"),
+      invalid.title && t("finance.shared.title"),
+      invalid.store && t("finance.shared.store"),
+      invalid.assignee && t("finance.shared.assignee"),
     ].filter(Boolean);
     if (missing.length > 0) {
-      setSaveError(`Zorunlu alanları doldurun: ${missing.join(", ")}`);
+      setSaveError(t("finance.shared.requiredFields", { fields: missing.join(", ") }));
       return;
     }
     setSaveError("");
@@ -90,7 +88,7 @@ function NewTicketContent() {
     });
     if (!id) {
       setSaving(false);
-      setSaveError("Talep oluşturulamadı. Bağlantınızı kontrol edip tekrar deneyin.");
+      setSaveError(t("finance.tickets.createFailed"));
       return;
     }
 
@@ -104,7 +102,7 @@ function NewTicketContent() {
       });
       if (errors.length > 0) {
         setSaving(false);
-        setSaveError(`Talep kaydedildi ancak bazı ekler yüklenemedi: ${errors.join(" ")}`);
+        setSaveError(t("finance.tickets.attachmentsFailed", { errors: errors.join(" ") }));
         return;
       }
     }
@@ -114,11 +112,11 @@ function NewTicketContent() {
   return (
     <ModuleFormShell
       backHref="/tickets"
-      backLabel="Tadilat Talepleri"
-      title="Yeni tadilat talebi"
+      backLabel={t("finance.tickets.title")}
+      title={t("finance.tickets.newTitle")}
       onSave={save}
       saving={saving}
-      saveLabel="Oluştur"
+      saveLabel={t("finance.shared.create")}
       canSave={!createdTicketId}
     >
       {saveError && (
@@ -126,7 +124,7 @@ function NewTicketContent() {
           {saveError}
           {createdTicketId && (
             <Link href={`/tickets/${createdTicketId}`} className="ml-2 underline underline-offset-2">
-              Talep detayını aç
+              {t("finance.tickets.openDetail")}
             </Link>
           )}
         </p>
@@ -134,7 +132,7 @@ function NewTicketContent() {
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div className="grid gap-4 sm:grid-cols-4">
           <div>
-            <label className="text-xs text-zinc-500">Kod *</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.code")} *</label>
             <Input
               className="mt-1 font-mono"
               value={ticketCode}
@@ -146,36 +144,36 @@ function NewTicketContent() {
             />
           </div>
           <div className="sm:col-span-3">
-            <label className="text-xs text-zinc-500">Başlık *</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.title")} *</label>
             <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} aria-invalid={showErrors && invalid.title} />
           </div>
         </div>
         <div>
-          <label className="text-xs text-zinc-500">Açıklama</label>
+          <label className="text-xs text-zinc-500">{t("finance.shared.description")}</label>
           <Textarea className="mt-1" rows={5} value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Saha *</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.store")} *</label>
             <Select className="mt-1" value={storeId} onChange={(e) => setStoreId(e.target.value)} aria-invalid={showErrors && invalid.store}>
-              <option value="">Seçiniz</option>
+              <option value="">{t("finance.shared.select")}</option>
               {stores.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </Select>
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Öncelik</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.priority")}</label>
             <Select className="mt-1" value={priority} onChange={(e) => setPriority(e.target.value as TicketPriority)}>
-              {Object.entries(PRIORITY_TR).map(([k, v]) => (
+              {Object.entries(TICKET_PRIORITY_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
             </Select>
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Atanan *</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.assignee")} *</label>
             <Select className="mt-1" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} aria-invalid={showErrors && invalid.assignee}>
-              <option value="">Seçiniz</option>
+              <option value="">{t("finance.shared.select")}</option>
               {sortedUsers.map((u) => (
                 <option key={u.id} value={u.id}>{u.name} — {getRoleLabel(u.role, organization)}</option>
               ))}

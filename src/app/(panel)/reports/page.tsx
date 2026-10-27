@@ -3,16 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import { ChevronRight, HardHat, Images, Pencil, Eye, Trash2 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { DataTable, TablePagination, type DataTableColumn } from "@/components/modules/module-table";
 import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n } from "@/contexts/i18n-context";
 import { useStores } from "@/contexts/stores-context";
 import { useServerTable } from "@/hooks/use-server-table";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import { getDateLocale, t } from "@/i18n/runtime";
 import {
   SITE_REPORTS_SOURCE,
   canModifySiteReport,
@@ -26,22 +27,27 @@ const REPORTS = [
   {
     href: "/reports/daily-site",
     icon: HardHat,
-    title: "Günlük şantiye raporu",
-    description:
-      "Şantiye şefinin yöneticilere günlük özeti: personel, yapılan işler, sorunlar, iş güvenliği ve fotoğraflar. PDF olarak alınır.",
+    get newTitle() {
+      return t("reports.index.dailySiteNew");
+    },
+    get description() {
+      return t("reports.index.dailySiteDescription");
+    },
   },
 ];
 
 type SortKey = "reportDate" | "storeName" | "createdByName" | "photoCount" | "updatedAt" | "actions";
 
-const COLUMNS: DataTableColumn<SortKey>[] = [
-  { key: "reportDate", label: "Rapor tarihi" },
-  { key: "storeName", label: "Şantiye" },
-  { key: "createdByName", label: "Hazırlayan" },
-  { key: "photoCount", label: "Fotoğraf" },
-  { key: "updatedAt", label: "Son değişiklik" },
-  { key: "actions", label: "", sortable: false },
-];
+function columns(): DataTableColumn<SortKey>[] {
+  return [
+    { key: "reportDate", label: t("reports.history.columns.reportDate") },
+    { key: "storeName", label: t("reports.history.columns.site") },
+    { key: "createdByName", label: t("reports.history.columns.preparedBy") },
+    { key: "photoCount", label: t("reports.history.columns.photos") },
+    { key: "updatedAt", label: t("reports.history.columns.lastChange") },
+    { key: "actions", label: "", sortable: false },
+  ];
+}
 
 const SORT_COLUMNS: Partial<Record<SortKey, string>> = {
   reportDate: "report_date",
@@ -53,16 +59,18 @@ const SORT_COLUMNS: Partial<Record<SortKey, string>> = {
 const SEARCH_COLUMNS = ["store_name", "store_city", "created_by_name"];
 
 function formatDay(value: string) {
-  return format(parseISO(value), "d MMM yyyy, EEE", { locale: tr });
+  return format(parseISO(value), "d MMM yyyy, EEE", { locale: getDateLocale() });
 }
 
 function formatStamp(value: string) {
-  return format(parseISO(value), "d MMM yyyy HH:mm", { locale: tr });
+  return format(parseISO(value), "d MMM yyyy HH:mm", { locale: getDateLocale() });
 }
 
 function ReportHistory() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const { stores } = useStores();
+  const COLUMNS = columns();
   const [query, setQuery] = usePersistentState("site-reports", "query", "");
   const [storeId, setStoreId] = usePersistentState("site-reports", "store", "all");
   const [version, setVersion] = useState(0);
@@ -82,7 +90,7 @@ function ReportHistory() {
   });
 
   const remove = async (row: SiteReportListRow) => {
-    if (!confirm(`${row.storeName} · ${formatDay(row.reportDate)} raporu ve fotoğrafları silinsin mi?`)) return;
+    if (!confirm(t("reports.history.confirmDelete", { name: `${row.storeName} · ${formatDay(row.reportDate)}` }))) return;
     setDeletingId(row.id);
     setError("");
     try {
@@ -90,7 +98,7 @@ function ReportHistory() {
       setVersion((current) => current + 1);
     } catch (err) {
       console.error("Rapor silinemedi:", err);
-      setError("Rapor silinemedi. Tekrar deneyin.");
+      setError(t("reports.history.deleteFailed"));
     } finally {
       setDeletingId(null);
     }
@@ -100,20 +108,20 @@ function ReportHistory() {
     <section className="mt-8">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-zinc-100">Geçmiş raporlar</h2>
-          <p className="text-sm text-zinc-500">Kaydedilen raporlar. Raporu yazan kişi ve yöneticiler düzenleyip silebilir.</p>
+          <h2 className="text-lg font-semibold text-zinc-100">{t("reports.history.title")}</h2>
+          <p className="text-sm text-zinc-500">{t("reports.history.description")}</p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto">
           <SearchInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Şantiye, şehir, hazırlayan…"
-            aria-label="Raporlarda ara"
+            placeholder={t("reports.history.searchPlaceholder")}
+            aria-label={t("reports.history.searchLabel")}
             containerClassName="w-full sm:w-64"
             className="h-10"
           />
           <Select value={storeId} onChange={(e) => setStoreId(e.target.value)} className="h-10 w-auto min-w-[180px]">
-            <option value="all">Tüm şantiyeler</option>
+            <option value="all">{t("reports.history.allSites")}</option>
             {stores.map((store) => (
               <option key={store.id} value={store.id}>
                 {store.name}
@@ -141,10 +149,10 @@ function ReportHistory() {
               <tr>
                 <td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-sm text-zinc-500">
                   {table.isLoading
-                    ? "Yükleniyor…"
+                    ? t("reports.history.loading")
                     : query || storeId !== "all"
-                      ? "Aramayla eşleşen rapor yok."
-                      : "Henüz kaydedilmiş rapor yok."}
+                      ? t("reports.history.noMatches")
+                      : t("reports.history.empty")}
                 </td>
               </tr>
             ) : (
@@ -177,8 +185,8 @@ function ReportHistory() {
                         <Link
                           href={`/reports/daily-site/${row.id}`}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-100"
-                          aria-label={canModify ? "Düzenle" : "Görüntüle"}
-                          title={canModify ? "Düzenle" : "Görüntüle"}
+                          aria-label={canModify ? t("common.edit") : t("reports.history.view")}
+                          title={canModify ? t("common.edit") : t("reports.history.view")}
                         >
                           {canModify ? <Pencil className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                         </Link>
@@ -188,8 +196,8 @@ function ReportHistory() {
                             onClick={() => void remove(row)}
                             disabled={deletingId === row.id}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
-                            aria-label="Sil"
-                            title="Sil"
+                            aria-label={t("common.delete")}
+                            title={t("common.delete")}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -222,11 +230,12 @@ function ReportHistory() {
 }
 
 function ReportsContent() {
+  const { t } = useI18n();
   return (
     <div className="scrollbar-themed h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-zinc-100">Raporlar</h1>
-        <p className="mt-1 text-sm text-zinc-500">Yeni rapor hazırlayın ya da geçmiş raporları açın.</p>
+        <h1 className="text-2xl font-semibold text-zinc-100">{t("pageTitle.reports")}</h1>
+        <p className="mt-1 text-sm text-zinc-500">{t("reports.index.description")}</p>
       </div>
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {REPORTS.map((report) => (
@@ -240,7 +249,7 @@ function ReportsContent() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center justify-between gap-2 font-medium text-zinc-100">
-                  Yeni {report.title.toLocaleLowerCase("tr-TR")}
+                  {report.newTitle}
                   <ChevronRight className="h-4 w-4 shrink-0 text-zinc-500 transition-transform group-hover:translate-x-0.5" aria-hidden />
                 </span>
                 <span className="mt-1 block text-sm text-zinc-500">{report.description}</span>

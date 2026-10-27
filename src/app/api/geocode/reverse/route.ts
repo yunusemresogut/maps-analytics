@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestCaller } from "@/lib/server-auth";
 import { NOMINATIM_HEADERS, parseNominatimItem } from "@/lib/geocode-server";
+import { localeFromRequest, serverTranslator } from "@/i18n/server";
 
 /** Konum → adres ve il. Haritadan seçilen ya da sürüklenen pin için kullanılır. */
 export async function GET(request: Request) {
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
   const lat = Number(searchParams.get("lat"));
   const lng = Number(searchParams.get("lng"));
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-    return NextResponse.json({ error: "Geçersiz koordinat" }, { status: 400 });
+    return NextResponse.json({ error: serverTranslator(localeFromRequest(request))("api.geocode.invalidCoordinates") }, { status: 400 });
   }
 
   try {

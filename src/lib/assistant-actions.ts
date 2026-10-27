@@ -14,6 +14,7 @@ import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
 import { materialLineTotal } from "@/lib/material-totals";
 import { formatMoney, formatMoneyTotals, parseCurrency, sumMoney, type CurrencyCode } from "@/lib/currency";
 import { matchLocationType } from "@/lib/location-types";
+import { getIntlLocale, localizedRecord, t } from "@/i18n/runtime";
 
 /**
  * Asistanın önerdiği kayıt ekleme eylemleri.
@@ -36,21 +37,25 @@ const PROJECT_STATUSES: ProjectStatus[] = [
 const PRIORITIES: TicketPriority[] = ["low", "medium", "high"];
 const WORK_PLAN_STATUSES: WorkPlanStatus[] = ["yapilacak", "devam_ediyor", "tamamlandi"];
 
-const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
-  proje: "Proje",
-  ihale: "İhale",
-  santiye: "Şantiye",
-  acilis: "Açılış",
-  hakedis: "Hakediş",
-  fatura: "Fatura",
-  yakinda_aciliyor: "Yakında Açılıyor",
-};
-const PRIORITY_LABELS: Record<TicketPriority, string> = { low: "Düşük", medium: "Orta", high: "Yüksek" };
-const WORK_PLAN_STATUS_LABELS: Record<WorkPlanStatus, string> = {
-  yapilacak: "Yapılacak",
-  devam_ediyor: "Devam ediyor",
-  tamamlandi: "Tamamlandı",
-};
+const PROJECT_STATUS_LABELS = localizedRecord<ProjectStatus>({
+  proje: "status.proje",
+  ihale: "status.ihale",
+  santiye: "status.santiye",
+  acilis: "status.acilis",
+  hakedis: "status.hakedis",
+  fatura: "status.fatura",
+  yakinda_aciliyor: "status.yakinda_aciliyor",
+});
+const PRIORITY_LABELS = localizedRecord<TicketPriority>({
+  low: "assistant.priority.low",
+  medium: "assistant.priority.medium",
+  high: "assistant.priority.high",
+});
+const WORK_PLAN_STATUS_LABELS = localizedRecord<WorkPlanStatus>({
+  yapilacak: "assistant.workPlanStatus.yapilacak",
+  devam_ediyor: "assistant.workPlanStatus.devam_ediyor",
+  tamamlandi: "assistant.workPlanStatus.tamamlandi",
+});
 
 /** Uygulamaya hazır, doğrulanmış eylem */
 export type ResolvedAction =
@@ -159,7 +164,7 @@ export function formatDate(value: string): string {
 /** Mağaza adını firma mağazalarıyla eşleştirir: önce tam, sonra kısmi eşleşme */
 function resolveStore(stores: Store[], rawName: unknown): { store?: Store; error?: string } {
   const name = str(rawName);
-  if (!name) return { error: "Saha belirtilmemiş." };
+  if (!name) return { error: t("assistant.actions.storeNotSpecified") };
   const target = normalizeName(name);
   const exact = stores.filter((store) => normalizeName(store.name) === target);
   if (exact.length === 1) return { store: exact[0] };
@@ -172,20 +177,23 @@ function resolveStore(stores: Store[], rawName: unknown): { store?: Store; error
   if (partial.length === 1) return { store: partial[0] };
   if (partial.length > 1) {
     return {
-      error: `"${name}" birden fazla sahayla eşleşiyor: ${partial
-        .slice(0, 5)
-        .map((store) => `${store.name} (${store.city})`)
-        .join(", ")}. Hangisi olduğunu belirtin.`,
+      error: t("assistant.actions.storeAmbiguous", {
+        name,
+        matches: partial
+          .slice(0, 5)
+          .map((store) => `${store.name} (${store.city})`)
+          .join(", "),
+      }),
     };
   }
-  return { error: `"${name}" adında bir saha bulunamadı.` };
+  return { error: t("assistant.actions.storeNotFound", { name }) };
 }
 
 function itemsOf(raw: Record<string, unknown>, errors: string[]): Record<string, unknown>[] {
   const items = Array.isArray(raw.items) ? raw.items : [];
   const valid = items.filter((item): item is Record<string, unknown> => !!item && typeof item === "object");
-  if (valid.length === 0) errors.push("Eklenecek kalem yok.");
-  if (valid.length > MAX_ITEMS) errors.push(`Tek seferde en fazla ${MAX_ITEMS} kalem eklenebilir.`);
+  if (valid.length === 0) errors.push(t("assistant.actions.noItems"));
+  if (valid.length > MAX_ITEMS) errors.push(t("assistant.actions.tooManyItems", { max: MAX_ITEMS }));
   return valid.slice(0, MAX_ITEMS);
 }
 
@@ -193,7 +201,7 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
   const errors: string[] = [];
   const warnings: string[] = [];
   if (!canModule(ctx.user, "map", "add") && !canModule(ctx.user, "stores", "add")) {
-    errors.push("Saha ekleme yetkiniz yok.");
+    errors.push(t("assistant.actions.store.noPermission"));
   }
 
   const name = str(raw.name);
@@ -208,24 +216,28 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
   const locationType =
     matchLocationType(str(raw.locationType), ctx.locationTypes) ?? ctx.locationTypes[0] ?? { key: "", label: "—" };
   if (str(raw.locationType) && !matchLocationType(str(raw.locationType), ctx.locationTypes)) {
-    warnings.push(`"${str(raw.locationType)}" saha türü tanınmadı; ${locationType.label} olarak kaydedilecek.`);
+    warnings.push(
+      t("assistant.actions.store.unknownLocationType", { value: str(raw.locationType), fallback: locationType.label })
+    );
   }
   const grossM2 = num(raw.grossM2) ?? 0;
   const floorCount = Math.max(1, Math.round(num(raw.floorCount) ?? 1));
   const totalBudget = num(raw.totalBudget);
   const budgetCurrency = parseCurrency(raw.budgetCurrency) ?? ctx.defaultCurrency;
   if (str(raw.budgetCurrency) && !parseCurrency(raw.budgetCurrency)) {
-    warnings.push(`"${str(raw.budgetCurrency)}" para birimi tanınmadı; bütçe ${ctx.defaultCurrency} olarak kaydedilecek.`);
+    warnings.push(
+      t("assistant.actions.store.unknownCurrency", { value: str(raw.budgetCurrency), fallback: ctx.defaultCurrency })
+    );
   }
 
-  if (!name) errors.push("Saha adı eksik.");
-  if (!rawCity) errors.push("Şehir eksik.");
-  if (address.length < 5) errors.push("Adres eksik ya da çok kısa.");
-  if (!isIsoDate(openingDate)) errors.push("Açılış tarihi eksik ya da geçersiz.");
-  if (acceptanceDate && !isIsoDate(acceptanceDate)) warnings.push("Kabul tarihi geçersiz olduğu için eklenmeyecek.");
-  if (grossM2 < 0) errors.push("Brüt m² negatif olamaz.");
+  if (!name) errors.push(t("assistant.actions.store.nameMissing"));
+  if (!rawCity) errors.push(t("assistant.actions.store.cityMissing"));
+  if (address.length < 5) errors.push(t("assistant.actions.store.addressMissing"));
+  if (!isIsoDate(openingDate)) errors.push(t("assistant.actions.store.openingDateInvalid"));
+  if (acceptanceDate && !isIsoDate(acceptanceDate)) warnings.push(t("assistant.actions.store.acceptanceDateInvalid"));
+  if (grossM2 < 0) errors.push(t("assistant.actions.store.negativeArea"));
   if (name && ctx.stores.some((store) => normalizeName(store.name) === normalizeName(name))) {
-    warnings.push(`"${name}" adında bir saha zaten var; yine de yeni kayıt oluşturulacak.`);
+    warnings.push(t("assistant.actions.store.duplicateName", { name }));
   }
 
   // Adres başka bir ilde bulunduysa pin ile yazılan il çelişir
@@ -237,37 +249,37 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
     if (!location) {
       location = fits(await ctx.geocode(expectedProvince ? `${expectedProvince}, Türkiye` : rawCity));
       if (location) {
-        warnings.push("Adres haritada bulunamadı; konum şehir merkezine yerleştirilecek, sonradan düzeltebilirsiniz.");
+        warnings.push(t("assistant.actions.store.cityCenterFallback"));
       } else {
-        errors.push(`"${address}, ${rawCity}" için harita konumu bulunamadı.`);
+        errors.push(t("assistant.actions.store.locationNotFound", { address: `${address}, ${rawCity}` }));
       }
     }
   }
   const city = location?.city ?? expectedProvince ?? rawCity;
 
   const fields = [
-    { label: "Ad", value: name || "—" },
+    { label: t("assistant.actions.store.fieldName"), value: name || "—" },
     {
-      label: "Konum",
+      label: t("assistant.actions.store.fieldLocation"),
       value:
         [[location?.district, city].filter(Boolean).join(" / "), location && location.country !== "Türkiye" ? location.country : ""]
           .filter(Boolean)
           .join(", ") || "—",
     },
-    { label: "Adres", value: address || "—" },
-    { label: "Durum", value: PROJECT_STATUS_LABELS[projectStatus] },
-    { label: "Açılış", value: openingDate ? formatDate(openingDate) : "—" },
-    { label: "Saha türü", value: locationType.label },
-    { label: "Brüt m²", value: String(grossM2) },
-    { label: "Kat", value: String(floorCount) },
-    ...(totalBudget ? [{ label: "Bütçe", value: formatMoney(totalBudget, budgetCurrency) }] : []),
-    ...(str(raw.contractorCompany) ? [{ label: "Yüklenici", value: str(raw.contractorCompany) }] : []),
-    ...(str(raw.siteManager) ? [{ label: "Şantiye şefi", value: str(raw.siteManager) }] : []),
-    ...(str(raw.phone) ? [{ label: "Telefon", value: str(raw.phone) }] : []),
+    { label: t("assistant.actions.store.fieldAddress"), value: address || "—" },
+    { label: t("assistant.actions.store.fieldStatus"), value: PROJECT_STATUS_LABELS[projectStatus] },
+    { label: t("assistant.actions.store.fieldOpening"), value: openingDate ? formatDate(openingDate) : "—" },
+    { label: t("assistant.actions.store.fieldLocationType"), value: locationType.label },
+    { label: t("assistant.actions.store.fieldGrossArea"), value: String(grossM2) },
+    { label: t("assistant.actions.store.fieldFloors"), value: String(floorCount) },
+    ...(totalBudget ? [{ label: t("assistant.actions.store.fieldBudget"), value: formatMoney(totalBudget, budgetCurrency) }] : []),
+    ...(str(raw.contractorCompany) ? [{ label: t("assistant.actions.store.fieldContractor"), value: str(raw.contractorCompany) }] : []),
+    ...(str(raw.siteManager) ? [{ label: t("assistant.actions.store.fieldSiteManager"), value: str(raw.siteManager) }] : []),
+    ...(str(raw.phone) ? [{ label: t("assistant.actions.store.fieldPhone"), value: str(raw.phone) }] : []),
   ];
 
   return {
-    title: "Yeni saha",
+    title: t("assistant.actions.store.title"),
     fields,
     warnings,
     errors,
@@ -301,12 +313,12 @@ async function buildStore(raw: Record<string, unknown>, ctx: BuildContext): Prom
 
 function buildTicket(raw: Record<string, unknown>, ctx: BuildContext): ActionPreview {
   const errors: string[] = [];
-  if (!ctx.isModuleEnabled("tickets")) errors.push("Tadilat talepleri modülü firma ayarlarından kapatılmış.");
-  else if (!canModule(ctx.user, "tickets", "add")) errors.push("Tadilat talebi oluşturma yetkiniz yok.");
+  if (!ctx.isModuleEnabled("tickets")) errors.push(t("assistant.actions.ticket.moduleDisabled"));
+  else if (!canModule(ctx.user, "tickets", "add")) errors.push(t("assistant.actions.ticket.noPermission"));
   const title = str(raw.title);
   const description = str(raw.description);
   const priority = pick(raw.priority, PRIORITIES, "medium");
-  if (!title) errors.push("Başlık eksik.");
+  if (!title) errors.push(t("assistant.actions.ticket.titleMissing"));
 
   let store: Store | undefined;
   if (str(raw.storeName)) {
@@ -316,12 +328,12 @@ function buildTicket(raw: Record<string, unknown>, ctx: BuildContext): ActionPre
   }
 
   return {
-    title: "Yeni tadilat talebi",
+    title: t("assistant.actions.ticket.title"),
     fields: [
-      { label: "Başlık", value: title || "—" },
-      { label: "Saha", value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" },
-      { label: "Öncelik", value: PRIORITY_LABELS[priority] },
-      { label: "Açıklama", value: description || "—" },
+      { label: t("assistant.actions.ticket.fieldTitle"), value: title || "—" },
+      { label: t("assistant.actions.ticket.fieldStore"), value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" },
+      { label: t("assistant.actions.ticket.fieldPriority"), value: PRIORITY_LABELS[priority] },
+      { label: t("assistant.actions.ticket.fieldDescription"), value: description || "—" },
     ],
     warnings: [],
     errors,
@@ -335,23 +347,23 @@ function buildTicket(raw: Record<string, unknown>, ctx: BuildContext): ActionPre
 function buildWorkPlan(raw: Record<string, unknown>, ctx: BuildContext): ActionPreview {
   const errors: string[] = [];
   if (!canModule(ctx.user, "stores", "edit") && !canModule(ctx.user, "map", "edit")) {
-    errors.push("İş planı ekleme yetkiniz yok.");
+    errors.push(t("assistant.actions.workPlan.noPermission"));
   }
   const { store, error } = resolveStore(ctx.stores, raw.storeName);
   if (error) errors.push(error);
 
   const rows: ParsedWorkPlanRow[] = itemsOf(raw, errors).map((item, index) => {
-    const label = `${index + 1}. kalem`;
+    const label = t("assistant.actions.itemLabel", { index: index + 1 });
     const description = str(item.description);
     const startDate = str(item.startDate);
     const endDate = str(item.endDate);
     const status = pick(item.status, WORK_PLAN_STATUSES, "yapilacak");
     const percent = num(item.percentComplete);
-    if (!description) errors.push(`${label}: iş tanımı eksik.`);
-    if (!isIsoDate(startDate)) errors.push(`${label}: başlangıç tarihi eksik ya da geçersiz.`);
-    if (endDate && !isIsoDate(endDate)) errors.push(`${label}: bitiş tarihi geçersiz.`);
+    if (!description) errors.push(t("assistant.actions.workPlan.descriptionMissing", { label }));
+    if (!isIsoDate(startDate)) errors.push(t("assistant.actions.workPlan.startDateInvalid", { label }));
+    if (endDate && !isIsoDate(endDate)) errors.push(t("assistant.actions.workPlan.endDateInvalid", { label }));
     if (isIsoDate(startDate) && isIsoDate(endDate) && endDate < startDate) {
-      errors.push(`${label}: bitiş tarihi başlangıçtan önce olamaz.`);
+      errors.push(t("assistant.actions.workPlan.endBeforeStart", { label }));
     }
     return {
       description,
@@ -367,10 +379,18 @@ function buildWorkPlan(raw: Record<string, unknown>, ctx: BuildContext): ActionP
   });
 
   return {
-    title: `İş planına ${rows.length} kalem`,
-    fields: [{ label: "Saha", value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" }],
+    title: t(rows.length === 1 ? "assistant.actions.workPlan.titleOne" : "assistant.actions.workPlan.titleOther", {
+      count: rows.length,
+    }),
+    fields: [{ label: t("assistant.actions.workPlan.fieldStore"), value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" }],
     table: {
-      columns: ["İş", "Başlangıç", "Bitiş", "Sorumlu", "Durum"],
+      columns: [
+        t("assistant.actions.workPlan.columnTask"),
+        t("assistant.actions.workPlan.columnStart"),
+        t("assistant.actions.workPlan.columnEnd"),
+        t("assistant.actions.workPlan.columnResponsible"),
+        t("assistant.actions.workPlan.columnStatus"),
+      ],
       rows: rows.map((row) => [
         row.description || "—",
         formatDate(row.startDate),
@@ -388,7 +408,7 @@ function buildWorkPlan(raw: Record<string, unknown>, ctx: BuildContext): ActionP
 function buildMaterials(raw: Record<string, unknown>, ctx: BuildContext): ActionPreview {
   const errors: string[] = [];
   if (!canModule(ctx.user, "stores", "edit") && !canModule(ctx.user, "map", "edit")) {
-    errors.push("Keşif ekleme yetkiniz yok.");
+    errors.push(t("assistant.actions.materials.noPermission"));
   }
   const { store, error } = resolveStore(ctx.stores, raw.storeName);
   if (error) errors.push(error);
@@ -396,15 +416,15 @@ function buildMaterials(raw: Record<string, unknown>, ctx: BuildContext): Action
   // Birim belirtilmezse keşfin karşılaştırıldığı bütçenin birimi
   const defaultCurrency = store?.budgetCurrency ?? ctx.defaultCurrency;
   const rows: (ParsedMaterialRow & { currency: CurrencyCode })[] = itemsOf(raw, errors).map((item, index) => {
-    const label = `${index + 1}. kalem`;
+    const label = t("assistant.actions.itemLabel", { index: index + 1 });
     const name = str(item.name);
     const quantity = num(item.quantity);
     const unitPrice = num(item.unitPrice) ?? 0;
     const currency = parseCurrency(item.currency);
-    if (!name) errors.push(`${label}: malzeme adı eksik.`);
-    if (quantity === null || quantity <= 0) errors.push(`${label}: miktar eksik ya da geçersiz.`);
-    if (unitPrice < 0) errors.push(`${label}: birim fiyat negatif olamaz.`);
-    if (str(item.currency) && !currency) errors.push(`${label}: "${str(item.currency)}" para birimi tanınmadı.`);
+    if (!name) errors.push(t("assistant.actions.materials.nameMissing", { label }));
+    if (quantity === null || quantity <= 0) errors.push(t("assistant.actions.materials.quantityInvalid", { label }));
+    if (unitPrice < 0) errors.push(t("assistant.actions.materials.negativeUnitPrice", { label }));
+    if (str(item.currency) && !currency) errors.push(t("assistant.actions.materials.unknownCurrency", { label, value: str(item.currency) }));
     return {
       pozNo: str(item.pozNo),
       name,
@@ -417,22 +437,30 @@ function buildMaterials(raw: Record<string, unknown>, ctx: BuildContext): Action
   const totals = sumMoney(rows, (row) => row.currency, materialLineTotal);
 
   return {
-    title: `Keşfe ${rows.length} kalem`,
+    title: t(rows.length === 1 ? "assistant.actions.materials.titleOne" : "assistant.actions.materials.titleOther", {
+      count: rows.length,
+    }),
     fields: [
-      { label: "Saha", value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" },
-      { label: "Toplam", value: formatMoneyTotals(totals, defaultCurrency) },
+      { label: t("assistant.actions.materials.fieldStore"), value: store ? `${store.name} (${store.city})` : str(raw.storeName) || "—" },
+      { label: t("assistant.actions.materials.fieldTotal"), value: formatMoneyTotals(totals, defaultCurrency) },
     ],
     table: {
-      columns: ["Poz no", "Malzeme", "Miktar", "Birim fiyat", "Tutar"],
+      columns: [
+        t("assistant.actions.materials.columnItemCode"),
+        t("assistant.actions.materials.columnMaterial"),
+        t("assistant.actions.materials.columnQuantity"),
+        t("assistant.actions.materials.columnUnitPrice"),
+        t("assistant.actions.materials.columnAmount"),
+      ],
       rows: rows.map((row) => [
         row.pozNo || "—",
         row.name || "—",
-        `${row.quantity.toLocaleString("tr-TR")} ${row.unit}`,
+        `${row.quantity.toLocaleString(getIntlLocale())} ${row.unit}`,
         formatMoney(row.unitPrice, row.currency),
         formatMoney(materialLineTotal(row), row.currency),
       ]),
     },
-    warnings: rows.some((row) => row.unitPrice === 0) ? ["Birim fiyatı belirtilmeyen kalemler 0 tutarla eklenecek."] : [],
+    warnings: rows.some((row) => row.unitPrice === 0) ? [t("assistant.actions.materials.zeroPriceWarning")] : [],
     errors,
     resolved: errors.length === 0 && store ? { type: "add_materials", storeId: store.id, rows } : undefined,
   };
@@ -444,7 +472,14 @@ export async function buildActionPreviews(
   ctx: BuildContext
 ): Promise<ActionPreview[]> {
   if (rawActions.length === 0) {
-    return [{ title: "Eylem okunamadı", fields: [], warnings: [], errors: ["Asistanın önerisi anlaşılamadı. İsteği tekrar yazmayı deneyin."] }];
+    return [
+      {
+        title: t("assistant.actions.unreadableTitle"),
+        fields: [],
+        warnings: [],
+        errors: [t("assistant.actions.unreadableError")],
+      },
+    ];
   }
   return Promise.all(
     rawActions.slice(0, 5).map((raw) => {
@@ -459,10 +494,10 @@ export async function buildActionPreviews(
           return buildMaterials(raw, ctx);
         default:
           return {
-            title: "Desteklenmeyen işlem",
+            title: t("assistant.actions.unsupportedTitle"),
             fields: [],
             warnings: [],
-            errors: [`"${str(raw.type) || "?"}" işlemi asistan üzerinden yapılamıyor.`],
+            errors: [t("assistant.actions.unsupportedError", { type: str(raw.type) || "?" })],
           };
       }
     })

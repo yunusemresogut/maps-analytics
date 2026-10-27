@@ -61,6 +61,7 @@ function StoreEditor({
   onCancel: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const { user } = useAuth();
   const { updateStore } = useStores();
   const { form, setForm, errors, setErrors, location, prepare } = useStoreForm(store);
@@ -90,7 +91,7 @@ function StoreEditor({
     const ok = await updateStore(store.id, prepared.data, { userId: user.id, userName: user.name });
     setSaving(false);
     if (!ok) {
-      setSaveError("Kayıt başarısız. Yetkinizi veya bağlantınızı kontrol edin.");
+      setSaveError(t("site.mapPanels.saveFailed"));
       return;
     }
     onSaved();
@@ -105,8 +106,8 @@ function StoreEditor({
             active: picking,
             onToggle: () => setPicking((value) => !value),
             hint: picking
-              ? "Haritaya tıklayın ya da pini sürükleyin"
-              : "Konumu haritadan değiştirebilirsiniz",
+              ? t("site.mapPanels.pickActiveHint")
+              : t("site.mapPanels.pickIdleHint"),
           }}
           errors={{ city: errors.city, address: errors.address }}
         />
@@ -120,16 +121,16 @@ function StoreEditor({
           </p>
         )}
         {canDelete && (
-          <Button variant="danger" size="sm" onClick={onDelete} aria-label="Sil">
+          <Button variant="danger" size="sm" onClick={onDelete} aria-label={t("common.delete")}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         )}
         <Button variant="ghost" size="sm" onClick={onCancel}>
-          İptal
+          {t("common.cancel")}
         </Button>
         <Button className="flex-1" size="sm" loading={saving} onClick={() => void handleSave()}>
           <Save className="h-3.5 w-3.5" />
-          Kaydet
+          {t("common.save")}
         </Button>
       </div>
     </>
@@ -165,7 +166,7 @@ export function StoreDetailPanel({
 
   const handleDelete = () => {
     if (!canDelete) return;
-    if (confirm("Bu konumu silmek istediğinize emin misiniz?")) {
+    if (confirm(t("site.mapPanels.confirmDelete"))) {
       deleteStore(store.id);
       onClose();
     }
@@ -208,7 +209,7 @@ export function StoreDetailPanel({
               type="button"
               onClick={onClose}
               className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
-              aria-label="Kapat"
+              aria-label={t("common.close")}
             >
               <X className="h-4 w-4" />
             </button>
@@ -240,7 +241,7 @@ export function StoreDetailPanel({
             </div>
 
             <div className="flex shrink-0 items-center gap-2 border-t border-zinc-800 p-4">
-              {saved && <p className="text-xs text-emerald-400">Kaydedildi</p>}
+              {saved && <p className="text-xs text-emerald-400">{t("site.mapPanels.saved")}</p>}
               {canEdit && (
                 <Button
                   size="sm"
@@ -249,7 +250,7 @@ export function StoreDetailPanel({
                   onClick={() => setEditingStoreId(store.id)}
                 >
                   <Pencil className="h-3.5 w-3.5" />
-                  Düzenle
+                  {t("common.edit")}
                 </Button>
               )}
             </div>

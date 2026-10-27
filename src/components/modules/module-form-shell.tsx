@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/contexts/i18n-context";
 
 type ModuleFormShellProps = {
   backHref: string;
@@ -27,10 +28,11 @@ export function ModuleFormShell({
   onSave,
   onDelete,
   saving,
-  saveLabel = "Kaydet",
+  saveLabel,
   canSave = true,
   canDelete = false,
 }: ModuleFormShellProps) {
+  const t = useT();
   return (
     <div className="scrollbar-themed h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
       <Link
@@ -52,12 +54,12 @@ export function ModuleFormShell({
         <div className="mt-8 flex flex-wrap gap-2">
           {canSave && onSave && (
             <Button onClick={onSave} loading={saving}>
-              {saveLabel}
+              {saveLabel ?? t("common.save")}
             </Button>
           )}
           {canDelete && onDelete && (
             <Button variant="danger" onClick={onDelete}>
-              Sil
+              {t("common.delete")}
             </Button>
           )}
         </div>

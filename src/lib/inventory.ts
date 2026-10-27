@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { localizedRecord, t } from "@/i18n/runtime";
 
 /**
  * Envanter: ekipman ve araçlar, kişilere zimmet ve teslim alma
@@ -16,27 +17,27 @@ export type InventoryStatus = "active" | "maintenance" | "retired";
 export type InventoryState = "available" | "assigned" | "maintenance" | "retired";
 export type ReturnCondition = "good" | "damaged" | "lost";
 
-export const CATEGORY_LABELS: Record<InventoryCategory, string> = {
-  equipment: "Ekipman",
-  vehicle: "Araç",
-  hand_tool: "El aleti",
-  electronics: "Elektronik",
-  safety: "İş güvenliği",
-  other: "Diğer",
-};
+export const CATEGORY_LABELS: Record<InventoryCategory, string> = localizedRecord({
+  equipment: "inventory.category.equipment",
+  vehicle: "inventory.category.vehicle",
+  hand_tool: "inventory.category.hand_tool",
+  electronics: "inventory.category.electronics",
+  safety: "inventory.category.safety",
+  other: "inventory.category.other",
+});
 
-export const STATUS_LABELS: Record<InventoryStatus, string> = {
-  active: "Kullanımda / depoda",
-  maintenance: "Bakımda",
-  retired: "Hurdaya ayrıldı",
-};
+export const STATUS_LABELS: Record<InventoryStatus, string> = localizedRecord({
+  active: "inventory.status.active",
+  maintenance: "inventory.status.maintenance",
+  retired: "inventory.status.retired",
+});
 
-export const STATE_LABELS: Record<InventoryState, string> = {
-  available: "Boşta",
-  assigned: "Zimmette",
-  maintenance: "Bakımda",
-  retired: "Hurda",
-};
+export const STATE_LABELS: Record<InventoryState, string> = localizedRecord({
+  available: "inventory.state.available",
+  assigned: "inventory.state.assigned",
+  maintenance: "inventory.state.maintenance",
+  retired: "inventory.state.retired",
+});
 
 export const STATE_STYLES: Record<InventoryState, string> = {
   available: "bg-emerald-500/10 text-emerald-400 border-emerald-500/25",
@@ -45,11 +46,11 @@ export const STATE_STYLES: Record<InventoryState, string> = {
   retired: "bg-zinc-800/60 text-zinc-500 border-zinc-700",
 };
 
-export const CONDITION_LABELS: Record<ReturnCondition, string> = {
-  good: "Sağlam",
-  damaged: "Hasarlı",
-  lost: "Kayıp",
-};
+export const CONDITION_LABELS: Record<ReturnCondition, string> = localizedRecord({
+  good: "inventory.condition.good",
+  damaged: "inventory.condition.damaged",
+  lost: "inventory.condition.lost",
+});
 
 export type InventoryItemInput = {
   code: string;
@@ -192,9 +193,24 @@ function vehicleToDb(input: InventoryItemInput) {
 }
 
 export const VEHICLE_DOCUMENTS = [
-  { key: "insuranceExpires", label: "Trafik sigortası" },
-  { key: "cascoExpires", label: "Kasko" },
-  { key: "inspectionExpires", label: "Muayene" },
+  {
+    key: "insuranceExpires",
+    get label() {
+      return t("inventory.vehicleDocument.insurance");
+    },
+  },
+  {
+    key: "cascoExpires",
+    get label() {
+      return t("inventory.vehicleDocument.casco");
+    },
+  },
+  {
+    key: "inspectionExpires",
+    get label() {
+      return t("inventory.vehicleDocument.inspection");
+    },
+  },
 ] as const;
 
 /** Aracın bitişi en yakın belgesi (ad ve tarih) */
@@ -231,9 +247,9 @@ function assignmentToDb(input: AssignmentInput) {
 /** Postgres hatalarını kullanıcıya anlaşılır mesaja çevirir */
 export function inventoryErrorMessage(error: unknown, fallback: string): string {
   const code = (error as { code?: string } | null)?.code;
-  if (code === "23505") return "Bu eşya zaten birine zimmetli. Önce teslim alın.";
-  if (code === "42501") return "Bu işlem için envanter yetkiniz yok.";
-  if (code === "23514") return "Tarihleri kontrol edin: teslim tarihi zimmet tarihinden önce olamaz.";
+  if (code === "23505") return t("inventory.errors.alreadyAssigned");
+  if (code === "42501") return t("inventory.errors.noPermission");
+  if (code === "23514") return t("inventory.errors.invalidDates");
   return fallback;
 }
 

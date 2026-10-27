@@ -16,15 +16,13 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Select } from "@/components/ui/select";
 import { MoneyInput } from "@/components/ui/money-input";
 import { DEFAULT_CURRENCY, formatMoney, formatMoneyTotals, type CurrencyCode } from "@/lib/currency";
-import { encodePaymentPeriod, paidAmountForPayment, parsePaymentPeriod } from "@/lib/module-finance";
+import {
+  encodePaymentPeriod,
+  paidAmountForPayment,
+  parsePaymentPeriod,
+  PAYMENT_STATUS_LABELS,
+} from "@/lib/module-finance";
 import type { ProgressPaymentStatus } from "@/types";
-
-const STATUS_TR: Record<ProgressPaymentStatus, string> = {
-  draft: "Taslak",
-  submitted: "Gönderildi",
-  approved: "Onaylandı",
-  paid: "Ödendi",
-};
 
 function EditPaymentContent({ id }: { id: string }) {
   const router = useRouter();
@@ -66,15 +64,15 @@ function EditPaymentContent({ id }: { id: string }) {
     if (!canEdit) return;
     setShowErrors(true);
     if (invalid.title) {
-      setSaveError("Başlık zorunludur.");
+      setSaveError(t("finance.shared.titleRequired"));
       return;
     }
     if (periodPartial) {
-      setSaveError("Dönem için başlangıç ve bitiş tarihlerini birlikte girin.");
+      setSaveError(t("finance.payments.periodPartial"));
       return;
     }
     if (periodStart && periodEnd && periodEnd < periodStart) {
-      setSaveError("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+      setSaveError(t("finance.shared.endBeforeStart"));
       return;
     }
     setSaveError("");
@@ -93,59 +91,62 @@ function EditPaymentContent({ id }: { id: string }) {
     });
     setSaving(false);
     if (ok) router.push("/progress-payments");
-    else setSaveError("Hakediş kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.");
+    else setSaveError(t("finance.payments.saveFailed"));
   };
 
   const remove = async () => {
-    if (!canDelete || !confirm("Hakediş silinsin mi?")) return;
+    if (!canDelete || !confirm(t("finance.payments.deleteConfirm"))) return;
     const ok = await deletePayment(id);
     if (ok) router.push("/progress-payments");
-    else setSaveError("Hakediş silinemedi. Tekrar deneyin.");
+    else setSaveError(t("finance.payments.deleteFailed"));
   };
 
   return (
-    <ModuleFormShell backHref="/progress-payments" backLabel="Hakedişler" title={title || "Hakediş düzenle"} onSave={save} onDelete={remove} saving={saving} canSave={canEdit} canDelete={canDelete}>
+    <ModuleFormShell backHref="/progress-payments" backLabel={t("finance.payments.backLabel")} title={title || t("finance.payments.editTitle")} onSave={save} onDelete={remove} saving={saving} canSave={canEdit} canDelete={canDelete}>
       {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400">
-        Toplam hakediş {formatMoney(payment.amount, payment.currency)} · Ödenen {formatMoneyTotals(paid, payment.currency)}
+        {t("finance.payments.summary", {
+          total: formatMoney(payment.amount, payment.currency),
+          paid: formatMoneyTotals(paid, payment.currency),
+        })}
         {contract && (
           <Link href={`/contracts/${contract.id}/edit`} className="mt-1 block text-cyan-400 hover:underline">
-            Sözleşme: {contract.title}
+            {t("finance.shared.contractLink", { name: contract.title })}
           </Link>
         )}
       </div>
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div>
-          <label className="text-xs text-zinc-500">Sözleşme</label>
+          <label className="text-xs text-zinc-500">{t("finance.shared.contract")}</label>
           <Select className="mt-1" value={contractId} onChange={(e) => setContractId(e.target.value)} disabled={!canEdit}>
-            <option value="">Seçiniz</option>
+            <option value="">{t("finance.shared.select")}</option>
             {contracts.map((c) => (
               <option key={c.id} value={c.id}>{c.title}</option>
             ))}
           </Select>
         </div>
         <div>
-          <label className="text-xs text-zinc-500">Başlık *</label>
+          <label className="text-xs text-zinc-500">{t("finance.shared.title")} *</label>
           <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit} aria-invalid={showErrors && invalid.title} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Dönem başlangıcı</label>
+            <label className="text-xs text-zinc-500">{t("finance.payments.periodStart")}</label>
             <DatePicker className="mt-1" value={periodStart} onChange={setPeriodStart} disabled={!canEdit} aria-invalid={showErrors && invalid.start} />
-            {!periodStart && periodLabel && <p className="mt-1 text-xs text-zinc-500">Mevcut dönem: {periodLabel}</p>}
+            {!periodStart && periodLabel && <p className="mt-1 text-xs text-zinc-500">{t("finance.payments.currentPeriod", { period: periodLabel })}</p>}
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Dönem bitişi</label>
+            <label className="text-xs text-zinc-500">{t("finance.payments.periodEnd")}</label>
             <DatePicker className="mt-1" value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} disabled={!canEdit} aria-invalid={showErrors && invalid.end} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Toplam hakediş</label>
+            <label className="text-xs text-zinc-500">{t("finance.payments.totalAmount")}</label>
             <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} disabled={!canEdit} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Durum</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.status")}</label>
             <Select className="mt-1" value={status} onChange={(e) => setStatus(e.target.value as ProgressPaymentStatus)} disabled={!canEdit}>
-              {Object.entries(STATUS_TR).map(([k, v]) => (
+              {Object.entries(PAYMENT_STATUS_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
             </Select>

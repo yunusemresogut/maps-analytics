@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   createContext,
   useCallback,
   useContext,
@@ -18,6 +19,7 @@ import {
   type TranslateParams,
   type TranslationKey,
 } from "@/i18n";
+import { setRuntimeLocale } from "@/i18n/runtime";
 import { STORAGE_KEYS } from "@/lib/storage-keys";
 import type { Locale as DateFnsLocale } from "date-fns";
 
@@ -49,6 +51,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = next;
   }, []);
 
+  // React dışındaki kod (lib/) aynı dili okusun; çocuklar render edilmeden önce ayarlanır
+  setRuntimeLocale(locale);
+
   const dictionary = useMemo(() => getDictionary(locale), [locale]);
   const dateLocale = useMemo(() => getDateFnsLocale(locale), [locale]);
 
@@ -74,4 +79,13 @@ export function useI18n() {
 
 export function useT() {
   return useI18n().t;
+}
+
+/**
+ * Dil değişince sayfa içeriğini yeniden kurar: sağlayıcıların verisi korunur,
+ * içerideki her metin (lib/ etiketleri dahil) yeni dille yeniden üretilir.
+ */
+export function LocaleBoundary({ children }: { children: React.ReactNode }) {
+  const { locale } = useI18n();
+  return <Fragment key={locale}>{children}</Fragment>;
 }

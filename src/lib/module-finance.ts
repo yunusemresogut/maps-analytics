@@ -1,4 +1,14 @@
-import type { Contract, Invoice, ProgressPayment } from "@/types";
+import type {
+  Contract,
+  ContractStatus,
+  Invoice,
+  InvoiceStatus,
+  ProgressPayment,
+  ProgressPaymentStatus,
+  TicketPriority,
+  TicketStatus,
+} from "@/types";
+import { localizedRecord } from "@/i18n/runtime";
 import { format, isValid, parseISO } from "date-fns";
 import type { Locale } from "date-fns";
 import { roundMoney, sumMoney, type MoneyTotals } from "@/lib/currency";
@@ -125,3 +135,40 @@ export function needsContractWarning(
   if (storeProjectStatus !== "ihale") return false;
   return !storeHasContract(storeId, contracts);
 }
+
+/** Modül durum / öncelik etiketleri; her okunuşta seçili dile çevrilir */
+export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = localizedRecord({
+  open: "finance.ticketStatus.open",
+  in_progress: "finance.ticketStatus.in_progress",
+  resolved: "finance.ticketStatus.resolved",
+  closed: "finance.ticketStatus.closed",
+});
+
+export const TICKET_PRIORITY_LABELS: Record<TicketPriority, string> = localizedRecord({
+  low: "finance.ticketPriority.low",
+  medium: "finance.ticketPriority.medium",
+  high: "finance.ticketPriority.high",
+});
+
+export const CONTRACT_STATUS_LABELS: Record<ContractStatus, string> = localizedRecord({
+  draft: "finance.contractStatus.draft",
+  active: "finance.contractStatus.active",
+  expired: "finance.contractStatus.expired",
+  cancelled: "finance.contractStatus.cancelled",
+  terminated: "finance.contractStatus.terminated",
+  completed: "finance.contractStatus.completed",
+});
+
+export const PAYMENT_STATUS_LABELS: Record<ProgressPaymentStatus, string> = localizedRecord({
+  draft: "finance.paymentStatus.draft",
+  submitted: "finance.paymentStatus.submitted",
+  approved: "finance.paymentStatus.approved",
+  paid: "finance.paymentStatus.paid",
+});
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = localizedRecord({
+  draft: "finance.invoiceStatus.draft",
+  issued: "finance.invoiceStatus.issued",
+  paid: "finance.invoiceStatus.paid",
+  cancelled: "finance.invoiceStatus.cancelled",
+});

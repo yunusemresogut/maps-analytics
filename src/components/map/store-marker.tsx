@@ -4,6 +4,7 @@ import { Marker } from "react-map-gl/maplibre";
 import { getOpeningAlert, shouldHighlightRed } from "@/lib/opening-dates";
 import { projectStatusConfig } from "@/lib/project-status";
 import type { Store } from "@/types";
+import { useT } from "@/contexts/i18n-context";
 
 type StoreMarkerProps = {
   store: Store;
@@ -18,6 +19,7 @@ export function StoreMarker({
   onClick,
   onDoubleClick,
 }: StoreMarkerProps) {
+  const t = useT();
   const projectConfig = projectStatusConfig[store.projectStatus];
   const openingAlert = getOpeningAlert(store.openingDate);
   const isRed = shouldHighlightRed(store.openingDate);
@@ -42,7 +44,7 @@ export function StoreMarker({
           onDoubleClick?.();
         }}
         className="group relative flex items-center justify-center"
-        aria-label={`${store.name}${openingAlert.isOpeningSoon ? " — yakında açılıyor" : ""}`}
+        aria-label={`${store.name}${openingAlert.isOpeningSoon ? t("site.opening.markerSoon") : ""}`}
         title={openingAlert.label}
       >
         {isRed && (

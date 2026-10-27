@@ -1,25 +1,28 @@
+import { localizedRecord } from "@/i18n/runtime";
+
 export type FieldErrors = Record<string, string>;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export const ValidationMessages = {
-  required: "Bu alan zorunludur",
-  emailInvalid: "Geçerli bir e-posta adresi girin",
-  passwordMin: "Şifre en az 6 karakter olmalıdır",
-  passwordMismatch: "Şifreler eşleşmiyor",
-  nameMin: "Ad soyad en az 2 karakter olmalıdır",
-  companyMin: "Firma adı en az 2 karakter olmalıdır",
-  phoneInvalid: "Geçerli bir telefon numarası girin (en az 10 rakam)",
-  urlInvalid: "Geçerli bir URL girin (https://...)",
-  addressMin: "Adres en az 5 karakter olmalıdır",
-  taxRequired: "Vergi numarası zorunludur",
-  authorizedMin: "Yetkili ad soyad en az 2 karakter olmalıdır",
-  titleRequired: "Başlık zorunludur",
-  numberInvalid: "Geçerli bir sayı girin",
-  positiveNumber: "0 veya daha büyük bir değer girin",
-  cityRequired: "Şehir zorunludur",
-  dateRequired: "Tarih zorunludur",
-} as const;
+/** Her okunuşta seçili dile çevrilir */
+export const ValidationMessages = localizedRecord({
+  required: "shell.validation.required",
+  emailInvalid: "shell.validation.emailInvalid",
+  passwordMin: "shell.validation.passwordMin",
+  passwordMismatch: "shell.validation.passwordMismatch",
+  nameMin: "shell.validation.nameMin",
+  companyMin: "shell.validation.companyMin",
+  phoneInvalid: "shell.validation.phoneInvalid",
+  urlInvalid: "shell.validation.urlInvalid",
+  addressMin: "shell.validation.addressMin",
+  taxRequired: "shell.validation.taxRequired",
+  authorizedMin: "shell.validation.authorizedMin",
+  titleRequired: "shell.validation.titleRequired",
+  numberInvalid: "shell.validation.numberInvalid",
+  positiveNumber: "shell.validation.positiveNumber",
+  cityRequired: "shell.validation.cityRequired",
+  dateRequired: "shell.validation.dateRequired",
+});
 
 export function isNonEmpty(value: string, min = 1): boolean {
   return value.trim().length >= min;

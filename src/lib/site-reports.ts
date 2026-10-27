@@ -1,3 +1,4 @@
+import { t } from "@/i18n/runtime";
 import { supabase } from "@/lib/supabase";
 import { MODULE_FILES_BUCKET } from "@/lib/upload-module-attachment";
 import { FULL_MANAGER_ROLES, isAdmin } from "@/lib/roles";
@@ -204,7 +205,7 @@ export async function saveSiteReport(input: {
       })
       .select("id")
       .single();
-    if (error || !data) throw error ?? new Error("Rapor oluşturulamadı");
+    if (error || !data) throw error ?? new Error(t("reports.editor.createFailed"));
     id = String(data.id);
   }
 
@@ -220,7 +221,7 @@ export async function saveSiteReport(input: {
       .from(MODULE_FILES_BUCKET)
       .upload(path, photo.file, { contentType: photo.file.type || "image/jpeg", upsert: false });
     if (error) {
-      errors.push(`"${photo.name}" yüklenemedi: ${error.message}`);
+      errors.push(t("reports.editor.photoUploadFailed", { name: photo.name, error: error.message }));
       continue;
     }
     photos.push({ ...photo, path, file: undefined });
@@ -273,4 +274,15 @@ export async function compressPhoto(file: File, maxSide = 1600, quality = 0.82):
   } catch {
     return file;
   }
+}
+
+/** `from` tarihinden bu yana raporu olan saha + gün çiftleri (pano rapor kapsamı) */
+export async function fetchReportDays(from: string): Promise<{ storeId: string; reportDate: string }[]> {
+  const { data, error } = await supabase
+    .from(SITE_REPORTS_SOURCE)
+    .select("store_id, report_date")
+    .gte("report_date", from)
+    .limit(5000);
+  if (error) throw error;
+  return (data ?? []).map((row) => ({ storeId: String(row.store_id ?? ""), reportDate: String(row.report_date ?? "") }));
 }

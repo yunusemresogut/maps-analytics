@@ -34,6 +34,8 @@ import { apiFetch } from "@/lib/api-client";
 import { searchAddresses } from "@/lib/geocode";
 import { useHorizontalDrag } from "@/hooks/use-horizontal-drag";
 import { useLocationTypes } from "@/hooks/use-location-types";
+import { useT } from "@/contexts/i18n-context";
+import type { TranslationKey } from "@/i18n";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -43,14 +45,14 @@ type ChatMessage = {
   proposal?: ActionProposal;
 };
 
-const SUGGESTIONS = [
-  "Genel durumu özetle",
-  "Önümüzdeki 30 günde açılacak sahalar hangileri?",
-  "Açılış tarihi geçmiş sahalar var mı?",
-  "Hakediş ve fatura durumunu yorumla",
-  "Riskli projeleri ve önerilerini listele",
-  "Yeni bir tadilat talebi aç",
-  "Bir sahanın keşfine malzeme ekle",
+const SUGGESTIONS: TranslationKey[] = [
+  "assistant.suggestions.summary",
+  "assistant.suggestions.upcomingOpenings",
+  "assistant.suggestions.overdueOpenings",
+  "assistant.suggestions.finance",
+  "assistant.suggestions.risks",
+  "assistant.suggestions.newTicket",
+  "assistant.suggestions.addMaterials",
 ];
 
 /** Modelin önceki önerilerin akıbetini bilmesi için geçmişe eklenen not */
@@ -157,6 +159,7 @@ async function loadStoreDetails(stores: Store[]): Promise<Record<string, StoreDe
 }
 
 export function AssistantWidget() {
+  const t = useT();
   const pathname = usePathname();
   const { user } = useAuth();
   const { stores, storeSummaries, contracts, progressPayments, invoices, tickets, organization } = useDb();
@@ -315,7 +318,7 @@ export function AssistantWidget() {
         const message =
           data && typeof data === "object" && "error" in data && typeof data.error === "string"
             ? data.error
-            : "Asistan şu anda yanıt veremiyor.";
+            : t("assistant.errors.unavailable");
         updateLast(() => ({ role: "assistant", content: message, error: true }));
         return;
       }
@@ -333,7 +336,7 @@ export function AssistantWidget() {
       if (!fullText.trim()) {
         updateLast(() => ({
           role: "assistant",
-          content: "Bir cevap üretilemedi. Soruyu farklı sormayı deneyin.",
+          content: t("assistant.errors.emptyAnswer"),
           error: true,
         }));
         return;
@@ -359,12 +362,12 @@ export function AssistantWidget() {
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         updateLast((message) =>
-          message.content ? message : { role: "assistant", content: "Yanıt durduruldu.", error: true }
+          message.content ? message : { role: "assistant", content: t("assistant.errors.stopped"), error: true }
         );
       } else {
         updateLast(() => ({
           role: "assistant",
-          content: "Bağlantı kurulamadı. İnternet bağlantınızı kontrol edin.",
+          content: t("assistant.errors.connection"),
           error: true,
         }));
       }
@@ -382,11 +385,11 @@ export function AssistantWidget() {
     );
 
   const runAction = async (action: ResolvedAction): Promise<ActionResult> => {
-    const storeName = (id: string) => stores.find((store) => store.id === id)?.name ?? "saha";
+    const storeName = (id: string) => stores.find((store) => store.id === id)?.name ?? t("assistant.results.fallbackStoreName");
     switch (action.type) {
       case "create_store": {
         const store = addStore(action.store, { userId: user.id, userName: user.name });
-        return { ok: true, label: `"${store.name}" sahası oluşturuldu`, href: `/stores/${store.id}` };
+        return { ok: true, label: t("assistant.results.storeCreated", { name: store.name }), href: `/stores/${store.id}` };
       }
       case "create_ticket": {
         const id = await createTicket({
@@ -394,20 +397,34 @@ export function AssistantWidget() {
           code: nextTicketCode(tickets, org.defaults.ticketCodePrefix),
         });
         return id
-          ? { ok: true, label: `"${action.ticket.title}" ticket'ı açıldı`, href: `/tickets/${id}` }
-          : { ok: false, label: "Tadilat talebi oluşturulamadı" };
+          ? { ok: true, label: t("assistant.results.ticketCreated", { title: action.ticket.title }), href: `/tickets/${id}` }
+          : { ok: false, label: t("assistant.results.ticketFailed") };
       }
       case "add_work_plan": {
         const count = await importWorkPlan(action.storeId, action.rows, "append");
         return count > 0
-          ? { ok: true, label: `${storeName(action.storeId)} iş planına ${count} kalem eklendi`, href: `/stores/${action.storeId}` }
-          : { ok: false, label: "İş planı kalemleri eklenemedi" };
+          ? {
+              ok: true,
+              label: t(count === 1 ? "assistant.results.workPlanAddedOne" : "assistant.results.workPlanAddedOther", {
+                store: storeName(action.storeId),
+                count,
+              }),
+              href: `/stores/${action.storeId}`,
+            }
+          : { ok: false, label: t("assistant.results.workPlanFailed") };
       }
       case "add_materials": {
         const count = await importMaterials(action.storeId, action.rows, "append");
         return count > 0
-          ? { ok: true, label: `${storeName(action.storeId)} keşfine ${count} kalem eklendi`, href: `/stores/${action.storeId}` }
-          : { ok: false, label: "Keşif kalemleri eklenemedi" };
+          ? {
+              ok: true,
+              label: t(count === 1 ? "assistant.results.materialsAddedOne" : "assistant.results.materialsAddedOther", {
+                store: storeName(action.storeId),
+                count,
+              }),
+              href: `/stores/${action.storeId}`,
+            }
+          : { ok: false, label: t("assistant.results.materialsFailed") };
       }
     }
   };
@@ -425,7 +442,7 @@ export function AssistantWidget() {
         results.push(await runAction(action));
       } catch (error) {
         console.error("Asistan eylemi uygulanamadı:", error);
-        results.push({ ok: false, label: "İşlem sırasında beklenmeyen bir hata oluştu" });
+        results.push({ ok: false, label: t("assistant.results.unexpectedError") });
       }
     }
     setProposal(index, (current) => ({ ...current, status: "done", results }));
@@ -446,7 +463,7 @@ export function AssistantWidget() {
         <section
           ref={panelRef}
           role="dialog"
-          aria-label="Maps'e Sor"
+          aria-label={t("assistant.widget.title")}
           onKeyDown={(event) => {
             if (event.key === "Escape") collapse();
           }}
@@ -459,7 +476,7 @@ export function AssistantWidget() {
         >
           <header
             {...handleProps}
-            title="Sağa sola taşımak için sürükleyin"
+            title={t("assistant.widget.dragHint")}
             className={cn(
               "flex touch-none items-center justify-between gap-2 border-b border-zinc-800 px-4 py-3",
               dragging ? "cursor-grabbing" : "cursor-grab"
@@ -470,8 +487,8 @@ export function AssistantWidget() {
                 <Sparkles className="h-4 w-4 text-cyan-400" />
               </span>
               <div>
-                <p className="text-sm font-semibold text-zinc-100">Maps&apos;e Sor</p>
-                <p className="text-[11px] text-zinc-500">Firma verilerinize göre cevaplar, onayınızla kayıt ekler</p>
+                <p className="text-sm font-semibold text-zinc-100">{t("assistant.widget.title")}</p>
+                <p className="text-[11px] text-zinc-500">{t("assistant.widget.subtitle")}</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -480,8 +497,8 @@ export function AssistantWidget() {
                   type="button"
                   onClick={reset}
                   className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800/50 hover:text-zinc-300"
-                  aria-label="Yeni sohbet"
-                  title="Yeni sohbet"
+                  aria-label={t("assistant.widget.newChat")}
+                  title={t("assistant.widget.newChat")}
                 >
                   <RotateCcw className="h-4 w-4" />
                 </button>
@@ -490,8 +507,8 @@ export function AssistantWidget() {
                 type="button"
                 onClick={collapse}
                 className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800/50 hover:text-zinc-300"
-                aria-label="Küçült"
-                title="Küçült"
+                aria-label={t("assistant.widget.minimize")}
+                title={t("assistant.widget.minimize")}
               >
                 <ChevronDown className="h-4 w-4" />
               </button>
@@ -503,15 +520,14 @@ export function AssistantWidget() {
               <div className="mx-auto flex h-full max-w-lg flex-col justify-center gap-5 py-2">
                 <div className="text-center">
                   <p className="text-base font-semibold text-zinc-100">
-                    Merhaba {user.name.split(" ")[0]}, ne öğrenmek istersiniz?
+                    {t("assistant.widget.greeting", { name: user.name.split(" ")[0] })}
                   </p>
                   <p className="mt-1 text-sm text-zinc-500">
-                    Sahalar, açılış takvimi, iş planları ve finans kayıtlarınız hakkında sorun. Saha, ticket, iş planı
-                    ya da keşif kalemi eklemesini de isteyebilirsiniz; önce önizleme gösterilir, onaylarsanız eklenir.
+                    {t("assistant.widget.intro")}
                   </p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
-                  {SUGGESTIONS.map((suggestion) => (
+                  {SUGGESTIONS.map((key) => t(key)).map((suggestion) => (
                     <button
                       key={suggestion}
                       type="button"
@@ -562,13 +578,13 @@ export function AssistantWidget() {
                               streaming &&
                               index === messages.length - 1 &&
                               message.content.includes("```action") && (
-                                <p className="text-xs text-zinc-500">Öneri hazırlanıyor…</p>
+                                <p className="text-xs text-zinc-500">{t("assistant.widget.preparingProposal")}</p>
                               )
                             )}
                           </>
                         )
                       ) : (
-                        <span className="inline-flex gap-1 py-1" aria-label="Yazıyor">
+                        <span className="inline-flex gap-1 py-1" aria-label={t("assistant.widget.typing")}>
                           {[0, 150, 300].map((delay) => (
                             <span
                               key={delay}
@@ -606,8 +622,8 @@ export function AssistantWidget() {
                 }}
                 rows={1}
                 maxLength={4000}
-                placeholder="Maps'e bir soru sorun…"
-                aria-label="Mesaj"
+                placeholder={t("assistant.widget.placeholder")}
+                aria-label={t("assistant.widget.messageLabel")}
                 className="max-h-32 min-h-9 flex-1 resize-none bg-transparent py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none [field-sizing:content]"
               />
               {streaming ? (
@@ -615,7 +631,7 @@ export function AssistantWidget() {
                   type="button"
                   onClick={() => abortRef.current?.abort()}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-zinc-300 transition-colors hover:bg-zinc-700"
-                  aria-label="Durdur"
+                  aria-label={t("assistant.widget.stop")}
                 >
                   <Square className="h-3.5 w-3.5 fill-current" />
                 </button>
@@ -624,14 +640,14 @@ export function AssistantWidget() {
                   type="submit"
                   disabled={!input.trim()}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-on transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Gönder"
+                  aria-label={t("assistant.widget.send")}
                 >
                   <ArrowUp className="h-4 w-4" />
                 </button>
               )}
             </div>
             <p className="mt-1.5 text-center text-[10px] text-zinc-600">
-              Yapay zekâ hata yapabilir; önemli kararlarda verileri kontrol edin.
+              {t("assistant.widget.disclaimer")}
             </p>
           </form>
         </section>
@@ -645,9 +661,9 @@ export function AssistantWidget() {
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-500/15">
             <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
           </span>
-          <span className="shrink-0 text-sm font-semibold text-zinc-100">Maps&apos;e Sor</span>
+          <span className="shrink-0 text-sm font-semibold text-zinc-100">{t("assistant.widget.title")}</span>
           <span className="min-w-0 flex-1 truncate text-sm text-zinc-500">
-            {messages.length > 0 ? "Sohbete devam et" : "Sahalar, açılışlar, finans…"}
+            {messages.length > 0 ? t("assistant.widget.continueChat") : t("assistant.widget.collapsedHint")}
           </span>
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-brand-on transition-colors group-hover:bg-brand-hover">
             <ArrowUp className="h-4 w-4" />

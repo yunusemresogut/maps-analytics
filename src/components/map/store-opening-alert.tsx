@@ -4,6 +4,7 @@ import { AlertTriangle, Clock } from "lucide-react";
 import { getOpeningAlert } from "@/lib/opening-dates";
 import { cn } from "@/lib/utils";
 import type { Store } from "@/types";
+import { t } from "@/i18n/runtime";
 
 type StoreOpeningAlertProps = {
   store: Store;
@@ -24,10 +25,12 @@ export function StoreOpeningAlert({
   if (!isOverdue && !isSoon) return null;
 
   const message = isOverdue
-    ? `Açılış tarihi ${openingAlert.daysSinceOpening} gün geçti`
+    ? t(openingAlert.daysSinceOpening === 1 ? "site.opening.overdueDaysOne" : "site.opening.overdueDaysOther", {
+        count: openingAlert.daysSinceOpening,
+      })
     : openingAlert.label;
 
-  const title = isOverdue ? "Açılış gecikmesi" : "Yakında açılıyor";
+  const title = isOverdue ? t("site.opening.overdueTitle") : t("site.opening.soonTitle");
   const Icon = isOverdue ? Clock : AlertTriangle;
 
   if (compact) {
@@ -70,12 +73,16 @@ export function StoreOpeningAlert({
 export function storeOpeningBadgeLabel(store: Store): string | null {
   const openingAlert = getOpeningAlert(store.openingDate);
   if (openingAlert.isOverdue && store.projectStatus !== "acilis") {
-    return `${openingAlert.daysSinceOpening} gün geçti`;
+    return t(openingAlert.daysSinceOpening === 1 ? "site.opening.badgeOverdueOne" : "site.opening.badgeOverdueOther", {
+      count: openingAlert.daysSinceOpening,
+    });
   }
   if (openingAlert.isOpeningSoon) {
     return openingAlert.daysUntilOpening === 0
-      ? "Bugün açılıyor"
-      : `${openingAlert.daysUntilOpening} gün kaldı`;
+      ? t("site.opening.badgeToday")
+      : t(openingAlert.daysUntilOpening === 1 ? "site.opening.badgeLeftOne" : "site.opening.badgeLeftOther", {
+          count: openingAlert.daysUntilOpening,
+        });
   }
   return null;
 }

@@ -6,6 +6,7 @@ import type { MapRef } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useTheme } from "@/contexts/theme-context";
 import type { Coords } from "@/lib/geocode";
+import { useT } from "@/contexts/i18n-context";
 
 const LIGHT_MAP_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 const DARK_MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
@@ -65,8 +66,9 @@ export function LocationPickerMap({
 
 /** Seçilmekte olan (henüz kaydedilmemiş) konumun pini */
 export function DraftPin() {
+  const t = useT();
   return (
-    <div className="flex cursor-grab flex-col items-center active:cursor-grabbing" title="Sürükleyerek taşıyın">
+    <div className="flex cursor-grab flex-col items-center active:cursor-grabbing" title={t("site.location.dragToMove")}>
       <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-cyan-600 shadow-md">
         <span className="h-2 w-2 rounded-full bg-white" />
       </span>

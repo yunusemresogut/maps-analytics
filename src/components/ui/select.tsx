@@ -17,6 +17,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
+import { useT } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 
 /**
@@ -119,12 +120,14 @@ export function Select({
   className,
   id,
   name,
-  placeholder = "Seçiniz",
+  placeholder: placeholderProp,
   "aria-label": ariaLabel,
   "aria-labelledby": ariaLabelledBy,
   "aria-invalid": ariaInvalid,
   "aria-describedby": ariaDescribedBy,
 }: SelectProps) {
+  const t = useT();
+  const placeholder = placeholderProp ?? t("shell.select.placeholder");
   const options = useMemo(() => collectOptions(children), [children]);
   const current = value === undefined || value === null ? "" : String(value);
   const selectedIndex = options.findIndex((option) => option.value === current);
@@ -325,7 +328,7 @@ export function Select({
             // Tıklama tetikleyiciden odağı almasın
             onMouseDown={(event) => event.preventDefault()}
           >
-            {options.length === 0 && <li className="px-2.5 py-2 text-sm text-zinc-500">Seçenek yok</li>}
+            {options.length === 0 && <li className="px-2.5 py-2 text-sm text-zinc-500">{t("shell.select.noOptions")}</li>}
             {options.map((option, index) => {
               const isSelected = index === selectedIndex;
               const isActive = index === activeIndex;

@@ -1,3 +1,4 @@
+import { t } from "@/i18n/runtime";
 import { cn } from "@/lib/utils";
 
 export function Spinner({
@@ -22,7 +23,7 @@ export function Spinner({
   );
 }
 
-export function PageLoader({ label = "Yükleniyor..." }: { label?: string }) {
+export function PageLoader({ label = t("common.loading") }: { label?: string }) {
   return (
     <div className="flex h-full min-h-[12rem] items-center justify-center">
       <div className="flex flex-col items-center gap-3">

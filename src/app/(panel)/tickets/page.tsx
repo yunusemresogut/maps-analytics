@@ -17,35 +17,26 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useModules } from "@/contexts/modules-context";
 import { mapTicket } from "@/contexts/db-context";
+import { useT } from "@/contexts/i18n-context";
+import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/module-finance";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerTable } from "@/hooks/use-server-table";
 import type { Ticket } from "@/types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 
-const PRIORITY_TR: Record<string, string> = {
-  low: "Düşük",
-  medium: "Orta",
-  high: "Yüksek",
-};
-
-const STATUS_TR: Record<string, string> = {
-  open: "Açık",
-  in_progress: "Devam ediyor",
-  resolved: "Çözüldü",
-  closed: "Kapalı",
-};
-
 type SortKey = "code" | "title" | "storeName" | "priority" | "status" | "assignee" | "actions";
 
-const COLUMNS: DataTableColumn<SortKey>[] = [
-  { key: "code", label: "Kod" },
-  { key: "title", label: "Başlık" },
-  { key: "storeName", label: "Saha" },
-  { key: "priority", label: "Öncelik" },
-  { key: "status", label: "Durum" },
-  { key: "assignee", label: "Atanan" },
-  { key: "actions", label: "" },
-];
+function getColumns(t: ReturnType<typeof useT>): DataTableColumn<SortKey>[] {
+  return [
+    { key: "code", label: t("finance.shared.code") },
+    { key: "title", label: t("finance.shared.title") },
+    { key: "storeName", label: t("finance.shared.store") },
+    { key: "priority", label: t("finance.shared.priority") },
+    { key: "status", label: t("finance.shared.status") },
+    { key: "assignee", label: t("finance.shared.assignee") },
+    { key: "actions", label: "" },
+  ];
+}
 
 type TicketRow = Ticket & { storeName: string; assignee: string };
 
@@ -69,6 +60,7 @@ const SORT_COLUMNS: Partial<Record<SortKey, string>> = {
 const SEARCH_COLUMNS = ["code", "title", "store_name", "assignee_name"];
 
 function TicketsContent() {
+  const t = useT();
   const router = useRouter();
   const { tickets, deleteTicket } = useModules();
   const { canAdd, canEdit, canDelete } = usePermissions("tickets");
@@ -90,19 +82,19 @@ function TicketsContent() {
   });
 
   const handleDelete = async (id: string, title: string) => {
-    if (!canDelete || !confirm(`"${title}" silinsin mi?`)) return;
+    if (!canDelete || !confirm(t("finance.shared.deleteNamedConfirm", { name: title }))) return;
     await deleteTicket(id);
   };
 
   return (
     <ModuleTableShell
-      title="Tadilat Talepleri"
-      description="Saha tadilat ve bakım talepleri."
+      title={t("finance.tickets.title")}
+      description={t("finance.tickets.description")}
       headerAction={
         canAdd ? (
           <Button size="sm" onClick={() => router.push("/tickets/new")}>
             <Plus className="h-3.5 w-3.5" />
-            Yeni
+            {t("finance.shared.new")}
           </Button>
         ) : undefined
       }
@@ -111,20 +103,20 @@ function TicketsContent() {
           <SearchInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Kod, saha, başlık veya atanandan ara…"
-            aria-label="Tadilat taleplerinde ara"
+            placeholder={t("finance.tickets.searchPlaceholder")}
+            aria-label={t("finance.tickets.searchLabel")}
             containerClassName="w-full max-w-sm"
             className="h-10"
           />
           <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-auto min-w-[160px]">
-            <option value="all">Tüm durumlar</option>
-            {Object.entries(STATUS_TR).map(([k, v]) => (
+            <option value="all">{t("finance.shared.allStatuses")}</option>
+            {Object.entries(TICKET_STATUS_LABELS).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
           </Select>
           <Select value={priority} onChange={(e) => setPriority(e.target.value)} className="h-10 w-auto min-w-[160px]">
-            <option value="all">Tüm öncelikler</option>
-            {Object.entries(PRIORITY_TR).map(([k, v]) => (
+            <option value="all">{t("finance.tickets.allPriorities")}</option>
+            {Object.entries(TICKET_PRIORITY_LABELS).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
           </Select>
@@ -143,7 +135,7 @@ function TicketsContent() {
         />
       }
     >
-      <DataTable columns={COLUMNS} sortKey={table.sort.key} sortDirection={table.sort.direction} onSort={table.toggleSort}>
+      <DataTable columns={getColumns(t)} sortKey={table.sort.key} sortDirection={table.sort.direction} onSort={table.toggleSort}>
         {table.pageItems.map((item) => (
           <tr key={item.id} className="text-zinc-300 hover:bg-zinc-900/50">
             <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-cyan-400/90">{item.code ?? "—"}</td>
@@ -153,8 +145,8 @@ function TicketsContent() {
               </Link>
             </td>
             <td className="whitespace-nowrap px-4 py-3">{item.storeName}</td>
-            <td className="px-4 py-3"><StatusBadge value={item.priority} label={PRIORITY_TR[item.priority]} /></td>
-            <td className="px-4 py-3"><StatusBadge value={item.status} label={STATUS_TR[item.status]} /></td>
+            <td className="px-4 py-3"><StatusBadge value={item.priority} label={TICKET_PRIORITY_LABELS[item.priority]} /></td>
+            <td className="px-4 py-3"><StatusBadge value={item.status} label={TICKET_STATUS_LABELS[item.status]} /></td>
             <td className="whitespace-nowrap px-4 py-3 text-zinc-400">{item.assignee}</td>
             <td className="whitespace-nowrap px-4 py-3">
               <div className="flex gap-1">
@@ -162,13 +154,13 @@ function TicketsContent() {
                   <Link
                     href={`/tickets/${item.id}/edit`}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/20 hover:text-zinc-100"
-                    aria-label="Düzenle"
+                    aria-label={t("common.edit")}
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Link>
                 )}
                 {canDelete && (
-                  <Button size="icon" variant="ghost" onClick={() => handleDelete(item.id, item.title)} aria-label="Sil">
+                  <Button size="icon" variant="ghost" onClick={() => handleDelete(item.id, item.title)} aria-label={t("common.delete")}>
                     <Trash2 className="h-3.5 w-3.5 text-red-400/80" />
                   </Button>
                 )}
@@ -177,7 +169,7 @@ function TicketsContent() {
           </tr>
         ))}
         {!table.isLoading && table.totalItems === 0 && (
-          <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
+          <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-600">{t("finance.shared.noRecords")}</td></tr>
         )}
       </DataTable>
     </ModuleTableShell>

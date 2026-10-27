@@ -11,7 +11,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useI18n } from "@/contexts/i18n-context";
+import { useI18n, useT } from "@/contexts/i18n-context";
 import { useStoreData } from "@/contexts/store-data-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { MaterialsPanel } from "@/components/map/materials-panel";
@@ -35,9 +35,10 @@ function formatFileSize(bytes: number) {
 
 /** Kullanıcının bu mağaza için kendi notu (başkaları göremez) */
 function PrivateNoteSection({ storeId }: { storeId: string }) {
+  const t = useT();
   const { note, loading, loadError, save } = usePrivateNote(storeId);
-  if (loading) return <p className="text-sm text-zinc-500">Yükleniyor…</p>;
-  if (loadError) return <p className="text-sm text-red-400">Not yüklenemedi. Sayfayı yenileyin.</p>;
+  if (loading) return <p className="text-sm text-zinc-500">{t("site.sections.loading")}</p>;
+  if (loadError) return <p className="text-sm text-red-400">{t("site.sections.noteLoadFailed")}</p>;
   return <SpecialNoteEditor saved={note} onSave={save} />;
 }
 
@@ -53,6 +54,7 @@ function SpecialNoteEditor({
   saved: string;
   onSave: (note: string) => Promise<boolean>;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState(saved);
   const [lastSaved, setLastSaved] = useState(saved);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -75,7 +77,7 @@ function SpecialNoteEditor({
     <div className="space-y-2">
       <Textarea
         className="min-h-30 resize-y"
-        placeholder="Bu saha için kendinize not alın…"
+        placeholder={t("site.sections.notePlaceholder")}
         value={draft}
         onChange={(e) => {
           setDraft(e.target.value);
@@ -87,7 +89,7 @@ function SpecialNoteEditor({
             void save();
           }
         }}
-        aria-label="Özel not"
+        aria-label={t("site.sections.privateNote")}
       />
       <div className="flex flex-wrap items-center justify-end gap-2">
         <span
@@ -98,11 +100,11 @@ function SpecialNoteEditor({
           )}
         >
           {status === "error"
-            ? "Kaydedilemedi. Tekrar deneyin."
+            ? t("site.sections.saveFailed")
             : status === "saved"
-              ? "Kaydedildi"
+              ? t("site.sections.saved")
               : dirty
-                ? "Kaydedilmemiş değişiklik var"
+                ? t("site.sections.unsaved")
                 : ""}
         </span>
         {dirty && (
@@ -115,11 +117,11 @@ function SpecialNoteEditor({
               setStatus("idle");
             }}
           >
-            Vazgeç
+            {t("site.sections.cancel")}
           </Button>
         )}
         <Button size="sm" disabled={!dirty} loading={status === "saving"} onClick={() => void save()}>
-          Kaydet
+          {t("common.save")}
         </Button>
       </div>
     </div>
@@ -161,7 +163,7 @@ function SectionCard({
 }
 
 export function StoreDetailSections({ store }: { store: Store }) {
-  const { dateLocale } = useI18n();
+  const { t, dateLocale } = useI18n();
   const { canEdit } = usePermissions("stores");
   const {
     getStoreData,
@@ -191,7 +193,7 @@ export function StoreDetailSections({ store }: { store: Store }) {
     if (!file) return;
     setFileError("");
     const result = await addFile(store.id, file);
-    if (!result.success) setFileError(result.error ?? "Yükleme başarısız");
+    if (!result.success) setFileError(result.error ?? t("site.sections.uploadFailed"));
     e.target.value = "";
   };
 
@@ -224,12 +226,12 @@ export function StoreDetailSections({ store }: { store: Store }) {
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
         <div className="space-y-4">
           <SectionCard
-            title="Özel Not"
+            title={t("site.sections.privateNoteTitle")}
             icon={StickyNote}
             action={
               <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">
                 <Lock className="h-3 w-3" aria-hidden />
-                Yalnızca siz görürsünüz
+                {t("site.sections.onlyYou")}
               </span>
             }
           >
@@ -237,7 +239,7 @@ export function StoreDetailSections({ store }: { store: Store }) {
           </SectionCard>
 
           <SectionCard
-            title="Dosyalar"
+            title={t("site.sections.files")}
             icon={FileText}
             action={
               canEdit ? (
@@ -248,7 +250,7 @@ export function StoreDetailSections({ store }: { store: Store }) {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Upload className="h-3.5 w-3.5" />
-                    Yükle
+                    {t("site.sections.upload")}
                   </Button>
                   <input
                     ref={fileInputRef}
@@ -271,7 +273,7 @@ export function StoreDetailSections({ store }: { store: Store }) {
             <ul className="space-y-2">
               {userData.files.length === 0 && (
                 <li className="rounded-lg border border-dashed border-zinc-800 py-6 text-center text-sm text-zinc-600">
-                  Henüz dosya yok
+                  {t("site.sections.noFiles")}
                 </li>
               )}
               {userData.files.map((file) => (
@@ -294,6 +296,7 @@ export function StoreDetailSections({ store }: { store: Store }) {
                     <Button
                       size="icon"
                       variant="ghost"
+                      aria-label={t("site.sections.download")}
                       onClick={async () => {
                         // Depo gizli: kısa ömürlü imzalı bağlantıyla indirilir
                         const link = document.createElement("a");
@@ -311,6 +314,7 @@ export function StoreDetailSections({ store }: { store: Store }) {
                       <Button
                         size="icon"
                         variant="ghost"
+                        aria-label={t("site.sections.deleteFile")}
                         onClick={() => deleteFile(store.id, file.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5 text-red-400/70" />
@@ -324,7 +328,7 @@ export function StoreDetailSections({ store }: { store: Store }) {
         </div>
 
         <SectionCard
-          title="Notlar"
+          title={t("site.sections.notes")}
           icon={MessageSquare}
           className="lg:min-h-full"
           bodyClassName="flex min-h-[280px] flex-col"
@@ -332,20 +336,20 @@ export function StoreDetailSections({ store }: { store: Store }) {
           {canEdit && (
             <div className="mb-3 flex gap-2">
               <Input
-                placeholder="Ekip notu ekle…"
+                placeholder={t("site.sections.notePlaceholderTeam")}
                 value={noteText}
                 onChange={(e) => setNoteText(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
               />
               <Button size="sm" className="shrink-0" onClick={handleAddNote}>
-                Ekle
+                {t("common.add")}
               </Button>
             </div>
           )}
           <ul className="scrollbar-themed flex-1 space-y-2 overflow-y-auto pr-1">
             {userData.notes.length === 0 && (
               <li className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-zinc-800 py-10 text-sm text-zinc-600">
-                Henüz not yok
+                {t("site.sections.noNotes")}
               </li>
             )}
             {userData.notes.map((note) => (
@@ -369,7 +373,7 @@ export function StoreDetailSections({ store }: { store: Store }) {
                     type="button"
                     onClick={() => deleteNote(store.id, note.id)}
                     className="shrink-0 rounded-md p-1 text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-800 hover:text-red-400 group-hover:opacity-100"
-                    aria-label="Notu sil"
+                    aria-label={t("site.sections.deleteNote")}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>

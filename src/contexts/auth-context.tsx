@@ -10,6 +10,7 @@ import {
 import { useDb } from "@/contexts/db-context";
 import { supabase } from "@/lib/supabase";
 import { appendActivityLog, logActivity } from "@/lib/activity-log";
+import { getLocale, t } from "@/i18n/runtime";
 import {
   MODULE_KEYS,
   VIEW_ONLY_CRUD,
@@ -291,13 +292,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ) {
             return {
               ok: false,
-              error: "E-posta veya şifre hatalı",
+              error: t("system.auth.invalidCredentials"),
             };
           }
           return { ok: false, error: error.message };
         }
         if (!data.user) {
-          return { ok: false, error: "Giriş başarısız" };
+          return { ok: false, error: t("system.auth.loginFailed") };
         }
 
         const { data: profile, error: profileErr } = await supabase
@@ -311,13 +312,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return {
             ok: false,
             error:
-              "Profil bulunamadı. Hesap migration sonrası bozulmuş olabilir.",
+              t("system.auth.profileNotFound"),
           };
         }
 
         if (profile.restricted) {
           await supabase.auth.signOut();
-          return { ok: false, error: "Hesabınız kısıtlanmış" };
+          return { ok: false, error: t("system.auth.accountRestricted") };
         }
 
         await replaceOtherSessions(data.user.id, data.session?.access_token);
@@ -345,7 +346,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Giriş hatası:", err);
         return {
           ok: false,
-          error: "Sunucuya bağlanılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+          error: t("system.auth.connectionFailed"),
         };
       }
     },
@@ -363,7 +364,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const response = await fetch("/api/auth/register", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-locale": getLocale() },
           body: JSON.stringify(data),
         });
         const res: unknown = await response.json().catch(() => null);
@@ -379,14 +380,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             ok: false,
             error:
               response.status >= 500
-                ? "Kayıt sırasında bir sunucu hatası oluştu. Lütfen tekrar deneyin."
-                : apiError || "Kayıt tamamlanamadı. Bilgilerinizi kontrol edin.",
+                ? t("system.auth.registerServerError")
+                : apiError || t("system.auth.registerFailed"),
           };
         }
         if (!res || typeof res !== "object" || !("success" in res) || res.success !== true) {
           return {
             ok: false,
-            error: "Sunucudan beklenmeyen bir yanıt alındı. Lütfen tekrar deneyin.",
+            error: t("system.auth.unexpectedResponse"),
           };
         }
 
@@ -396,7 +397,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             ok: false,
             error:
               loginResult.error ||
-              "Kayıt oluştu ancak giriş yapılamadı. Lütfen giriş yapın.",
+              t("system.auth.registeredButLoginFailed"),
           };
         }
         return { ok: true };
@@ -404,7 +405,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Kayıt isteği başarısız:", err);
         return {
           ok: false,
-          error: "Sunucuya bağlanılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+          error: t("system.auth.connectionFailed"),
         };
       }
     },
@@ -436,7 +437,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }) => {
       try {
         if (!user?.organizationId) {
-          return { ok: false, error: "Organizasyon bilgisi bulunamadı." };
+          return { ok: false, error: t("system.auth.organizationNotFound") };
         }
         const role = normalizeRole(data.role);
         const permissions =
@@ -467,7 +468,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!response.ok) {
           return {
             ok: false,
-            error: errorMessage || "Kullanıcı oluşturulamadı. Bilgileri kontrol edin.",
+            error: errorMessage || t("system.auth.createUserFailed"),
           };
         }
         if (
@@ -481,7 +482,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ) {
           return {
             ok: false,
-            error: "Sunucudan geçerli kullanıcı bilgisi alınamadı.",
+            error: t("system.auth.invalidUserResponse"),
           };
         }
         await refetchDb();
@@ -501,7 +502,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error:
             err instanceof Error
               ? err.message
-              : "Kullanıcı oluşturulurken beklenmeyen bir hata oluştu.",
+              : t("system.auth.createUserUnexpected"),
         };
       }
     },

@@ -5,11 +5,13 @@ import Link from "next/link";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { DailySiteReportEditor } from "@/components/reports/daily-site-report-editor";
 import { PageLoader } from "@/components/ui/spinner";
+import { useT } from "@/contexts/i18n-context";
 import { fetchSiteReport } from "@/lib/site-reports";
 
 type Loaded = Awaited<ReturnType<typeof fetchSiteReport>>;
 
 function SavedReportContent({ id }: { id: string }) {
+  const t = useT();
   const [state, setState] = useState<{ id: string; status: "ready"; data: Loaded } | { id: string; status: "error" } | null>(
     null
   );
@@ -32,9 +34,9 @@ function SavedReportContent({ id }: { id: string }) {
   if (state.status === "error" || !state.data) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-zinc-500">
-        {state.status === "error" ? "Rapor yüklenemedi." : "Rapor bulunamadı ya da silinmiş."}
+        {state.status === "error" ? t("reports.saved.loadFailed") : t("reports.saved.notFound")}
         <Link href="/reports" className="text-cyan-400 hover:underline">
-          Raporlara dön
+          {t("reports.saved.backToReports")}
         </Link>
       </div>
     );

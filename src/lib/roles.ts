@@ -7,6 +7,8 @@ import type {
   ProjectApprovals,
   UserRole,
 } from "@/types";
+import { LOCALES, getDictionary, translate } from "@/i18n";
+import { localizedRecord, t } from "@/i18n/runtime";
 
 /** Yerleşik roller (özel roller firmaya göre değişir, bkz. organizationRoles) */
 export const ALL_ROLES: BuiltInRole[] = [
@@ -21,17 +23,17 @@ export const ALL_ROLES: BuiltInRole[] = [
   "accounting",
 ];
 
-export const ROLE_LABELS: Record<BuiltInRole, string> = {
-  admin: "Kurucu",
-  mechanical_engineer: "Makine Mühendisi",
-  electrical_engineer: "Elektrik Mühendisi",
-  architect: "Mimar",
-  civil_engineer: "İnşaat Mühendisi",
-  manager: "Yönetici",
-  regional_manager: "Bölge Müdürü",
-  store_manager: "Saha Sorumlusu",
-  accounting: "Muhasebe",
-};
+export const ROLE_LABELS: Record<BuiltInRole, string> = localizedRecord({
+  admin: "shell.roles.admin",
+  mechanical_engineer: "shell.roles.mechanical_engineer",
+  electrical_engineer: "shell.roles.electrical_engineer",
+  architect: "shell.roles.architect",
+  civil_engineer: "shell.roles.civil_engineer",
+  manager: "shell.roles.manager",
+  regional_manager: "shell.roles.regional_manager",
+  store_manager: "shell.roles.store_manager",
+  accounting: "shell.roles.accounting",
+});
 
 /** Veritabanındaki app_normalize_role ve profiles_role_check ile aynı biçim */
 export const CUSTOM_ROLE_PATTERN = /^custom_[a-z0-9]{4,32}$/;
@@ -77,11 +79,26 @@ export function getRoleLabel(
   org?: Pick<Organization, "roleLabels" | "customRoles"> | null
 ): string {
   if (isCustomRole(role)) {
-    return org?.customRoles?.find((item) => item.key === role)?.label ?? "Özel rol";
+    return org?.customRoles?.find((item) => item.key === role)?.label ?? t("shell.roles.custom");
   }
-  const custom = org?.roleLabels?.[role];
-  if (custom?.trim()) return custom.trim();
-  return ROLE_LABELS[role] ?? role;
+  const custom = roleLabelOverride(role, org);
+  return custom ?? ROLE_LABELS[role] ?? role;
+}
+
+/**
+ * Firmanın yerleşik rol için verdiği özel ad. Varsayılan adların kendisi
+ * (eski kayıtlarda varsayılan Türkçe ad da yazılırdı) özelleştirme sayılmaz,
+ * böylece seçili dilin varsayılan adı görünür.
+ */
+export function roleLabelOverride(
+  role: BuiltInRole,
+  org?: Pick<Organization, "roleLabels"> | null
+): string | undefined {
+  const custom = org?.roleLabels?.[role]?.trim();
+  if (!custom) return undefined;
+  const key = `shell.roles.${role}` as const;
+  const defaults = LOCALES.map((locale) => translate(getDictionary(locale), key));
+  return defaults.includes(custom) ? undefined : custom;
 }
 
 export const ENGINEER_ROLES: UserRole[] = [

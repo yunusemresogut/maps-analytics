@@ -1,5 +1,6 @@
 "use client";
 
+import { inTurkish } from "@/i18n/runtime";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -11,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/contexts/auth-context";
+import { useT } from "@/contexts/i18n-context";
+import type { TranslationKey } from "@/i18n";
 import { useMyPersonnelId } from "@/hooks/use-my-personnel";
 import { usePermissions } from "@/hooks/use-permissions";
 import { usePersistentState } from "@/hooks/use-persistent-state";
@@ -37,22 +40,23 @@ import { cn } from "@/lib/utils";
 
 type SortKey = "expires" | "personnel" | "type";
 
-const SORT_OPTIONS: { key: SortKey; label: string; column: string }[] = [
-  { key: "expires", label: "Bitiş tarihine göre", column: "expires_at" },
-  { key: "personnel", label: "Personele göre", column: "personnel_name" },
-  { key: "type", label: "Belge türüne göre", column: "type" },
+const SORT_OPTIONS: { key: SortKey; label: TranslationKey; column: string }[] = [
+  { key: "expires", label: "hr.certificateList.sortExpires", column: "expires_at" },
+  { key: "personnel", label: "hr.certificateList.sortPersonnel", column: "personnel_name" },
+  { key: "type", label: "hr.certificateList.sortType", column: "type" },
 ];
 const SORT_COLUMNS = Object.fromEntries(SORT_OPTIONS.map((option) => [option.key, option.column])) as Record<SortKey, string>;
 
-const STAT_CARDS: { key: CertificateValidity | "pending"; label: string; tone: string }[] = [
-  { key: "expired", label: "Süresi geçmiş", tone: "text-red-400" },
-  { key: "expiring", label: "30 gün içinde bitiyor", tone: "text-amber-400" },
-  { key: "pending", label: "Onay bekliyor", tone: "text-teal-300" },
-  { key: "valid", label: "Geçerli", tone: "text-emerald-400" },
+const STAT_CARDS: { key: CertificateValidity | "pending"; label: TranslationKey; tone: string }[] = [
+  { key: "expired", label: "hr.certificateList.statExpired", tone: "text-red-400" },
+  { key: "expiring", label: "hr.certificateList.statExpiring", tone: "text-amber-400" },
+  { key: "pending", label: "hr.personnelDetail.pending", tone: "text-teal-300" },
+  { key: "valid", label: "hr.validity.valid", tone: "text-emerald-400" },
 ];
 
 function CertificatesContent() {
   const router = useRouter();
+  const t = useT();
   const { user } = useAuth();
   const { canView, canEdit, canDelete } = usePermissions("personnel");
   const { myPersonnelId, loaded } = useMyPersonnelId();
@@ -138,14 +142,14 @@ function CertificatesContent() {
     } catch (err) {
       popup?.close();
       console.error("Dosya açılamadı:", err);
-      flash("error", "Dosya açılamadı. Sağlık raporlarını yalnızca özlük yetkilisi açabilir.");
+      flash("error", t("hr.certificateList.fileOpenFailed"));
     }
   };
 
   if (!canView) {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-sm text-zinc-500">
-        {loaded && !myPersonnelId ? "Hesabınız bir personel kartına bağlı değil. İnsan kaynaklarına başvurun." : "Yükleniyor…"}
+        {loaded && !myPersonnelId ? t("hr.personnelList.notLinked") : t("hr.common.loading")}
       </div>
     );
   }
@@ -155,9 +159,9 @@ function CertificatesContent() {
   return (
     <div className="scrollbar-themed h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-zinc-100">Belgeler ve sertifikalar</h1>
+        <h1 className="text-xl font-semibold text-zinc-100">{t("hr.personnelDetail.certificates")}</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Tüm personelin İSG, sağlık, MYK ve diğer belgeleri. Yeni belge personel kartından eklenir.
+          {t("hr.certificateList.description")}
         </p>
       </div>
 
@@ -183,7 +187,7 @@ function CertificatesContent() {
                 selected ? "border-cyan-500/50" : "border-zinc-800 hover:border-zinc-700"
               )}
             >
-              <p className="text-xs text-zinc-500">{card.label}</p>
+              <p className="text-xs text-zinc-500">{t(card.label)}</p>
               <p className={cn("mt-1 text-2xl font-semibold tabular-nums", card.tone)}>{counts ? counts[card.key] : "–"}</p>
             </button>
           );
@@ -206,46 +210,46 @@ function CertificatesContent() {
         <SearchInput
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Personel, belge adı, belge no, kurum…"
-          aria-label="Belgelerde ara"
+          placeholder={t("hr.certificateList.searchPlaceholder")}
+          aria-label={t("hr.certificateList.searchLabel")}
           containerClassName="flex-1 sm:max-w-sm"
         />
-        <Select value={validity} onChange={(e) => setValidity(e.target.value)} className="w-auto min-w-[150px]" aria-label="Geçerlilik">
-          <option value="all">Tüm geçerlilikler</option>
+        <Select value={validity} onChange={(e) => setValidity(e.target.value)} className="w-auto min-w-[150px]" aria-label={t("hr.certificateList.validity")}>
+          <option value="all">{t("hr.certificateList.allValidities")}</option>
           {Object.entries(VALIDITY_LABELS).map(([value, text]) => (
             <option key={value} value={value}>
               {text}
             </option>
           ))}
         </Select>
-        <Select value={type} onChange={(e) => setType(e.target.value)} className="w-auto min-w-[180px]" aria-label="Belge türü">
-          <option value="all">Tüm belge türleri</option>
+        <Select value={type} onChange={(e) => setType(e.target.value)} className="w-auto min-w-[180px]" aria-label={t("hr.certificateForm.type")}>
+          <option value="all">{t("hr.certificateList.allTypes")}</option>
           {Object.entries(CERTIFICATE_TYPE_LABELS).map(([value, text]) => (
             <option key={value} value={value}>
               {text}
             </option>
           ))}
         </Select>
-        <Select value={verified} onChange={(e) => setVerified(e.target.value)} className="w-auto min-w-[140px]" aria-label="Onay">
-          <option value="all">Onaylı / bekleyen</option>
-          <option value="yes">Onaylı</option>
-          <option value="no">Onay bekliyor</option>
+        <Select value={verified} onChange={(e) => setVerified(e.target.value)} className="w-auto min-w-[140px]" aria-label={t("hr.certificateList.approval")}>
+          <option value="all">{t("hr.certificateList.allApprovals")}</option>
+          <option value="yes">{t("hr.personnelDetail.verified")}</option>
+          <option value="no">{t("hr.personnelDetail.pending")}</option>
         </Select>
         <Select
           value={table.sort.key}
           onChange={(e) => table.setSort({ key: e.target.value as SortKey, direction: "asc" })}
           className="w-auto min-w-[170px]"
-          aria-label="Sıralama"
+          aria-label={t("hr.personnelList.sort")}
         >
           {SORT_OPTIONS.map((option) => (
             <option key={option.key} value={option.key}>
-              {option.label}
+              {t(option.label)}
             </option>
           ))}
         </Select>
         <label className="flex items-center gap-2 text-xs text-zinc-400">
           <input type="checkbox" checked={includeLeft} onChange={(e) => setIncludeLeft(e.target.checked)} className="accent-cyan-500" />
-          Ayrılanlar dahil
+          {t("hr.certificateList.includeLeft")}
         </label>
       </div>
 
@@ -257,7 +261,7 @@ function CertificatesContent() {
         </ul>
       ) : table.totalItems === 0 ? (
         <div className="rounded-xl border border-dashed border-zinc-800 px-4 py-12 text-center text-sm text-zinc-500">
-          {filtered ? "Filtreyle eşleşen belge yok." : "Henüz belge yok. Belgeleri personel kartından ekleyin."}
+          {filtered ? t("hr.certificateList.noMatch") : t("hr.certificateList.empty")}
         </div>
       ) : (
         <ul className={cn("flex flex-col gap-2", table.isLoading && "opacity-60")}>
@@ -283,7 +287,7 @@ function CertificatesContent() {
                 </Link>
                 <p className="truncate text-xs text-zinc-500">
                   {EMPLOYMENT_TYPE_LABELS[certificate.employmentType]}
-                  {!certificate.personnelActive && " · ayrıldı"}
+                  {!certificate.personnelActive && ` · ${t("hr.certificateList.left")}`}
                 </p>
               </div>
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -294,12 +298,12 @@ function CertificatesContent() {
                 {certificate.verified ? (
                   <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
                     <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
-                    Onaylı
+                    {t("hr.personnelDetail.verified")}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-xs text-teal-300">
                     <Clock className="h-3.5 w-3.5" aria-hidden />
-                    Onay bekliyor
+                    {t("hr.personnelDetail.pending")}
                   </span>
                 )}
               </div>
@@ -307,7 +311,7 @@ function CertificatesContent() {
                 {certificate.filePath && (
                   <Button size="sm" variant="ghost" onClick={() => void openFile(certificate)} title={certificate.fileName}>
                     <FileText className="h-3.5 w-3.5" />
-                    Dosya
+                    {t("hr.certificateForm.file")}
                   </Button>
                 )}
                 {canEdit && !certificate.verified && (
@@ -317,21 +321,21 @@ function CertificatesContent() {
                     onClick={() =>
                       void setCertificateVerified(certificate.id, true)
                         .then(() => {
-                          log("approve", `Belge onaylandı: ${certificate.personnelName} · ${label(certificate)}`, certificate);
+                          log("approve", inTurkish(() => `Belge onaylandı: ${certificate.personnelName} · ${label(certificate)}`), certificate);
                           setVersion((current) => current + 1);
                         })
-                        .catch((err) => flash("error", hrErrorMessage(err, "Belge onaylanamadı.")))
+                        .catch((err) => flash("error", hrErrorMessage(err, t("hr.personnelDetail.approveFailed"))))
                     }
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
-                    Onayla
+                    {t("hr.leaveDecision.approve")}
                   </Button>
                 )}
                 {canEdit && (
                   <button
                     type="button"
-                    aria-label="Düzenle"
-                    title="Düzenle"
+                    aria-label={t("common.edit")}
+                    title={t("common.edit")}
                     onClick={() => {
                       setSubmit({ saving: false, error: "" });
                       setEditing(certificate);
@@ -344,16 +348,16 @@ function CertificatesContent() {
                 {canDelete && (
                   <button
                     type="button"
-                    aria-label="Sil"
-                    title="Sil"
+                    aria-label={t("common.delete")}
+                    title={t("common.delete")}
                     onClick={() => {
-                      if (!confirm(`${certificate.personnelName} · ${label(certificate)} silinsin mi?`)) return;
+                      if (!confirm(t("hr.certificateList.deleteConfirm", { name: `${certificate.personnelName} · ${label(certificate)}` }))) return;
                       void deleteCertificate(certificate)
                         .then(() => {
-                          log("delete", `Belge silindi: ${certificate.personnelName} · ${label(certificate)}`, certificate);
+                          log("delete", inTurkish(() => `Belge silindi: ${certificate.personnelName} · ${label(certificate)}`), certificate);
                           setVersion((current) => current + 1);
                         })
-                        .catch((err) => flash("error", hrErrorMessage(err, "Belge silinemedi.")));
+                        .catch((err) => flash("error", hrErrorMessage(err, t("hr.personnelDetail.deleteCertificateFailed"))));
                     }}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-red-500/10 hover:text-red-400"
                   >
@@ -399,16 +403,16 @@ function CertificatesContent() {
               previousPath: editing.filePath,
             })
               .then(() => {
-                log("update", `Belge güncellendi: ${editing.personnelName} · ${input.name || CERTIFICATE_TYPE_LABELS[input.type]}`, editing);
+                log("update", inTurkish(() => `Belge güncellendi: ${editing.personnelName} · ${input.name || CERTIFICATE_TYPE_LABELS[input.type]}`), editing);
                 setEditing(null);
                 setVersion((current) => current + 1);
-                flash("success", "Belge güncellendi.");
+                flash("success", t("hr.personnelDetail.certificateUpdated"));
               })
               .catch((err) => {
                 console.error("Belge kaydedilemedi:", err);
                 setSubmit({
                   saving: false,
-                  error: hrErrorMessage(err, "Belge kaydedilemedi."),
+                  error: hrErrorMessage(err, t("hr.personnelDetail.certificateSaveFailed")),
                 });
               });
           }}

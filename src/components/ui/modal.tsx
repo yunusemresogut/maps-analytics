@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useT } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 
 type ModalProps = {
@@ -28,6 +29,7 @@ export function Modal({
   footer,
   className,
 }: ModalProps) {
+  const t = useT();
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -96,7 +98,7 @@ export function Modal({
             type="button"
             onClick={() => onCloseRef.current()}
             className="-mr-1 rounded-md p-1 text-zinc-500 transition-colors hover:bg-zinc-800/50 hover:text-zinc-300"
-            aria-label="Kapat"
+            aria-label={t("common.close")}
           >
             <X className="h-4 w-4" />
           </button>

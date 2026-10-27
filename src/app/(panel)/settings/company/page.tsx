@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useAuth } from "@/contexts/auth-context";
+import { useT } from "@/contexts/i18n-context";
 import { useSettings } from "@/contexts/settings-context";
 import { VAT_RATE_OPTIONS } from "@/lib/module-finance";
 import { CurrencySelect, MoneyInput } from "@/components/ui/money-input";
@@ -17,6 +18,7 @@ import { LocationTypesSection } from "@/components/settings/location-types-secti
 
 function CompanyInfoSection() {
   const { organization, updateOrganization } = useAuth();
+  const t = useT();
   const { state, run } = useAutoSave();
   const [form, setForm] = useState({
     name: organization?.name ?? "",
@@ -60,26 +62,26 @@ function CompanyInfoSection() {
   };
 
   return (
-    <SettingsSection title="Firma bilgileri" action={<SaveIndicator state={state} />}>
+    <SettingsSection title={t("settings.company.info")} action={<SaveIndicator state={state} />}>
       <div className="grid gap-3 p-5 sm:grid-cols-2">
-        <FormField label="Firma adı" required error={errors.companyName} className="sm:col-span-2">
+        <FormField label={t("settings.company.companyName")} required error={errors.companyName} className="sm:col-span-2">
           <Input {...field("name", "companyName")} />
         </FormField>
-        <FormField label="Vergi numarası" required error={errors.taxNumber}>
+        <FormField label={t("settings.company.taxNumber")} required error={errors.taxNumber}>
           <Input {...field("taxNumber")} />
         </FormField>
-        <FormField label="Yetkili kişi" required error={errors.authorizedPerson}>
+        <FormField label={t("settings.company.authorizedPerson")} required error={errors.authorizedPerson}>
           <Input {...field("authorizedPerson")} />
         </FormField>
-        <FormField label="Telefon" required error={errors.orgPhone}>
+        <FormField label={t("profile.phone")} required error={errors.orgPhone}>
           <Input {...field("phone", "orgPhone")} />
         </FormField>
-        <FormField label="Adres" required error={errors.address} className="sm:col-span-2">
+        <FormField label={t("profile.address")} required error={errors.address} className="sm:col-span-2">
           <Textarea rows={3} {...field("address")} />
         </FormField>
         <div className="sm:col-span-2">
           <Button onClick={save} loading={state === "saving"}>
-            Kaydet
+            {t("common.save")}
           </Button>
         </div>
       </div>
@@ -89,6 +91,7 @@ function CompanyInfoSection() {
 
 function DefaultsSection() {
   const { org, updateOrgSettings } = useSettings();
+  const t = useT();
   const { state, run } = useAutoSave();
   const [form, setForm] = useState({
     storeBudget: org.defaults.storeBudget as number | null,
@@ -125,14 +128,14 @@ function DefaultsSection() {
 
   return (
     <SettingsSection
-      title="Varsayılanlar"
-      description="Yeni kayıtlarda önerilen değerler; kayıt sırasında değiştirilebilir."
+      title={t("settings.company.defaults")}
+      description={t("settings.company.defaultsDescription")}
       action={<SaveIndicator state={state} />}
     >
       <div className="grid gap-3 p-5 sm:grid-cols-2">
         <FormField
-          label="Varsayılan para birimi"
-          hint="Yeni bütçe, keşif kalemi, sözleşme, hakediş ve faturada önerilir."
+          label={t("settings.company.currency")}
+          hint={t("settings.company.currencyHint")}
         >
           <CurrencySelect
             value={form.currency}
@@ -141,8 +144,8 @@ function DefaultsSection() {
           />
         </FormField>
         <FormField
-          label="Yeni saha bütçesi"
-          error={budgetInvalid ? "Geçerli bir tutar girin." : undefined}
+          label={t("settings.company.storeBudget")}
+          error={budgetInvalid ? t("settings.company.invalidAmount") : undefined}
         >
           <MoneyInput
             value={form.storeBudget}
@@ -151,33 +154,33 @@ function DefaultsSection() {
             onValueChange={(storeBudget) => setForm((prev) => ({ ...prev, storeBudget }))}
           />
         </FormField>
-        <FormField label="Fatura KDV oranı">
+        <FormField label={t("settings.company.vatRate")}>
           <Select
             value={form.vatRate}
             onChange={(e) => setForm((prev) => ({ ...prev, vatRate: Number(e.target.value) }))}
           >
             {VAT_RATE_OPTIONS.map((rate) => (
               <option key={rate} value={rate}>
-                %{rate}
+                {t("settings.company.vatRateValue", { rate })}
               </option>
             ))}
           </Select>
         </FormField>
         <FormField
-          label="Tadilat talebi kod öneki"
-          hint={`Örnek: ${form.ticketCodePrefix || "TT"}-0001`}
+          label={t("settings.company.ticketPrefix")}
+          hint={t("settings.company.example", { value: `${form.ticketCodePrefix || "TT"}-0001` })}
         >
           <Input {...prefixInput("ticketCodePrefix")} />
         </FormField>
         <FormField
-          label="Sözleşme kod öneki"
-          hint={`Örnek: ${form.contractCodePrefix || "SZ"}-0001`}
+          label={t("settings.company.contractPrefix")}
+          hint={t("settings.company.example", { value: `${form.contractCodePrefix || "SZ"}-0001` })}
         >
           <Input {...prefixInput("contractCodePrefix")} />
         </FormField>
         <div className="sm:col-span-2">
           <Button onClick={save} loading={state === "saving"} disabled={budgetInvalid}>
-            Kaydet
+            {t("common.save")}
           </Button>
         </div>
       </div>
@@ -188,12 +191,19 @@ function DefaultsSection() {
 export default function CompanySettingsPage() {
   return (
     <AuthGuard routeKey="adminSettings">
-      <div className="space-y-6">
-        <SettingsPageHeader title="Firma ve varsayılanlar" description="Firma bilgileri, yeni kayıtlarda kullanılan varsayılan değerler ve saha türleri." />
-        <CompanyInfoSection />
-        <DefaultsSection />
-        <LocationTypesSection />
-      </div>
+      <CompanySettingsContent />
     </AuthGuard>
+  );
+}
+
+function CompanySettingsContent() {
+  const t = useT();
+  return (
+    <div className="space-y-6">
+      <SettingsPageHeader title={t("pageTitle.settingsCompany")} description={t("settings.company.description")} />
+      <CompanyInfoSection />
+      <DefaultsSection />
+      <LocationTypesSection />
+    </div>
   );
 }

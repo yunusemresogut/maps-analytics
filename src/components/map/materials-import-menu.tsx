@@ -9,6 +9,7 @@ import {
 } from "@/lib/excel-materials";
 import { formatMoney } from "@/lib/currency";
 import { useSettings } from "@/contexts/settings-context";
+import { useT } from "@/contexts/i18n-context";
 
 type MaterialsImportMenuProps = {
   existingCount: number;
@@ -25,12 +26,16 @@ async function parseMaterials(file: File) {
 
 export function MaterialsImportMenu({ existingCount, onImport }: MaterialsImportMenuProps) {
   const { org } = useSettings();
+  const t = useT();
   return (
     <ImportMenu
       accept=".xlsx,.xls"
-      itemLabel="keşif kalemi"
+      itemLabel={t("site.import.materials.item")}
+      countLabel={(count) =>
+        t(count === 1 ? "site.import.materials.countOne" : "site.import.materials.countOther", { count })
+      }
       existingCount={existingCount}
-      hint="Excel dosyası seçin (Açıklama, Miktar, Birim, Birim Fiyat; isteğe bağlı Poz No ve Para Birimi)"
+      hint={t("site.import.materials.hint")}
       parse={parseMaterials}
       onTemplate={downloadMaterialsTemplate}
       onConfirm={onImport}
@@ -38,11 +43,11 @@ export function MaterialsImportMenu({ existingCount, onImport }: MaterialsImport
         <table className="w-full min-w-[320px] text-xs">
           <thead className="sticky top-0 bg-zinc-900 text-zinc-500">
             <tr>
-              <th className="px-2 py-1.5 text-left font-medium">Poz no</th>
-              <th className="px-2 py-1.5 text-left font-medium">Açıklama</th>
-              <th className="px-2 py-1.5 text-right font-medium">Miktar</th>
-              <th className="px-2 py-1.5 text-left font-medium">Birim</th>
-              <th className="px-2 py-1.5 text-right font-medium">Birim fiyat</th>
+              <th className="px-2 py-1.5 text-left font-medium">{t("site.import.materials.pozNo")}</th>
+              <th className="px-2 py-1.5 text-left font-medium">{t("site.import.materials.description")}</th>
+              <th className="px-2 py-1.5 text-right font-medium">{t("site.import.materials.quantity")}</th>
+              <th className="px-2 py-1.5 text-left font-medium">{t("site.import.materials.unit")}</th>
+              <th className="px-2 py-1.5 text-right font-medium">{t("site.import.materials.unitPrice")}</th>
             </tr>
           </thead>
           <tbody>

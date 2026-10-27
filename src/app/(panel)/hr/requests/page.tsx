@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import { Ban, Check, CircleCheckBig, Info, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { Button } from "@/components/ui/button";
@@ -13,6 +12,9 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n, useT } from "@/contexts/i18n-context";
+import type { TranslationKey } from "@/i18n";
+import { getDateLocale, inTurkish } from "@/i18n/runtime";
 import { useMyPersonnelId } from "@/hooks/use-my-personnel";
 import { usePermissions } from "@/hooks/use-permissions";
 import { usePersistentState } from "@/hooks/use-persistent-state";
@@ -40,15 +42,15 @@ import { cn } from "@/lib/utils";
 type Tab = "pending" | "mine" | "all";
 type SubmitState = { saving: boolean; error: string };
 
-const REQUEST_HINTS: Partial<Record<RequestType, string>> = {
-  advance:
-    "Avans sonraki ücretten mahsup edilir. Mahsup için personelin yazılı onayının alınması önerilir; tutar bordroda gösterilmelidir.",
-  document: "İşten ayrılan personel istediğinde çalışma belgesi verilmesi zorunludur (İş Kanunu md. 28).",
+const REQUEST_HINTS: Partial<Record<RequestType, TranslationKey>> = {
+  advance: "hr.requests.hintAdvance",
+  document: "hr.requests.hintDocument",
 };
 
-const formatStamp = (value: string) => format(parseISO(value), "d MMM yyyy", { locale: tr });
+const formatStamp = (value: string) => format(parseISO(value), "d MMM yyyy", { locale: getDateLocale() });
 
 function RequestsContent() {
+  const { t, locale } = useI18n();
   const { user } = useAuth();
   const { canView, canAdd, canEdit, canDelete } = usePermissions("hrRequests");
   const { myPersonnelId, loaded: myLoaded } = useMyPersonnelId();
@@ -60,7 +62,7 @@ function RequestsContent() {
   const [pending, setPending] = useState<PersonnelRequest[]>([]);
   const [people, setPeople] = useState<Personnel[]>([]);
   const [version, setVersion] = useState(0);
-  const [loadError, setLoadError] = useState("");
+  const [loadError, setLoadError] = useState(false);
   const [editing, setEditing] = useState<{ request: PersonnelRequest | null } | null>(null);
   const [deciding, setDeciding] = useState<{ request: PersonnelRequest; status: RequestStatus } | null>(null);
   const [submit, setSubmit] = useState<SubmitState>({ saving: false, error: "" });
@@ -78,11 +80,11 @@ function RequestsContent() {
         if (cancelled) return;
         setRequests(yearRows);
         setPending(openRows);
-        setLoadError("");
+        setLoadError(false);
       })
       .catch((err) => {
         console.error("Talepler yüklenemedi:", err);
-        if (!cancelled) setLoadError("Talepler yüklenemedi. Veritabanı güncellemesi (İK Faz 4 migration'ı) uygulanmamış olabilir.");
+        if (!cancelled) setLoadError(true);
       });
     return () => {
       cancelled = true;
@@ -111,12 +113,12 @@ function RequestsContent() {
 
   const tabs = useMemo(() => {
     const list: { key: Tab; label: string; count?: number }[] = [];
-    if (canEdit) list.push({ key: "pending", label: "Sonuçlandırılacaklar", count: toHandle.length });
-    if (myPersonnelId) list.push({ key: "mine", label: "Taleplerim" });
-    if (canView) list.push({ key: "all", label: "Tüm talepler" });
+    if (canEdit) list.push({ key: "pending", label: t("hr.requests.tabPending"), count: toHandle.length });
+    if (myPersonnelId) list.push({ key: "mine", label: t("hr.leaves.tabMine") });
+    if (canView) list.push({ key: "all", label: t("hr.leaves.tabAll") });
     return list;
-  }, [canEdit, canView, myPersonnelId, toHandle.length]);
-  const activeTab: Tab | undefined = tab && tabs.some((t) => t.key === tab) ? tab : tabs[0]?.key;
+  }, [canEdit, canView, myPersonnelId, toHandle.length, t]);
+  const activeTab: Tab | undefined = tab && tabs.some((item) => item.key === tab) ? tab : tabs[0]?.key;
 
   const log = useCallback(
     (action: string, message: string, request: Pick<PersonnelRequest, "personnelId" | "personnelName">) => {
@@ -141,32 +143,32 @@ function RequestsContent() {
   };
 
   const cancel = async (request: PersonnelRequest) => {
-    if (!confirm("Talep iptal edilsin mi?")) return;
+    if (!confirm(t("hr.requests.cancelConfirm"))) return;
     try {
       await setPersonnelRequestStatus(request.id, "cancelled");
       log("cancel", `Talep iptal edildi: ${request.personnelName} · ${request.title}`, request);
       setVersion((v) => v + 1);
       refreshHrNotifications();
     } catch (err) {
-      flash("error", hrErrorMessage(err, "Talep iptal edilemedi."));
+      flash("error", hrErrorMessage(err, t("hr.requests.cancelFailed")));
     }
   };
 
   const remove = async (request: PersonnelRequest) => {
-    if (!confirm("Talep kalıcı olarak silinsin mi?")) return;
+    if (!confirm(t("hr.requests.deleteConfirm"))) return;
     try {
       await deletePersonnelRequest(request.id);
       log("delete", `Talep silindi: ${request.personnelName} · ${request.title}`, request);
       setVersion((v) => v + 1);
     } catch (err) {
-      flash("error", hrErrorMessage(err, "Talep silinemedi."));
+      flash("error", hrErrorMessage(err, t("hr.requests.deleteFailed")));
     }
   };
 
   if (myLoaded && !myPersonnelId && tabs.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-sm text-zinc-500">
-        Hesabınız bir personel kartına bağlı değil. İnsan kaynaklarına başvurun.
+        {t("hr.personnelList.notLinked")}
       </div>
     );
   }
@@ -175,8 +177,8 @@ function RequestsContent() {
     <div className="scrollbar-themed h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-100">Talep kutusu</h1>
-          <p className="mt-1 text-sm text-zinc-500">Avans, belge, malzeme, eğitim ve diğer talepler insan kaynaklarına iletilir.</p>
+          <h1 className="text-xl font-semibold text-zinc-100">{t("hr.requests.title")}</h1>
+          <p className="mt-1 text-sm text-zinc-500">{t("hr.requests.description")}</p>
         </div>
         {(canAdd || myPersonnelId) && people.length > 0 && (
           <Button
@@ -186,29 +188,29 @@ function RequestsContent() {
             }}
           >
             <Plus className="h-4 w-4" />
-            Yeni talep
+            {t("hr.requests.newTitle")}
           </Button>
         )}
       </div>
 
       {tabs.length > 1 && (
         <div className="mb-4 flex flex-wrap gap-1 border-b border-zinc-800" role="tablist">
-          {tabs.map((t) => (
+          {tabs.map((item) => (
             <button
-              key={t.key}
+              key={item.key}
               type="button"
               role="tab"
-              aria-selected={activeTab === t.key}
-              onClick={() => setTab(t.key)}
+              aria-selected={activeTab === item.key}
+              onClick={() => setTab(item.key)}
               className={cn(
                 "-mb-px inline-flex items-center gap-2 border-b-2 px-3 py-2 text-sm transition-colors",
-                activeTab === t.key ? "border-cyan-400 text-cyan-300" : "border-transparent text-zinc-400 hover:text-zinc-200"
+                activeTab === item.key ? "border-cyan-400 text-cyan-300" : "border-transparent text-zinc-400 hover:text-zinc-200"
               )}
             >
-              {t.label}
-              {!!t.count && (
+              {item.label}
+              {!!item.count && (
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-semibold text-brand-on">
-                  {t.count}
+                  {item.count}
                 </span>
               )}
             </button>
@@ -229,13 +231,13 @@ function RequestsContent() {
       )}
       {loadError && (
         <p role="alert" className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
-          {loadError}
+          {t("hr.requests.loadFailed")}
         </p>
       )}
 
       {activeTab !== "pending" && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <Select value={year} onChange={(e) => setYear(Number(e.target.value))} className="w-auto min-w-[110px]" aria-label="Yıl">
+          <Select value={year} onChange={(e) => setYear(Number(e.target.value))} className="w-auto min-w-[110px]" aria-label={t("hr.leaves.year")}>
             {[0, 1, 2, 3].map((offset) => {
               const value = new Date().getFullYear() - offset;
               return (
@@ -245,16 +247,16 @@ function RequestsContent() {
               );
             })}
           </Select>
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-auto min-w-[150px]" aria-label="Durum">
-            <option value="all">Tüm durumlar</option>
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-auto min-w-[150px]" aria-label={t("common.status")}>
+            <option value="all">{t("hr.leaves.allStatuses")}</option>
             {Object.entries(REQUEST_STATUS_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
           </Select>
-          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-auto min-w-[160px]" aria-label="Tür">
-            <option value="all">Tüm türler</option>
+          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-auto min-w-[160px]" aria-label={t("hr.requests.type")}>
+            <option value="all">{t("hr.requests.allTypes")}</option>
             {Object.entries(REQUEST_TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label.split(" (")[0]}
@@ -272,7 +274,7 @@ function RequestsContent() {
         </ul>
       ) : !activeTab || listFor(activeTab).length === 0 ? (
         <div className="rounded-xl border border-dashed border-zinc-800 px-4 py-12 text-center text-sm text-zinc-500">
-          {activeTab === "pending" ? "Sonuçlandırılacak talep yok." : "Bu dönemde talep yok."}
+          {activeTab === "pending" ? t("hr.requests.noPending") : t("hr.requests.empty")}
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -326,7 +328,7 @@ function RequestsContent() {
                         }}
                       >
                         <Check className="h-3.5 w-3.5" />
-                        Onayla
+                        {t("hr.leaveDecision.approve")}
                       </Button>
                       <Button
                         size="sm"
@@ -337,7 +339,7 @@ function RequestsContent() {
                         }}
                       >
                         <X className="h-3.5 w-3.5" />
-                        Reddet
+                        {t("hr.leaveDecision.reject")}
                       </Button>
                     </>
                   )}
@@ -357,14 +359,14 @@ function RequestsContent() {
                   {request.status === "pending" && (own || canEdit) && (
                     <Button size="sm" variant="ghost" onClick={() => void cancel(request)}>
                       <Ban className="h-3.5 w-3.5" />
-                      İptal
+                      {t("common.cancel")}
                     </Button>
                   )}
                   {canEdit && (request.status === "pending" || request.status === "approved") && (
                     <button
                       type="button"
-                      aria-label="Düzelt"
-                      title="Düzelt"
+                      aria-label={t("hr.leaves.correct")}
+                      title={t("hr.leaves.correct")}
                       onClick={() => {
                         setSubmit({ saving: false, error: "" });
                         setEditing({ request });
@@ -377,8 +379,8 @@ function RequestsContent() {
                   {canDelete && (
                     <button
                       type="button"
-                      aria-label="Sil"
-                      title="Sil"
+                      aria-label={t("common.delete")}
+                      title={t("common.delete")}
                       onClick={() => void remove(request)}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-red-500/10 hover:text-red-400"
                     >
@@ -412,12 +414,12 @@ function RequestsContent() {
                 setEditing(null);
                 setVersion((v) => v + 1);
                 refreshHrNotifications();
-                flash("success", existing ? "Talep düzeltildi." : "Talebiniz insan kaynaklarına iletildi.");
+                flash("success", existing ? t("hr.requests.corrected") : t("hr.requests.submitted"));
                 if (!existing && input.personnelId === myPersonnelId) setTab("mine");
               })
               .catch((err) => {
                 console.error("Talep kaydedilemedi:", err);
-                setSubmit({ saving: false, error: hrErrorMessage(err, "Talep kaydedilemedi.") });
+                setSubmit({ saving: false, error: hrErrorMessage(err, t("hr.requests.saveFailed")) });
               });
           }}
         />
@@ -432,17 +434,28 @@ function RequestsContent() {
             setSubmit({ saving: true, error: "" });
             setPersonnelRequestStatus(deciding.request.id, deciding.status, note)
               .then(() => {
-                const label =
+                const label = (
                   deciding.status === "completed"
-                    ? REQUEST_COMPLETE_LABELS[deciding.request.type].toLocaleLowerCase("tr-TR")
-                    : REQUEST_STATUS_LABELS[deciding.status].toLocaleLowerCase("tr-TR");
-                log(deciding.status, `Talep ${label}: ${deciding.request.personnelName} · ${deciding.request.title}`, deciding.request);
+                    ? REQUEST_COMPLETE_LABELS[deciding.request.type]
+                    : REQUEST_STATUS_LABELS[deciding.status]
+                ).toLocaleLowerCase(locale);
+                log(
+                  deciding.status,
+                  inTurkish(() => {
+                    const status =
+                      deciding.status === "completed"
+                        ? REQUEST_COMPLETE_LABELS[deciding.request.type]
+                        : REQUEST_STATUS_LABELS[deciding.status];
+                    return `Talep ${status.toLocaleLowerCase("tr-TR")}: ${deciding.request.personnelName} · ${deciding.request.title}`;
+                  }),
+                  deciding.request
+                );
                 setDeciding(null);
                 setVersion((v) => v + 1);
                 refreshHrNotifications();
-                flash("success", `Talep ${label}.`);
+                flash("success", t("hr.requests.statusChanged", { status: label }));
               })
-              .catch((err) => setSubmit({ saving: false, error: hrErrorMessage(err, "İşlem yapılamadı.") }));
+              .catch((err) => setSubmit({ saving: false, error: hrErrorMessage(err, t("hr.timesheets.actionFailed")) }));
           }}
         />
       )}
@@ -464,6 +477,7 @@ function RequestModal({
   onSubmit: (input: PersonnelRequestInput) => void;
 }) {
   const formId = useId();
+  const t = useT();
   const [form, setForm] = useState<PersonnelRequestInput>({
     personnelId: request?.personnelId ?? (people.length === 1 ? people[0].id : ""),
     type: request?.type ?? "advance",
@@ -484,9 +498,9 @@ function RequestModal({
 
   const validate = () => {
     const next: Record<string, string> = {};
-    if (!form.personnelId) next.personnelId = "Personel seçin";
-    if (!form.title.trim()) next.title = "Başlık zorunludur";
-    if (form.type === "advance" && !(form.amount && form.amount > 0)) next.amount = "Avans tutarı 0'dan büyük olmalı";
+    if (!form.personnelId) next.personnelId = t("hr.leaveForm.selectPersonnel");
+    if (!form.title.trim()) next.title = t("hr.requests.titleRequired");
+    if (form.type === "advance" && !(form.amount && form.amount > 0)) next.amount = t("hr.requests.amountPositive");
     return next;
   };
 
@@ -495,15 +509,15 @@ function RequestModal({
       open
       onClose={onClose}
       className="sm:max-w-xl"
-      title={request ? "Talebi düzelt" : "Yeni talep"}
+      title={request ? t("hr.requests.editTitle") : t("hr.requests.newTitle")}
       description={request?.personnelName}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Vazgeç
+            {t("hr.common.cancel")}
           </Button>
           <Button type="submit" form={formId} loading={state.saving}>
-            {request ? "Kaydet" : "Gönder"}
+            {request ? t("common.save") : t("hr.requests.send")}
           </Button>
         </>
       }
@@ -521,15 +535,15 @@ function RequestModal({
       >
         {(state.error || Object.keys(errors).length > 0) && (
           <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-            {state.error || "Lütfen işaretli alanları kontrol edin."}
+            {state.error || t("hr.common.checkFields")}
           </p>
         )}
         {people.length > 1 && (
-          <FormField label="Personel" required error={errors.personnelId}>
+          <FormField label={t("hr.leaveForm.personnel")} required error={errors.personnelId}>
             <Select
               value={form.personnelId}
               onChange={(e) => set("personnelId", e.target.value)}
-              placeholder="Personel seçin"
+              placeholder={t("hr.leaveForm.selectPersonnel")}
               aria-invalid={!!errors.personnelId}
             >
               {people.map((p) => (
@@ -542,7 +556,7 @@ function RequestModal({
           </FormField>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Talep türü" required>
+          <FormField label={t("hr.requests.requestType")} required>
             <Select value={form.type} onChange={(e) => set("type", e.target.value as RequestType)}>
               {Object.entries(REQUEST_TYPE_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -552,7 +566,7 @@ function RequestModal({
             </Select>
           </FormField>
           {form.type === "advance" && (
-            <FormField label="Tutar (TL)" required error={errors.amount}>
+            <FormField label={t("hr.requests.amount")} required error={errors.amount}>
               <Input
                 type="number"
                 min={0}
@@ -565,21 +579,27 @@ function RequestModal({
             </FormField>
           )}
         </div>
-        <FormField label="Başlık" required error={errors.title}>
+        <FormField label={t("common.title")} required error={errors.title}>
           <Input
             value={form.title}
             onChange={(e) => set("title", e.target.value)}
-            placeholder={form.type === "advance" ? "ör. Kasım ayı avansı" : form.type === "document" ? "ör. SGK hizmet dökümü" : undefined}
+            placeholder={
+              form.type === "advance"
+                ? t("hr.requests.titlePlaceholderAdvance")
+                : form.type === "document"
+                  ? t("hr.requests.titlePlaceholderDocument")
+                  : undefined
+            }
             aria-invalid={!!errors.title}
           />
         </FormField>
-        <FormField label="Açıklama">
+        <FormField label={t("hr.leaveForm.reason")}>
           <Textarea rows={3} value={form.description} onChange={(e) => set("description", e.target.value)} />
         </FormField>
         {REQUEST_HINTS[form.type] && (
           <p className="flex gap-2 rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs text-zinc-400">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-            {REQUEST_HINTS[form.type]}
+            {t(REQUEST_HINTS[form.type]!)}
           </p>
         )}
       </form>
@@ -601,10 +621,15 @@ function DecisionModal({
   onSubmit: (note: string) => void;
 }) {
   const formId = useId();
+  const t = useT();
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const title =
-    status === "approved" ? "Talebi onayla" : status === "rejected" ? "Talebi reddet" : `${REQUEST_COMPLETE_LABELS[request.type]} olarak işaretle`;
+    status === "approved"
+      ? t("hr.requests.approveTitle")
+      : status === "rejected"
+        ? t("hr.requests.rejectTitle")
+        : t("hr.requests.markAs", { status: REQUEST_COMPLETE_LABELS[request.type] });
 
   return (
     <Modal
@@ -616,10 +641,14 @@ function DecisionModal({
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Vazgeç
+            {t("hr.common.cancel")}
           </Button>
           <Button type="submit" form={formId} loading={state.saving} variant={status === "rejected" ? "danger" : "default"}>
-            {status === "approved" ? "Onayla" : status === "rejected" ? "Reddet" : REQUEST_COMPLETE_LABELS[request.type]}
+            {status === "approved"
+              ? t("hr.leaveDecision.approve")
+              : status === "rejected"
+                ? t("hr.leaveDecision.reject")
+                : REQUEST_COMPLETE_LABELS[request.type]}
           </Button>
         </>
       }
@@ -631,7 +660,7 @@ function DecisionModal({
         onSubmit={(event) => {
           event.preventDefault();
           if (status === "rejected" && !note.trim()) {
-            setError("Ret gerekçesi zorunludur");
+            setError(t("hr.leaveDecision.reasonRequired"));
             return;
           }
           onSubmit(note);
@@ -646,10 +675,10 @@ function DecisionModal({
           <p className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-300">{request.description}</p>
         )}
         <FormField
-          label={status === "rejected" ? "Ret gerekçesi" : "Not"}
+          label={status === "rejected" ? t("hr.leaveDecision.rejectReason") : t("hr.common.note")}
           required={status === "rejected"}
           error={error}
-          hint={status === "completed" && request.type === "advance" ? "ör. ödeme tarihi, dekont no, mahsup edilecek ay" : undefined}
+          hint={status === "completed" && request.type === "advance" ? t("hr.requests.advanceNoteHint") : undefined}
         >
           <Textarea
             rows={3}

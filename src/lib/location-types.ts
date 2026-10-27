@@ -1,17 +1,32 @@
 import type { LocationTypeOption, Organization } from "@/types";
+import { localizedRecord, t } from "@/i18n/runtime";
 
 /** Firma listesi tanımlanmamışsa kullanılan varsayılan saha türleri (migration ile aynı) */
+// Etiketler her okunuşta seçili dile çevrilir
+function defaultType(key: "magaza" | "ofis" | "kafe" | "konut" | "otel" | "endustriyel"): LocationTypeOption {
+  return {
+    key,
+    get label() {
+      return t(`site.locationTypes.${key}`);
+    },
+  };
+}
+
 export const DEFAULT_LOCATION_TYPES: LocationTypeOption[] = [
-  { key: "magaza", label: "Mağaza" },
-  { key: "ofis", label: "Ofis" },
-  { key: "kafe", label: "Kafe" },
-  { key: "konut", label: "Konut" },
-  { key: "otel", label: "Otel" },
-  { key: "endustriyel", label: "Endüstriyel" },
+  defaultType("magaza"),
+  defaultType("ofis"),
+  defaultType("kafe"),
+  defaultType("konut"),
+  defaultType("otel"),
+  defaultType("endustriyel"),
 ];
 
 // Eski sabit değerler; migration uygulanmadan önceki kayıtlar okunabilsin
-const LEGACY_LABELS: Record<string, string> = { avm: "AVM", cadde: "Cadde", outdoor: "Outdoor" };
+const LEGACY_LABELS: Record<string, string> = localizedRecord({
+  avm: "site.locationTypes.avm",
+  cadde: "site.locationTypes.cadde",
+  outdoor: "site.locationTypes.outdoor",
+});
 
 /** Veritabanındaki guard_organization_location_types ile aynı biçim */
 export const LOCATION_TYPE_KEY_PATTERN = /^[a-z0-9_]{2,40}$/;

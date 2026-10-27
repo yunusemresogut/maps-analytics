@@ -1,5 +1,6 @@
 import { VAT_RATE_OPTIONS } from "@/lib/module-finance";
 import { DEFAULT_CURRENCY, normalizeCurrency, roundMoney, type CurrencyCode } from "@/lib/currency";
+import { t } from "@/i18n/runtime";
 import type { NotificationType } from "@/types";
 
 /**
@@ -28,14 +29,18 @@ export function notificationModuleDisabled(module: NotificationModule, org: OrgS
 /** Firma genelinde kapatılabilen modüller; harita ve mağazalar çekirdektir */
 export type ToggleableModule = "tickets" | "contracts" | "progressPayments" | "invoices" | "team" | "hr";
 
-export const TOGGLEABLE_MODULES: { key: ToggleableModule; label: string; description: string }[] = [
-  { key: "tickets", label: "Tadilat Talepleri", description: "Tadilat talebi oluşturma ve takibi" },
-  { key: "contracts", label: "Sözleşmeler", description: "Sözleşmeler ve ekleri" },
-  { key: "progressPayments", label: "Hakedişler", description: "Hakediş kayıtları ve ekleri" },
-  { key: "invoices", label: "Faturalar", description: "Fatura kayıtları" },
-  { key: "team", label: "Ekip", description: "Firma içi mesajlaşma" },
-  { key: "hr", label: "İnsan Kaynakları", description: "Personel kartları, belge / sertifika takibi ve puantaj" },
-];
+/** Etiket ve açıklama her okunuşta seçili dile çevrilir (settings.toggleable.<key>) */
+export const TOGGLEABLE_MODULES: { key: ToggleableModule; label: string; description: string }[] = (
+  ["tickets", "contracts", "progressPayments", "invoices", "team", "hr"] as const
+).map((key) => ({
+  key,
+  get label() {
+    return t(`settings.toggleable.${key}.label`);
+  },
+  get description() {
+    return t(`settings.toggleable.${key}.description`);
+  },
+}));
 
 /** Bir modüle bağlı sayfalar (modül kapalıysa menüde görünmez ve açılmaz) */
 export const MODULE_ROUTES: Partial<Record<string, ToggleableModule>> = {
@@ -48,49 +53,61 @@ export const MODULE_ROUTES: Partial<Record<string, ToggleableModule>> = {
   hrReports: "hr",
 };
 
-export const NOTIFICATION_MODULES: { key: NotificationModule; label: string }[] = [
-  { key: "stores", label: "Sahalar ve açılışlar" },
-  { key: "contracts", label: "Sözleşmeler" },
-  { key: "tickets", label: "Tadilat talepleri" },
-  { key: "progressPayments", label: "Hakedişler" },
-  { key: "invoices", label: "Faturalar" },
-  { key: "team", label: "Ekip mesajları" },
-  { key: "hr", label: "İnsan kaynakları" },
-  { key: "inventory", label: "Envanter ve araçlar" },
-];
+export const NOTIFICATION_MODULES: { key: NotificationModule; label: string }[] = (
+  ["stores", "contracts", "tickets", "progressPayments", "invoices", "team", "hr", "inventory"] as const
+).map((key) => ({
+  key,
+  get label() {
+    return t(`settings.notificationModules.${key}`);
+  },
+}));
 
+/** Etiket ve açıklama her okunuşta seçili dile çevrilir (settings.notificationTypes.<type>) */
 export const NOTIFICATION_TYPES: {
   type: NotificationType;
   module: NotificationModule;
   label: string;
   description: string;
-}[] = [
-  { type: "opening_soon", module: "stores", label: "Yaklaşan açılış", description: "Açılışına belirlenen gün sayısı kalan sahalar" },
-  { type: "opening_overdue", module: "stores", label: "Geciken açılış", description: "Açılış tarihi geçtiği hâlde açılmamış sahalar" },
-  { type: "ihale_contract_reminder", module: "contracts", label: "Sözleşme gerekli", description: "İhale aşamasında sözleşmesi olmayan sahalar" },
-  { type: "contract_expiring", module: "contracts", label: "Bitmek üzere olan sözleşme", description: "Bitiş tarihi yaklaşan aktif sözleşmeler" },
-  { type: "ticket_assigned", module: "tickets", label: "Bana atanan talepler", description: "Size atanmış, açık ya da devam eden talepler" },
-  { type: "ticket_high_priority", module: "tickets", label: "Yüksek öncelikli talepler", description: "Açık durumdaki yüksek öncelikli talepler" },
-  { type: "payment_pending_approval", module: "progressPayments", label: "Onay bekleyen hakedişler", description: "Gönderilmiş ve onay bekleyen hakedişler" },
-  { type: "invoice_unpaid", module: "invoices", label: "Ödenmemiş faturalar", description: "Kesilmiş ama ödenmemiş faturalar" },
-  { type: "team_unread", module: "team", label: "Okunmamış mesajlar", description: "Ekip sohbetinde size gelen yeni mesajlar" },
-  { type: "certificate_expiring", module: "hr", label: "Süresi dolan belgeler", description: "Süresi geçmiş ya da yaklaşan personel belge ve sertifikaları" },
-  { type: "certificate_pending", module: "hr", label: "Onay bekleyen belgeler", description: "Personelin yüklediği, İK onayı bekleyen belgeler" },
-  { type: "leave_pending", module: "hr", label: "Onay bekleyen izinler", description: "Yöneticisi ya da İK olarak onaylamanız gereken izin talepleri" },
-  { type: "leave_decided", module: "hr", label: "İzin talebimin sonucu", description: "İzin talebiniz onaylandığında ya da reddedildiğinde" },
-  { type: "announcement_unread", module: "hr", label: "Yeni duyurular", description: "Henüz okumadığınız firma duyuruları" },
-  { type: "hr_request_pending", module: "hr", label: "Bekleyen personel talepleri", description: "Sonuçlandırmanız gereken avans, belge ve diğer talepler" },
-  { type: "hr_request_decided", module: "hr", label: "Talebimin sonucu", description: "Avans ya da diğer talebiniz onaylandığında, reddedildiğinde ya da tamamlandığında" },
-  { type: "vehicle_expiring", module: "inventory", label: "Araç belgesi bitiyor", description: "Sigortası, kaskosu ya da muayenesi yaklaşan veya geçen araçlar" },
-];
+}[] = (
+  [
+    ["opening_soon", "stores"],
+    ["opening_overdue", "stores"],
+    ["ihale_contract_reminder", "contracts"],
+    ["contract_expiring", "contracts"],
+    ["ticket_assigned", "tickets"],
+    ["ticket_high_priority", "tickets"],
+    ["payment_pending_approval", "progressPayments"],
+    ["invoice_unpaid", "invoices"],
+    ["team_unread", "team"],
+    ["certificate_expiring", "hr"],
+    ["certificate_pending", "hr"],
+    ["leave_pending", "hr"],
+    ["leave_decided", "hr"],
+    ["announcement_unread", "hr"],
+    ["hr_request_pending", "hr"],
+    ["hr_request_decided", "hr"],
+    ["vehicle_expiring", "inventory"],
+  ] as const
+).map(([type, module]) => ({
+  type,
+  module,
+  get label() {
+    return t(`settings.notificationTypes.${type}.label`);
+  },
+  get description() {
+    return t(`settings.notificationTypes.${type}.description`);
+  },
+}));
 
-export const START_PAGES: { value: string; label: string; routeKey: "dashboard" | "map" | "stores" | "tickets" | "contracts" }[] = [
-  { value: "/map", label: "Harita", routeKey: "map" },
-  { value: "/dashboard", label: "Dashboard", routeKey: "dashboard" },
-  { value: "/stores", label: "Sahalar", routeKey: "stores" },
-  { value: "/tickets", label: "Tadilat Talepleri", routeKey: "tickets" },
-  { value: "/contracts", label: "Sözleşmeler", routeKey: "contracts" },
-];
+export const START_PAGES: { value: string; label: string; routeKey: "dashboard" | "map" | "stores" | "tickets" | "contracts" }[] = (
+  ["map", "dashboard", "stores", "tickets", "contracts"] as const
+).map((routeKey) => ({
+  value: `/${routeKey}`,
+  routeKey,
+  get label() {
+    return t(`nav.${routeKey}`);
+  },
+}));
 
 export const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 

@@ -108,7 +108,7 @@ export function StoreListPanel({
         <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
           <div className="flex items-center gap-2">
             <Store className="h-4 w-4 text-cyan-400" />
-            <span className="text-sm font-medium text-zinc-200">Sahalar</span>
+            <span className="text-sm font-medium text-zinc-200">{t("site.mapPanels.sites")}</span>
             <span className="rounded-full bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-500">
               {filtered.length}
             </span>
@@ -117,6 +117,7 @@ export function StoreListPanel({
             type="button"
             onClick={() => setStoreListOpen(false)}
             className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
+            aria-label={t("common.close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -126,8 +127,8 @@ export function StoreListPanel({
           <SearchInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Saha, şehir ara..."
-            aria-label="Sahalarda ara"
+            placeholder={t("site.mapPanels.searchPlaceholder")}
+            aria-label={t("site.mapPanels.searchLabel")}
           />
 
           <div className="scrollbar-themed flex gap-1 overflow-x-auto pb-0.5">
@@ -153,7 +154,7 @@ export function StoreListPanel({
         <ul className="scrollbar-themed flex-1 overflow-y-auto p-2">
           {table.totalItems === 0 && (
             <li className="px-3 py-8 text-center text-sm text-zinc-600">
-              Saha bulunamadı
+              {t("site.mapPanels.noSites")}
             </li>
           )}
           {table.pageItems.map((store) => {

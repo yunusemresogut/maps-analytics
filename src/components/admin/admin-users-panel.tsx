@@ -11,6 +11,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { useT } from "@/contexts/i18n-context";
 import { TablePagination } from "@/components/modules/module-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,11 +41,18 @@ export function AdminUsersPanel() {
     setUserRestricted,
     getRoleDefaultMatrix,
   } = useAuth();
+  const t = useT();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("manager");
-  const [message, setMessage] = useState("");
+  const [message, setMessageText] = useState("");
+  // Mesajın rengi: başarılı işlem yeşil, hata kırmızı
+  const [messageOk, setMessageOk] = useState(false);
+  const setMessage = (text: string, ok = false) => {
+    setMessageText(text);
+    setMessageOk(ok);
+  };
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
@@ -98,14 +106,14 @@ export function AdminUsersPanel() {
     });
     setSubmitting(false);
     if (result.ok) {
-      setMessage("Kullanıcı başarıyla eklendi");
+      setMessage(t("admin.users.added"), true);
       setName("");
       setEmail("");
       setPassword("");
       setRole("manager");
       setFieldErrors({});
     } else {
-      setMessage(result.error || "Kullanıcı oluşturulamadı");
+      setMessage(result.error || t("admin.users.createFailed"));
     }
   };
 
@@ -124,15 +132,15 @@ export function AdminUsersPanel() {
   const saveEdit = async () => {
     if (!editingUser) return;
     if (!editName.trim() || editName.trim().length < 2) {
-      setMessage("Ad soyad en az 2 karakter olmalı");
+      setMessage(t("admin.users.nameTooShort"));
       return;
     }
     if (!editEmail.includes("@")) {
-      setMessage("Geçerli bir e-posta girin");
+      setMessage(t("admin.users.invalidEmail"));
       return;
     }
     if (editPassword && editPassword.length < 6) {
-      setMessage("Yeni şifre en az 6 karakter olmalı");
+      setMessage(t("admin.users.passwordTooShort"));
       return;
     }
     setSavingEdit(true);
@@ -145,28 +153,27 @@ export function AdminUsersPanel() {
     });
     setSavingEdit(false);
     if (success) {
-      setMessage("Kullanıcı güncellendi");
+      setMessage(t("admin.users.updated"), true);
       setEditingUser(null);
     } else {
-      setMessage("Güncelleme başarısız — e-posta kullanımda olabilir");
+      setMessage(t("admin.users.updateFailed"));
     }
   };
 
   const handleDelete = async (u: User) => {
-    if (!confirm(`"${u.name}" kullanıcısı silinsin mi?`)) return;
+    if (!confirm(t("admin.users.confirmDelete", { name: u.name }))) return;
     const success = await deleteUser(u.id);
     if (success) {
-      setMessage("Kullanıcı silindi");
+      setMessage(t("admin.users.deleted"), true);
       if (editingUser?.id === u.id) setEditingUser(null);
     }
   };
 
   const handleRestrict = async (u: User) => {
     const next = !u.restricted;
-    const label = next ? "kısıtlansın" : "kısıtlaması kaldırılsın";
-    if (!confirm(`"${u.name}" ${label} mı?`)) return;
+    if (!confirm(t(next ? "admin.users.confirmRestrict" : "admin.users.confirmUnrestrict", { name: u.name }))) return;
     await setUserRestricted(u.id, next);
-    setMessage(next ? "Kullanıcı kısıtlandı" : "Kısıtlama kaldırıldı");
+    setMessage(next ? t("admin.users.restricted") : t("admin.users.unrestricted"), true);
   };
 
   return (
@@ -174,10 +181,10 @@ export function AdminUsersPanel() {
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
         <div className="mb-4 flex items-center gap-2">
           <UserPlus className="h-5 w-5 text-cyan-400" />
-          <h2 className="font-medium text-zinc-200">Yeni Kullanıcı</h2>
+          <h2 className="font-medium text-zinc-200">{t("admin.users.newUser")}</h2>
         </div>
         <form onSubmit={handleAddUser} className="space-y-3" noValidate>
-          <FormField label="Ad Soyad" required error={fieldErrors.name}>
+          <FormField label={t("auth.fullName")} required error={fieldErrors.name}>
             <Input
               value={name}
               onChange={(e) => {
@@ -187,7 +194,7 @@ export function AdminUsersPanel() {
               aria-invalid={!!fieldErrors.name}
             />
           </FormField>
-          <FormField label="E-posta" required error={fieldErrors.email}>
+          <FormField label={t("auth.email")} required error={fieldErrors.email}>
             <Input
               type="email"
               value={email}
@@ -199,10 +206,10 @@ export function AdminUsersPanel() {
             />
           </FormField>
           <FormField
-            label="Şifre"
+            label={t("auth.password")}
             required
             error={fieldErrors.password}
-            hint="En az 6 karakter"
+            hint={t("auth.passwordRequirements")}
           >
             <PasswordInput
               value={password}
@@ -213,7 +220,7 @@ export function AdminUsersPanel() {
               aria-invalid={!!fieldErrors.password}
             />
           </FormField>
-          <FormField label="Rol" required>
+          <FormField label={t("admin.users.role")} required>
             <Select
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
@@ -228,11 +235,7 @@ export function AdminUsersPanel() {
           {message && !editingUser && (
             <p
               className={`text-sm ${
-                message.includes("başarı") ||
-                message.includes("güncellendi") ||
-                message.includes("silindi") ||
-                message.includes("kısıt") ||
-                message.includes("kaldırıldı")
+                messageOk
                   ? "text-emerald-400"
                   : "text-red-400"
               }`}
@@ -241,7 +244,7 @@ export function AdminUsersPanel() {
             </p>
           )}
           <Button type="submit" className="w-full" loading={submitting}>
-            Kullanıcı Ekle
+            {t("admin.users.addUser")}
           </Button>
         </form>
       </div>
@@ -250,17 +253,17 @@ export function AdminUsersPanel() {
         {editingUser && (
           <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-5">
             <h3 className="mb-3 text-sm font-medium text-cyan-300">
-              Kullanıcı Düzenle
+              {t("admin.users.editUser")}
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <Input
-                placeholder="Ad Soyad"
+                placeholder={t("auth.fullName")}
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
               />
               <Input
                 type="email"
-                placeholder="E-posta"
+                placeholder={t("auth.email")}
                 value={editEmail}
                 onChange={(e) => setEditEmail(e.target.value)}
               />
@@ -282,11 +285,11 @@ export function AdminUsersPanel() {
                   onChange={(e) => setApplyRoleDefaults(e.target.checked)}
                   className="rounded border-zinc-600 bg-zinc-900 accent-cyan-500"
                 />
-                Rol değişince varsayılan yetki matrisini uygula
+                {t("admin.users.applyRoleDefaults")}
               </label>
               <div className="sm:col-span-2">
                 <PasswordInput
-                  placeholder="Yeni şifre (boş bırakılabilir)"
+                  placeholder={t("admin.users.newPasswordPlaceholder")}
                   value={editPassword}
                   onChange={(e) => setEditPassword(e.target.value)}
                 />
@@ -294,14 +297,14 @@ export function AdminUsersPanel() {
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" onClick={saveEdit} loading={savingEdit}>
-                Kaydet
+                {t("common.save")}
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => setEditingUser(null)}
               >
-                İptal
+                {t("common.cancel")}
               </Button>
             </div>
           </div>
@@ -310,21 +313,21 @@ export function AdminUsersPanel() {
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-medium text-zinc-200">
-              Kullanıcılar ({orgUsers.length})
+              {t("admin.users.listTitle", { count: orgUsers.length })}
             </h2>
             <Select
               value={table.sort.key}
               onChange={(e) => onSortKeyChange(e.target.value as UserSortKey)}
               className="h-9 w-auto min-w-[140px]"
             >
-              <option value="name">Ada göre</option>
-              <option value="email">E-postaya göre</option>
-              <option value="role">Role göre</option>
+              <option value="name">{t("admin.regions.sortByName")}</option>
+              <option value="email">{t("admin.users.sortByEmail")}</option>
+              <option value="role">{t("admin.users.sortByRole")}</option>
             </Select>
           </div>
           <ul className="space-y-3">
             {table.totalItems === 0 && (
-              <li className="text-sm text-zinc-600">Henüz kullanıcı yok</li>
+              <li className="text-sm text-zinc-600">{t("admin.users.empty")}</li>
             )}
             {table.pageItems.map((u) => (
               <li
@@ -342,7 +345,7 @@ export function AdminUsersPanel() {
                       </span>
                       {u.restricted && (
                         <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-400">
-                          Kısıtlı
+                          {t("admin.users.restrictedBadge")}
                         </span>
                       )}
                     </div>
@@ -367,12 +370,12 @@ export function AdminUsersPanel() {
                       onClick={() => startEdit(u)}
                     >
                       <Pencil className="h-3.5 w-3.5" />
-                      Düzenle
+                      {t("common.edit")}
                     </Button>
                     <Link href={`/admin/permissions?user=${u.id}`}>
                       <Button size="sm" variant="outline">
                         <Shield className="h-3.5 w-3.5" />
-                        Yetkiler
+                        {t("nav.permissions")}
                       </Button>
                     </Link>
                     <Button
@@ -383,12 +386,12 @@ export function AdminUsersPanel() {
                       {u.restricted ? (
                         <>
                           <UserCheck className="h-3.5 w-3.5" />
-                          Aç
+                          {t("admin.users.unrestrict")}
                         </>
                       ) : (
                         <>
                           <Ban className="h-3.5 w-3.5" />
-                          Kısıtla
+                          {t("admin.users.restrict")}
                         </>
                       )}
                     </Button>

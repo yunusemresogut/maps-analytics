@@ -11,8 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useI18n, useT } from "@/contexts/i18n-context";
 import { useSettings } from "@/contexts/settings-context";
-import { fetchPersonnelPrivate, formatHours, type Personnel } from "@/lib/hr";
+import { fetchPersonnelPrivate, formatDayCount, type Personnel } from "@/lib/hr";
 import {
   LEAVE_STATUS_LABELS,
   LEAVE_TYPE_HINTS,
@@ -78,11 +79,12 @@ export function usePersonnelLeaves(person: Personnel | undefined, refreshKey?: u
 
 /** Yıllık izin özeti (kart ve form) */
 export function LeaveBalanceSummary({ balance, compact }: { balance: LeaveBalance; compact?: boolean }) {
+  const t = useT();
   const items = [
-    { label: "Hak edilen", value: balance.earned + balance.adjustment },
-    { label: "Kullanılan", value: balance.used },
-    { label: "Onay bekleyen", value: balance.pending },
-    { label: "Kalan", value: balance.remaining, tone: balance.remaining < 0 ? "text-red-400" : "text-emerald-400" },
+    { label: t("hr.leaveBalance.earned"), value: balance.earned + balance.adjustment },
+    { label: t("hr.leaveBalance.used"), value: balance.used },
+    { label: t("hr.leaveBalance.pending"), value: balance.pending },
+    { label: t("hr.leaveBalance.remaining"), value: balance.remaining, tone: balance.remaining < 0 ? "text-red-400" : "text-emerald-400" },
   ];
   return (
     <div>
@@ -90,16 +92,25 @@ export function LeaveBalanceSummary({ balance, compact }: { balance: LeaveBalanc
         {items.map((item) => (
           <div key={item.label}>
             <dt className="text-xs text-zinc-500">{item.label}</dt>
-            <dd className={cn("font-semibold tabular-nums text-zinc-100", item.tone)}>{formatHours(item.value)} gün</dd>
+            <dd className={cn("font-semibold tabular-nums text-zinc-100", item.tone)}>{formatDayCount(item.value)}</dd>
           </div>
         ))}
       </dl>
       {!compact && (
         <p className="mt-3 text-xs text-zinc-500">
-          {balance.serviceYears} yıl hizmet
-          {balance.adjustment !== 0 && ` · ${balance.adjustment > 0 ? "+" : ""}${formatHours(balance.adjustment)} gün düzeltme dahil`}
-          {balance.nextAccrual && ` · ${formatDay(balance.nextAccrual.date)} tarihinde +${balance.nextAccrual.days} gün`}
-          {balance.ageUnknown && " · Yaş kuralı (18 yaş altı / 50 yaş üstü en az 20 gün) için doğum tarihi gerekir"}
+          {t(balance.serviceYears === 1 ? "hr.leaveBalance.serviceYearsOne" : "hr.leaveBalance.serviceYearsOther", {
+            count: balance.serviceYears,
+          })}
+          {balance.adjustment !== 0 &&
+            ` · ${t("hr.leaveBalance.adjustmentIncluded", {
+              days: `${balance.adjustment > 0 ? "+" : ""}${formatDayCount(balance.adjustment)}`,
+            })}`}
+          {balance.nextAccrual &&
+            ` · ${t("hr.leaveBalance.nextAccrual", {
+              date: formatDay(balance.nextAccrual.date),
+              days: `+${formatDayCount(balance.nextAccrual.days)}`,
+            })}`}
+          {balance.ageUnknown && ` · ${t("hr.leaveBalance.ageUnknown")}`}
         </p>
       )}
     </div>
@@ -123,6 +134,7 @@ export function LeaveRequestModal({
   onSubmit: (input: LeaveRequestInput) => void;
 }) {
   const formId = useId();
+  const { t, locale } = useI18n();
   const { org } = useSettings();
   const saturdayWorking = org.hr.saturdayWorking;
   const [form, setForm] = useState<LeaveRequestInput>({
@@ -168,15 +180,18 @@ export function LeaveRequestModal({
 
   const validate = (): Errors => {
     const next: Errors = {};
-    if (!form.personnelId) next.personnelId = "Personel seçin";
-    if (!form.startDate) next.startDate = "Başlangıç tarihi zorunludur";
-    if (!form.endDate) next.endDate = "Bitiş tarihi zorunludur";
-    else if (form.startDate && form.endDate < form.startDate) next.endDate = "Bitiş tarihi başlangıçtan önce olamaz";
-    else if (calendarDays > 366) next.endDate = "İzin en fazla bir yıl olabilir";
-    if (!(dayCount > 0)) next.dayCount = "Gün sayısı 0'dan büyük olmalı";
-    else if (calendarDays && dayCount > calendarDays) next.dayCount = `En fazla ${calendarDays} gün olabilir`;
+    if (!form.personnelId) next.personnelId = t("hr.leaveForm.selectPersonnel");
+    if (!form.startDate) next.startDate = t("hr.leaveForm.startRequired");
+    if (!form.endDate) next.endDate = t("hr.leaveForm.endRequired");
+    else if (form.startDate && form.endDate < form.startDate) next.endDate = t("hr.leaveForm.endBeforeStart");
+    else if (calendarDays > 366) next.endDate = t("hr.leaveForm.maxOneYear");
+    if (!(dayCount > 0)) next.dayCount = t("hr.leaveForm.dayCountPositive");
+    else if (calendarDays && dayCount > calendarDays) next.dayCount = t("hr.leaveForm.dayCountMax", { days: formatDayCount(calendarDays) });
     if (overlapping) {
-      next.startDate = `Bu tarihlerde ${LEAVE_STATUS_LABELS[overlapping.status].toLocaleLowerCase("tr-TR")} bir izin var (${formatDay(overlapping.startDate)} – ${formatDay(overlapping.endDate)})`;
+      next.startDate = t("hr.leaveForm.overlap", {
+        status: LEAVE_STATUS_LABELS[overlapping.status].toLocaleLowerCase(locale),
+        range: `${formatDay(overlapping.startDate)} – ${formatDay(overlapping.endDate)}`,
+      });
     }
     return next;
   };
@@ -194,15 +209,15 @@ export function LeaveRequestModal({
       open
       onClose={onClose}
       className="sm:max-w-2xl"
-      title={request ? "İzin talebini düzelt" : "İzin talebi"}
-      description={request ? request.personnelName : "Talep önce yöneticinize, sonra insan kaynaklarına onaya gider."}
+      title={request ? t("hr.leaveForm.editTitle") : t("hr.leaveForm.newTitle")}
+      description={request ? request.personnelName : t("hr.leaveForm.description")}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Vazgeç
+            {t("hr.common.cancel")}
           </Button>
           <Button type="submit" form={formId} loading={state.saving}>
-            {request ? "Kaydet" : "Talep oluştur"}
+            {request ? t("common.save") : t("hr.leaveForm.submit")}
           </Button>
         </>
       }
@@ -218,14 +233,14 @@ export function LeaveRequestModal({
           if (Object.keys(next).length === 0) onSubmit({ ...form, dayCount });
         }}
       >
-        <ErrorText message={state.error || (Object.keys(errors).length > 0 ? "Lütfen işaretli alanları kontrol edin." : "")} />
+        <ErrorText message={state.error || (Object.keys(errors).length > 0 ? t("hr.common.checkFields") : "")} />
         <div className="grid gap-4 sm:grid-cols-2">
           {people.length > 1 && !request && (
-            <FormField label="Personel" required error={errors.personnelId} className="sm:col-span-2">
+            <FormField label={t("hr.leaveForm.personnel")} required error={errors.personnelId} className="sm:col-span-2">
               <Select
                 value={form.personnelId}
                 onChange={(e) => set("personnelId", e.target.value)}
-                placeholder="Personel seçin"
+                placeholder={t("hr.leaveForm.selectPersonnel")}
                 aria-invalid={!!errors.personnelId}
               >
                 {people.map((p) => (
@@ -237,7 +252,7 @@ export function LeaveRequestModal({
               </Select>
             </FormField>
           )}
-          <FormField label="İzin türü" required className="sm:col-span-2">
+          <FormField label={t("hr.leaveForm.type")} required className="sm:col-span-2">
             <Select
               value={form.type}
               onChange={(e) => set("type", e.target.value as LeaveType)}
@@ -250,7 +265,7 @@ export function LeaveRequestModal({
               ))}
             </Select>
           </FormField>
-          <FormField label="Başlangıç" required error={errors.startDate}>
+          <FormField label={t("hr.leaveForm.start")} required error={errors.startDate}>
             <DatePicker
               value={form.startDate}
               onChange={(value) => {
@@ -261,7 +276,7 @@ export function LeaveRequestModal({
               aria-invalid={!!errors.startDate}
             />
           </FormField>
-          <FormField label="Bitiş (dahil)" required error={errors.endDate}>
+          <FormField label={t("hr.leaveForm.end")} required error={errors.endDate}>
             <DatePicker
               value={form.endDate}
               onChange={(value) => set("endDate", value)}
@@ -271,13 +286,13 @@ export function LeaveRequestModal({
             />
           </FormField>
           <FormField
-            label="İzinden düşülecek gün"
+            label={t("hr.leaveForm.dayCount")}
             required
             error={errors.dayCount}
             hint={
               dayCountTouched && dayCount !== autoDays
-                ? `Hesaplanan: ${autoDays} gün`
-                : `Pazar${saturdayWorking ? "" : ", Cumartesi"} ve sabit resmî tatiller sayılmaz; dini bayramları düşün`
+                ? t("hr.leaveForm.calculated", { days: formatDayCount(autoDays) })
+                : t(saturdayWorking ? "hr.leaveForm.dayCountHintSaturdayWorking" : "hr.leaveForm.dayCountHint")
             }
           >
             <Input
@@ -295,11 +310,14 @@ export function LeaveRequestModal({
           {form.type === "annual" && balance && (
             <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs text-zinc-400">
               <p>
-                Kalan yıllık izin: <b className="text-zinc-100">{formatHours(balance.remaining - balance.pending)} gün</b>
-                {balance.pending > 0 && ` (${formatHours(balance.pending)} gün onay bekliyor)`}
+                {t("hr.leaveForm.remainingAnnual")}{" "}
+                <b className="text-zinc-100">{formatDayCount(balance.remaining - balance.pending)}</b>
+                {balance.pending > 0 && ` (${t("hr.leaveForm.pendingDays", { days: formatDayCount(balance.pending) })})`}
               </p>
               {remainingAfter !== null && remainingAfter < 0 && (
-                <p className="mt-1 text-amber-400">Bu talep kalan hakkı {formatHours(-remainingAfter)} gün aşıyor (avans izin).</p>
+                <p className="mt-1 text-amber-400">
+                  {t("hr.leaveForm.exceedsBalance", { days: formatDayCount(-remainingAfter) })}
+                </p>
               )}
             </div>
           )}
@@ -311,15 +329,15 @@ export function LeaveRequestModal({
           </p>
         )}
         {form.type === "annual" && person && !person.startDate && (
-          <p className="text-xs text-amber-400">Personelin işe giriş tarihi girilmemiş; yıllık izin hakkı hesaplanamıyor.</p>
+          <p className="text-xs text-amber-400">{t("hr.leaveForm.noStartDate")}</p>
         )}
         {person?.employmentType === "subcontractor" && (
           <p className="text-xs text-amber-400">
-            Taşeron personelin yıllık izni alt işverenin yükümlülüğündedir; bu kayıt yalnızca puantaj ve takip içindir.
+            {t("hr.leaveForm.subcontractorNotice")}
           </p>
         )}
-        <FormField label="Açıklama">
-          <Textarea rows={2} value={form.reason} onChange={(e) => set("reason", e.target.value)} placeholder="ör. Yaz tatili, evlilik izni" />
+        <FormField label={t("hr.leaveForm.reason")}>
+          <Textarea rows={2} value={form.reason} onChange={(e) => set("reason", e.target.value)} placeholder={t("hr.leaveForm.reasonPlaceholder")} />
         </FormField>
       </form>
     </Modal>
@@ -344,6 +362,7 @@ export function LeaveDecisionModal({
   onSubmit: (note: string) => void;
 }) {
   const formId = useId();
+  const t = useT();
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
 
@@ -352,15 +371,15 @@ export function LeaveDecisionModal({
       open
       onClose={onClose}
       className="sm:max-w-lg"
-      title={approve ? "İzni onayla" : "İzni reddet"}
-      description={`${request.personnelName} · ${LEAVE_TYPE_LABELS[request.type]} · ${formatDay(request.startDate)} – ${formatDay(request.endDate)} (${formatHours(request.dayCount)} gün)`}
+      title={approve ? t("hr.leaveDecision.approveTitle") : t("hr.leaveDecision.rejectTitle")}
+      description={`${request.personnelName} · ${LEAVE_TYPE_LABELS[request.type]} · ${formatDay(request.startDate)} – ${formatDay(request.endDate)} (${formatDayCount(request.dayCount)})`}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Vazgeç
+            {t("hr.common.cancel")}
           </Button>
           <Button type="submit" form={formId} loading={state.saving} variant={approve ? "default" : "danger"}>
-            {approve ? "Onayla" : "Reddet"}
+            {approve ? t("hr.leaveDecision.approve") : t("hr.leaveDecision.reject")}
           </Button>
         </>
       }
@@ -372,7 +391,7 @@ export function LeaveDecisionModal({
         onSubmit={(event) => {
           event.preventDefault();
           if (!approve && !note.trim()) {
-            setError("Ret gerekçesi zorunludur");
+            setError(t("hr.leaveDecision.reasonRequired"));
             return;
           }
           onSubmit(note);
@@ -382,17 +401,17 @@ export function LeaveDecisionModal({
         {approve && (
           <p className="text-sm text-zinc-400">
             {finalStep
-              ? "İzin kesinleşir ve günler puantaja yazılır. O günlere ait mevcut puantaj kayıtları izinle değiştirilir."
-              : "Talep insan kaynaklarının onayına gönderilir."}
+              ? t("hr.leaveDecision.finalNotice")
+              : t("hr.leaveDecision.forwardNotice")}
           </p>
         )}
         {request.reason && (
           <p className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-300">
-            <span className="text-xs text-zinc-500">Açıklama: </span>
+            <span className="text-xs text-zinc-500">{t("hr.leaveDecision.reasonPrefix")} </span>
             {request.reason}
           </p>
         )}
-        <FormField label={approve ? "Not" : "Ret gerekçesi"} required={!approve} error={error}>
+        <FormField label={approve ? t("hr.common.note") : t("hr.leaveDecision.rejectReason")} required={!approve} error={error}>
           <Textarea
             rows={3}
             value={note}
@@ -404,7 +423,7 @@ export function LeaveDecisionModal({
           />
         </FormField>
         {request.startDate < today() && approve && finalStep && (
-          <p className="text-xs text-amber-400">İzin başlangıcı geçmiş bir tarih; kapatılmış aylara yazılamaz.</p>
+          <p className="text-xs text-amber-400">{t("hr.leaveDecision.pastStart")}</p>
         )}
       </form>
     </Modal>

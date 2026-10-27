@@ -90,21 +90,21 @@ export function AddStorePanel({
       >
         <div className="flex items-center justify-between border-b border-zinc-800 p-4">
           <div>
-            <h3 className="font-semibold text-zinc-100">Yeni Konum Ekle</h3>
+            <h3 className="font-semibold text-zinc-100">{t("site.mapPanels.addTitle")}</h3>
             <p className="mt-0.5 flex items-center gap-1 text-xs text-zinc-500">
               <MapPin className="h-3 w-3" />
               {city
                 ? [[district, city].filter(Boolean).join(" / "), country && country !== "Türkiye" ? country : ""]
                     .filter(Boolean)
                     .join(", ")
-                : "Konum seçilmedi"}
+                : t("site.mapPanels.noLocation")}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
-            aria-label="Kapat"
+            aria-label={t("common.close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -116,7 +116,7 @@ export function AddStorePanel({
               controller={location}
               mapPick={{
                 active: true,
-                hint: "Haritaya tıklayın; pini sürükleyerek ince ayar yapın",
+                hint: t("site.mapPanels.addHint"),
               }}
               errors={{ city: errors.city, address: errors.address }}
             />

@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { parseCurrency, parseDecimal, roundMoney, type CurrencyCode } from "@/lib/currency";
+import { t } from "@/i18n/runtime";
 
 export type ParsedMaterialRow = {
   /** Dosyada poz sütunu yoksa boş */
@@ -59,7 +60,7 @@ export async function parseMaterialsFromExcel(
   const sheetName = workbook.SheetNames[0];
 
   if (!sheetName) {
-    return { materials: [], errors: ["Excel dosyasında sayfa bulunamadı"], matchedColumns: {} };
+    return { materials: [], errors: [t("site.excel.noSheet")], matchedColumns: {} };
   }
 
   const sheet = workbook.Sheets[sheetName];
@@ -70,28 +71,39 @@ export async function parseMaterialsFromExcel(
   });
 
   if (rows.length === 0) {
-    return { materials: [], errors: ["Dosyada veri satırı yok"], matchedColumns: {} };
+    return { materials: [], errors: [t("site.excel.noRows")], matchedColumns: {} };
   }
 
   const headers = Object.keys(rows[0]);
 
-  const pozCol = findColumn(headers, (h) => h.includes("poz"));
+  // Türkçe başlıklar ve İngilizce şablonun başlıkları birlikte tanınır
+  const pozCol = findColumn(headers, (h) => h.includes("poz") || h.includes("item code") || h === "code");
   const descriptionCol = findColumn(
     headers,
-    (h) => !h.includes("poz") && (h.includes("aciklama") || h.includes("ad") || h.includes("isim") || h.includes("tanim"))
+    (h) =>
+      !h.includes("poz") &&
+      !h.includes("code") &&
+      (h.includes("aciklama") ||
+        h.includes("ad") ||
+        h.includes("isim") ||
+        h.includes("tanim") ||
+        h.includes("description") ||
+        h.includes("name"))
   );
-  const quantityCol = findColumn(headers, (h) => h.includes("miktar"));
+  const quantityCol = findColumn(headers, (h) => h.includes("miktar") || h.includes("quantity") || h === "qty");
   const currencyCol = findColumn(
     headers,
     (h) => h.includes("para birimi") || h.includes("doviz") || h.includes("currency")
   );
   const unitCol = findColumn(
     headers,
-    (h) => h.includes("birim") && !h.includes("fiyat") && !h.includes("para")
+    (h) =>
+      (h.includes("birim") && !h.includes("fiyat") && !h.includes("para")) ||
+      (h.includes("unit") && !h.includes("price"))
   );
   const unitPriceCol = findColumn(
     headers,
-    (h) => h.includes("birim") && h.includes("fiyat")
+    (h) => (h.includes("birim") && h.includes("fiyat")) || (h.includes("unit") && h.includes("price"))
   );
   const statusCol = findColumn(headers, (h) => h.includes("durum") || h.includes("stat"));
 
@@ -105,9 +117,9 @@ export async function parseMaterialsFromExcel(
     status: statusCol,
   };
 
-  if (!descriptionCol) errors.push('"Açıklama" veya "Kalem Adı" sütunu bulunamadı');
-  if (!quantityCol) errors.push('"Miktar" sütunu bulunamadı');
-  if (!unitPriceCol) errors.push('"Birim Fiyat" sütunu bulunamadı');
+  if (!descriptionCol) errors.push(t("site.excel.materials.missingDescription"));
+  if (!quantityCol) errors.push(t("site.excel.materials.missingQuantity"));
+  if (!unitPriceCol) errors.push(t("site.excel.materials.missingUnitPrice"));
 
   if (!descriptionCol || !quantityCol || !unitPriceCol) {
     return { materials: [], errors, matchedColumns };
@@ -127,9 +139,11 @@ export async function parseMaterialsFromExcel(
     const unitPrice = roundMoney(parseNumber(row[unitPriceCol]));
     const currency = currencyCol ? parseCurrency(String(row[currencyCol] ?? "")) ?? undefined : undefined;
     const rawStatus = statusCol ? String(row[statusCol] ?? "").trim().toLowerCase() : "bekleniyor";
-    const status = rawStatus.includes("geld") || rawStatus === "geldi"
+    // İngilizce şablondaki "delivered" / "dispatched" değerleri de tanınır
+    const status =
+      rawStatus.includes("geld") || rawStatus === "geldi" || rawStatus.includes("deliver") || rawStatus.includes("arriv")
       ? "geldi"
-      : rawStatus.includes("git") || rawStatus === "gitti"
+      : rawStatus.includes("git") || rawStatus === "gitti" || rawStatus.includes("dispatch") || rawStatus === "sent"
         ? "gitti"
         : "bekleniyor";
 
@@ -137,29 +151,39 @@ export async function parseMaterialsFromExcel(
   }
 
   if (materials.length === 0) {
-    errors.push("Geçerli keşif satırı bulunamadı");
+    errors.push(t("site.excel.materials.noValidRows"));
   }
 
   return { materials, errors, matchedColumns };
 }
 
 export function downloadMaterialsTemplate() {
-  const headers = [["Poz No", "Kalem Adı", "Miktar", "Birim", "Birim Fiyat", "Para Birimi", "Durum"]];
+  const headers = [
+    [
+      t("site.excel.materials.headers.pozNo"),
+      t("site.excel.materials.headers.name"),
+      t("site.excel.materials.headers.quantity"),
+      t("site.excel.materials.headers.unit"),
+      t("site.excel.materials.headers.unitPrice"),
+      t("site.excel.materials.headers.currency"),
+      t("site.excel.materials.headers.status"),
+    ],
+  ];
   const sampleData = [
-    ["10.130.1005", "Cement / Çimento", 150, "torba", 320.5, "TRY", "bekleniyor"],
-    ["10.140.1002", "Steel Bars / İnşaat Demiri", 12, "ton", 28000, "TRY", "geldi"],
-    ["", "Copper Pipe / Bakır Boru", 45, "metre", 4.75, "USD", "gitti"],
+    ["10.130.1005", t("site.excel.materials.sample.cement"), 150, t("site.excel.materials.sample.bag"), 320.5, "TRY", t("site.excel.materials.sample.pending")],
+    ["10.140.1002", t("site.excel.materials.sample.steel"), 12, t("site.excel.materials.sample.ton"), 28000, "TRY", t("site.excel.materials.sample.arrived")],
+    ["", t("site.excel.materials.sample.copper"), 45, t("site.excel.materials.sample.metre"), 4.75, "USD", t("site.excel.materials.sample.sent")],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([...headers, ...sampleData]);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Keşif");
+  XLSX.utils.book_append_sheet(wb, ws, t("site.excel.materials.sheetName"));
 
   const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
   const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "kesif_sablonu.xlsx";
+  link.download = t("site.excel.materials.fileName");
   link.click();
 }

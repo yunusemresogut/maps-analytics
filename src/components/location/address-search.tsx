@@ -60,7 +60,7 @@ export function AddressSearch({
           if (e.key === "Enter") e.preventDefault();
         }}
         placeholder={placeholder ?? t("geocode.searchPlaceholder")}
-        aria-label="Adres ara"
+        aria-label={t("geocode.addressSearch")}
       />
       {canSearch && (
         <ul className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-950 shadow-(--panel-shadow)">

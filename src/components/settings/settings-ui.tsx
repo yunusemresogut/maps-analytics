@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Check, CircleAlert, Lock } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
+import { useT } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -30,6 +31,7 @@ export function useAutoSave() {
 }
 
 export function SaveIndicator({ state }: { state: SaveState }) {
+  const t = useT();
   if (state === "idle") return null;
   return (
     <span
@@ -42,7 +44,7 @@ export function SaveIndicator({ state }: { state: SaveState }) {
       {state === "saving" && <Spinner size="sm" />}
       {state === "saved" && <Check className="h-3.5 w-3.5" />}
       {state === "error" && <CircleAlert className="h-3.5 w-3.5" />}
-      {state === "saving" ? "Kaydediliyor…" : state === "saved" ? "Kaydedildi" : "Kaydedilemedi"}
+      {state === "saving" ? t("settings.save.saving") : state === "saved" ? t("settings.save.saved") : t("settings.save.failed")}
     </span>
   );
 }

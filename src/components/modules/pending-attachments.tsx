@@ -11,6 +11,7 @@ import {
   isAllowedFileType,
 } from "@/lib/file-types";
 import { FileTypeIcon } from "@/components/modules/module-attachments";
+import { useT } from "@/contexts/i18n-context";
 import { FilePreviewModal, type FilePreview } from "@/components/modules/file-preview-modal";
 
 /**
@@ -18,6 +19,7 @@ import { FilePreviewModal, type FilePreview } from "@/components/modules/file-pr
  * uploadModuleAttachments ile yüklenir. Seçim sırasında önizlenebilir.
  */
 export function PendingAttachments({ files, onChange }: { files: File[]; onChange: (files: File[]) => void }) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<FilePreview | null>(null);
@@ -26,7 +28,7 @@ export function PendingAttachments({ files, onChange }: { files: File[]; onChang
     const rejected = selected.filter((file) => !isAllowedFileType(file.name) || file.size > MAX_ATTACHMENT_BYTES);
     setError(
       rejected.length > 0
-        ? `Eklenmedi (desteklenmeyen tür ya da 50 MB üstü): ${rejected.map((file) => file.name).join(", ")}`
+        ? t("finance.attachments.rejected", { files: rejected.map((file) => file.name).join(", ") })
         : ""
     );
     const accepted = selected.filter((file) => !rejected.includes(file));
@@ -63,9 +65,9 @@ export function PendingAttachments({ files, onChange }: { files: File[]; onChang
           onClick={() => inputRef.current?.click()}
         >
           <Paperclip className="h-4 w-4" />
-          Ek dosya seç
+          {t("finance.attachments.chooseFile")}
         </button>
-        <span className="min-w-0 truncate text-xs text-zinc-500">{ALLOWED_FILE_LABELS} · en fazla 50 MB</span>
+        <span className="min-w-0 truncate text-xs text-zinc-500">{ALLOWED_FILE_LABELS} · {t("finance.attachments.maxSize")}</span>
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
       {files.length > 0 && (
@@ -88,8 +90,8 @@ export function PendingAttachments({ files, onChange }: { files: File[]; onChang
                       type="button"
                       onClick={() => openPreview(file)}
                       className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                      aria-label="Önizle"
-                      title="Önizle"
+                      aria-label={t("finance.attachments.preview")}
+                      title={t("finance.attachments.preview")}
                     >
                       <Eye className="h-3.5 w-3.5" />
                     </button>
@@ -98,8 +100,8 @@ export function PendingAttachments({ files, onChange }: { files: File[]; onChang
                     type="button"
                     onClick={() => onChange(files.filter((_, i) => i !== index))}
                     className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
-                    aria-label="Kaldır"
-                    title="Kaldır"
+                    aria-label={t("finance.attachments.remove")}
+                    title={t("finance.attachments.remove")}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>

@@ -17,27 +17,41 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { NOTIFICATION_TYPES } from "@/lib/settings";
+import { t } from "@/i18n/runtime";
 import type { NotificationType } from "@/types";
 
+type NotificationMeta = { icon: LucideIcon; color: string; label: string };
+
+/** Etiket her okunuşta seçili dile çevrilir */
+function meta(type: NotificationType, icon: LucideIcon, color: string): NotificationMeta {
+  return {
+    icon,
+    color,
+    get label() {
+      return t(`system.notificationType.${type}`);
+    },
+  };
+}
+
 /** Bildirim türlerinin panel ve sayfadaki görünümü */
-export const NOTIFICATION_META: Record<NotificationType, { icon: LucideIcon; color: string; label: string }> = {
-  opening_soon: { icon: AlertTriangle, color: "text-red-400", label: "Yakında Açılış" },
-  opening_overdue: { icon: Clock, color: "text-amber-400", label: "Açılış Gecikmesi" },
-  ihale_contract_reminder: { icon: ShoppingCart, color: "text-violet-400", label: "Sözleşme Gerekli" },
-  contract_expiring: { icon: CalendarClock, color: "text-violet-400", label: "Sözleşme Bitiyor" },
-  ticket_assigned: { icon: UserCheck, color: "text-cyan-400", label: "Size Atanan Talep" },
-  ticket_high_priority: { icon: Ticket, color: "text-red-400", label: "Yüksek Öncelikli Talep" },
-  payment_pending_approval: { icon: Receipt, color: "text-emerald-400", label: "Onay Bekleyen Hakediş" },
-  invoice_unpaid: { icon: Coins, color: "text-amber-400", label: "Ödenmemiş Fatura" },
-  team_unread: { icon: MessageSquare, color: "text-cyan-400", label: "Yeni Mesaj" },
-  certificate_expiring: { icon: FileClock, color: "text-amber-400", label: "Belge Süresi" },
-  certificate_pending: { icon: FileBadge, color: "text-teal-400", label: "Onay Bekleyen Belge" },
-  leave_pending: { icon: CalendarClock, color: "text-sky-400", label: "Onay Bekleyen İzin" },
-  leave_decided: { icon: CalendarCheck, color: "text-emerald-400", label: "İzin Sonucu" },
-  announcement_unread: { icon: Megaphone, color: "text-cyan-400", label: "Duyuru" },
-  hr_request_pending: { icon: Inbox, color: "text-sky-400", label: "Bekleyen Talep" },
-  hr_request_decided: { icon: Inbox, color: "text-emerald-400", label: "Talep Sonucu" },
-  vehicle_expiring: { icon: Car, color: "text-amber-400", label: "Araç Belgesi" },
+export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
+  opening_soon: meta("opening_soon", AlertTriangle, "text-red-400"),
+  opening_overdue: meta("opening_overdue", Clock, "text-amber-400"),
+  ihale_contract_reminder: meta("ihale_contract_reminder", ShoppingCart, "text-violet-400"),
+  contract_expiring: meta("contract_expiring", CalendarClock, "text-violet-400"),
+  ticket_assigned: meta("ticket_assigned", UserCheck, "text-cyan-400"),
+  ticket_high_priority: meta("ticket_high_priority", Ticket, "text-red-400"),
+  payment_pending_approval: meta("payment_pending_approval", Receipt, "text-emerald-400"),
+  invoice_unpaid: meta("invoice_unpaid", Coins, "text-amber-400"),
+  team_unread: meta("team_unread", MessageSquare, "text-cyan-400"),
+  certificate_expiring: meta("certificate_expiring", FileClock, "text-amber-400"),
+  certificate_pending: meta("certificate_pending", FileBadge, "text-teal-400"),
+  leave_pending: meta("leave_pending", CalendarClock, "text-sky-400"),
+  leave_decided: meta("leave_decided", CalendarCheck, "text-emerald-400"),
+  announcement_unread: meta("announcement_unread", Megaphone, "text-cyan-400"),
+  hr_request_pending: meta("hr_request_pending", Inbox, "text-sky-400"),
+  hr_request_decided: meta("hr_request_decided", Inbox, "text-emerald-400"),
+  vehicle_expiring: meta("vehicle_expiring", Car, "text-amber-400"),
 };
 
 export function notificationModule(type: NotificationType) {

@@ -5,23 +5,26 @@ import { usePathname } from "next/navigation";
 import { Bell, Building2, LayoutGrid, Settings2, ShieldCheck, SlidersHorizontal, UserCircle } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useAuth } from "@/contexts/auth-context";
+import { useT } from "@/contexts/i18n-context";
+import type { TranslationKey } from "@/i18n";
 import { isAdmin } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
-const PERSONAL_NAV = [
-  { href: "/settings/profile", label: "Profil", icon: UserCircle },
-  { href: "/settings/notifications", label: "Bildirimler", icon: Bell },
-  { href: "/settings/preferences", label: "Tercihler", icon: SlidersHorizontal },
+const PERSONAL_NAV: { href: string; labelKey: TranslationKey; icon: typeof UserCircle }[] = [
+  { href: "/settings/profile", labelKey: "settings.nav.profile", icon: UserCircle },
+  { href: "/settings/notifications", labelKey: "settings.nav.notifications", icon: Bell },
+  { href: "/settings/preferences", labelKey: "settings.nav.preferences", icon: SlidersHorizontal },
 ];
 
-const COMPANY_NAV = [
-  { href: "/settings/company", label: "Firma ve varsayılanlar", icon: Building2 },
-  { href: "/settings/notification-rules", label: "Bildirim kuralları", icon: ShieldCheck },
-  { href: "/settings/modules", label: "Modüller ve özellikler", icon: LayoutGrid },
+const COMPANY_NAV: typeof PERSONAL_NAV = [
+  { href: "/settings/company", labelKey: "settings.nav.company", icon: Building2 },
+  { href: "/settings/notification-rules", labelKey: "settings.nav.notificationRules", icon: ShieldCheck },
+  { href: "/settings/modules", labelKey: "settings.nav.modules", icon: LayoutGrid },
 ];
 
 function SettingsNav() {
   const pathname = usePathname();
+  const t = useT();
   const { user } = useAuth();
   const admin = Boolean(user && isAdmin(user.role));
 
@@ -39,28 +42,28 @@ function SettingsNav() {
         )}
       >
         <Icon className={cn("h-4 w-4", active ? "text-cyan-400" : "text-zinc-500")} />
-        {item.label}
+        {t(item.labelKey)}
       </Link>
     );
   };
 
   return (
     <nav
-      aria-label="Ayarlar"
+      aria-label={t("settings.nav.title")}
       className="scrollbar-themed flex gap-1 overflow-x-auto border-b border-zinc-800 p-3 md:w-60 md:shrink-0 md:flex-col md:overflow-visible md:border-b-0 md:border-r md:p-4"
     >
       <p className="hidden items-center gap-2 px-3 pb-3 text-sm font-semibold text-zinc-100 md:flex">
         <Settings2 className="h-4 w-4 text-cyan-400" />
-        Ayarlar
+        {t("settings.nav.title")}
       </p>
       <p className="hidden px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600 md:block">
-        Kişisel
+        {t("settings.nav.personal")}
       </p>
       {PERSONAL_NAV.map(renderLink)}
       {admin && (
         <>
           <p className="hidden px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wider text-zinc-600 md:block">
-            Firma (admin)
+            {t("settings.nav.companyAdmin")}
           </p>
           <span className="mx-1 w-px shrink-0 bg-zinc-800 md:hidden" aria-hidden />
           {COMPANY_NAV.map(renderLink)}

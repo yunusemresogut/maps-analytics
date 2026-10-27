@@ -4,10 +4,10 @@ import { useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import { ArrowLeft, Bell, RotateCcw, Settings, X } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { TablePagination } from "@/components/modules/module-table";
+import { useI18n } from "@/contexts/i18n-context";
 import { useNotifications } from "@/contexts/notifications-context";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -21,6 +21,7 @@ type SortKey = "createdAt" | "type" | "dismissed";
 
 function NotificationsContent() {
   const router = useRouter();
+  const { t, dateLocale } = useI18n();
   const { allNotifications, dismissedIds, dismiss, undismiss, dismissAll } =
     useNotifications();
 
@@ -73,14 +74,14 @@ function NotificationsContent() {
               className="mb-3 inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              Haritaya dön
+              {t("notFound.goHome")}
             </Link>
             <h1 className="flex items-center gap-2 text-2xl font-semibold text-zinc-100">
               <Bell className="h-6 w-6 text-cyan-400" />
-              Bildirimler
+              {t("notifications.title")}
             </h1>
             <p className="mt-1 text-sm text-zinc-500">
-              {activeCount} aktif · {items.length} toplam
+              {t("shell.notificationsPage.summary", { active: activeCount, total: items.length })}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -89,20 +90,20 @@ function NotificationsContent() {
               onChange={(e) => onSortKeyChange(e.target.value as SortKey)}
               className="h-9 w-auto min-w-[150px]"
             >
-              <option value="createdAt">Tarihe göre</option>
-              <option value="type">Tipe göre</option>
-              <option value="dismissed">Okunma durumuna göre</option>
+              <option value="createdAt">{t("shell.notificationsPage.sortByDate")}</option>
+              <option value="type">{t("shell.notificationsPage.sortByType")}</option>
+              <option value="dismissed">{t("shell.notificationsPage.sortByRead")}</option>
             </Select>
             <Link
               href="/settings/notifications"
               className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
             >
               <Settings className="h-3.5 w-3.5" />
-              Bildirim ayarları
+              {t("shell.notificationsPage.settings")}
             </Link>
             {activeCount > 0 && (
               <Button size="sm" variant="outline" onClick={handleDismissAll}>
-                Tümünü okundu işaretle
+                {t("shell.notificationsPage.markAllRead")}
               </Button>
             )}
           </div>
@@ -111,7 +112,7 @@ function NotificationsContent() {
         <ul className="space-y-2">
           {table.totalItems === 0 && (
             <li className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-12 text-center text-sm text-zinc-500">
-              Henüz bildirim yok
+              {t("shell.notificationsPage.empty")}
             </li>
           )}
           {table.pageItems.map((notif) => {
@@ -134,7 +135,7 @@ function NotificationsContent() {
                       </span>
                       {notif.dismissed && (
                         <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">
-                          Okundu
+                          {t("shell.notificationsPage.read")}
                         </span>
                       )}
                     </div>
@@ -142,12 +143,12 @@ function NotificationsContent() {
                     <p className="mt-1 text-xs text-zinc-600">
                       {notif.storeName ? `${notif.storeName} · ` : ""}
                       {format(parseISO(notif.createdAt), "d MMM yyyy, HH:mm", {
-                        locale: tr,
+                        locale: dateLocale,
                       })}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button size="sm" onClick={() => handleOpen(notif)}>
-                        {notif.actionLabel ?? "Haritada aç"}
+                        {notif.actionLabel ?? t("shell.notificationsPage.openOnMap")}
                       </Button>
                       {notif.dismissed ? (
                         <Button
@@ -156,7 +157,7 @@ function NotificationsContent() {
                           onClick={() => undismiss(notif.id)}
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
-                          Geri al
+                          {t("shell.notificationsPage.undo")}
                         </Button>
                       ) : (
                         <Button
@@ -165,7 +166,7 @@ function NotificationsContent() {
                           onClick={() => dismiss(notif.id)}
                         >
                           <X className="h-3.5 w-3.5" />
-                          Kapat
+                          {t("common.close")}
                         </Button>
                       )}
                     </div>

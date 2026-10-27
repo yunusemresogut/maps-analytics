@@ -12,6 +12,7 @@ import { useLocationTypes } from "@/hooks/use-location-types";
 import { canonicalProvince } from "@/data/regions";
 import { hasErrors, validateStoreForm, type FieldErrors } from "@/lib/validation";
 import type { Store, StoreInput } from "@/types";
+import { t } from "@/i18n/runtime";
 
 /**
  * Mağaza ekleme/düzenleme formu: genel alanlar + konum (pin, il, adres).
@@ -49,7 +50,7 @@ export function useStoreForm(store?: Store) {
     setErrors(nextErrors);
     if (location.blocker) return { ok: false, message: location.blocker };
     if (hasErrors(nextErrors) || !location.location.coords) {
-      return { ok: false, message: "Lütfen zorunlu alanları kontrol edin." };
+      return { ok: false, message: t("site.form.checkRequired") };
     }
     return {
       ok: true,

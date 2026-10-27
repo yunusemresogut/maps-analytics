@@ -17,6 +17,7 @@ import {
   parseMoney,
   type CurrencyCode,
 } from "@/lib/currency";
+import { useT } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 
 export const CURRENCY_ICONS: Record<CurrencyCode, LucideIcon> = {
@@ -43,6 +44,7 @@ type CurrencySelectProps = {
 };
 
 export function CurrencySelect({ value, onChange, disabled, className, id, withLabel }: CurrencySelectProps) {
+  const t = useT();
   return (
     <Select
       id={id}
@@ -50,7 +52,7 @@ export function CurrencySelect({ value, onChange, disabled, className, id, withL
       onChange={(e) => onChange(e.target.value as CurrencyCode)}
       disabled={disabled}
       className={className}
-      aria-label="Para birimi"
+      aria-label={t("shell.currency.label")}
     >
       {CURRENCY_CODES.map((code) => (
         <option key={code} value={code}>
@@ -101,6 +103,7 @@ export function MoneyInput({
   "aria-label": ariaLabel,
   "aria-describedby": ariaDescribedBy,
 }: MoneyInputProps) {
+  const t = useT();
   // Yazarken kullanıcının metni korunur; odak dışında değer biçimli gösterilir
   const [draft, setDraft] = useState<string | null>(null);
   const formatted = value === null ? "" : formatMoneyInput(value, currency);
@@ -159,7 +162,7 @@ export function MoneyInput({
       ) : (
         <span
           className={cn("shrink-0 border-l border-zinc-800 text-zinc-500", small ? "px-1.5" : "px-3")}
-          title="Para birimi"
+          title={t("shell.currency.label")}
         >
           {currency}
         </span>

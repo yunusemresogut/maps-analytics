@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AlertTriangle, Check, CircleAlert, Loader2, X } from "lucide-react";
 import type { ActionPreview } from "@/lib/assistant-actions";
 import { cn } from "@/lib/utils";
+import { useT } from "@/contexts/i18n-context";
 
 export type ActionResult = { label: string; href?: string; ok: boolean };
 
@@ -16,6 +17,7 @@ export type ActionProposal = {
 const MAX_TABLE_ROWS = 8;
 
 function PreviewBlock({ preview }: { preview: ActionPreview }) {
+  const t = useT();
   const hiddenRows = (preview.table?.rows.length ?? 0) - MAX_TABLE_ROWS;
   return (
     <div className="space-y-2">
@@ -55,7 +57,9 @@ function PreviewBlock({ preview }: { preview: ActionPreview }) {
             </tbody>
           </table>
           {hiddenRows > 0 && (
-            <p className="border-t border-zinc-800 px-2 py-1.5 text-[11px] text-zinc-500">… ve {hiddenRows} kalem daha</p>
+            <p className="border-t border-zinc-800 px-2 py-1.5 text-[11px] text-zinc-500">
+              {t(hiddenRows === 1 ? "assistant.card.moreRowsOne" : "assistant.card.moreRowsOther", { count: hiddenRows })}
+            </p>
           )}
         </div>
       )}
@@ -85,11 +89,12 @@ export function ActionPreviewCard({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   if (proposal.status === "preparing") {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2.5 text-xs text-zinc-400">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        Önizleme hazırlanıyor…
+        {t("assistant.card.preparingPreview")}
       </div>
     );
   }
@@ -122,13 +127,13 @@ export function ActionPreviewCard({
       )}
 
       {proposal.status === "cancelled" && (
-        <p className="border-t border-zinc-800 pt-3 text-xs text-zinc-500">İptal edildi; hiçbir kayıt eklenmedi.</p>
+        <p className="border-t border-zinc-800 pt-3 text-xs text-zinc-500">{t("assistant.card.cancelled")}</p>
       )}
 
       {(proposal.status === "ready" || proposal.status === "running") && (
         <div className="flex items-center justify-end gap-2 border-t border-zinc-800 pt-3">
           {blocked && (
-            <p className="mr-auto text-xs text-zinc-500">Eksikleri sohbette düzeltin, yeni önizleme hazırlanır.</p>
+            <p className="mr-auto text-xs text-zinc-500">{t("assistant.card.fixInChat")}</p>
           )}
           <button
             type="button"
@@ -136,7 +141,7 @@ export function ActionPreviewCard({
             disabled={proposal.status === "running"}
             className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-40"
           >
-            {blocked ? "Kapat" : "İptal"}
+            {blocked ? t("common.close") : t("common.cancel")}
           </button>
           {!blocked && (
             <button
@@ -150,7 +155,7 @@ export function ActionPreviewCard({
               ) : (
                 <Check className="h-3.5 w-3.5" />
               )}
-              Onayla ve ekle
+              {t("assistant.card.confirm")}
             </button>
           )}
         </div>

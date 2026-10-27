@@ -1,384 +1,196 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
+import { format } from "date-fns";
 import {
-  BarChart3,
-  Calendar,
-  Clock,
-  Coins,
-  MapPin,
-  Store,
-  TrendingUp,
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Gauge,
+  HardHat,
+  Map as MapIcon,
+  Ticket as TicketIcon,
 } from "lucide-react";
-import { useStores } from "@/contexts/stores-context";
-import { useRegions } from "@/contexts/regions-context";
+import { useAuth } from "@/contexts/auth-context";
+import { useI18n } from "@/contexts/i18n-context";
 import { useDb } from "@/contexts/db-context";
-import { formatMoneyTotals, mergeMoneyTotals } from "@/lib/currency";
-import { useT } from "@/contexts/i18n-context";
+import { useRegions } from "@/contexts/regions-context";
+import { useSettings } from "@/contexts/settings-context";
+import { useStores } from "@/contexts/stores-context";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { Select } from "@/components/ui/select";
 import { findRegionForCity } from "@/data/regions";
-import { getOpeningAlert } from "@/lib/opening-dates";
-import {
-  getProjectStatusLabel,
-  projectStatusConfig,
-} from "@/lib/project-status";
-import type { ProjectStatus } from "@/types";
-import { useLocationTypes } from "@/hooks/use-location-types";
+import { portfolioMetrics, ticketMetrics } from "@/lib/dashboard-metrics";
+import { canAccessRoute, canModule } from "@/lib/permissions";
+import type { AppModuleKey } from "@/types";
+import { Kpi } from "@/components/dashboard/dashboard-ui";
+import { PortfolioSection } from "@/components/dashboard/portfolio-section";
+import { TrendsSection } from "@/components/dashboard/trends-section";
+import { OperationsSection } from "@/components/dashboard/operations-section";
 
-export function UserDashboard() {
-  const { stores } = useStores();
-  const { types: locationTypes, label: locationTypeLabel } = useLocationTypes();
-  const { regions } = useRegions();
-  const { storeSummaries } = useDb();
-  const t = useT();
+const OTHER_REGION = "__other";
 
-  // Status distributions
-  const statusCounts = stores.reduce(
-    (acc, s) => {
-      acc[s.projectStatus] = (acc[s.projectStatus] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<ProjectStatus, number>
-  );
-
-  // Region distributions
-  const regionCounts = stores.reduce(
-    (acc, store) => {
-      const r = findRegionForCity(store.city, regions);
-      const name = r ? r.name : "Diğer";
-      acc[name] = (acc[name] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-
-  // Saha türü dağılımı: firmanın türleri + listede olmayan kayıtlı türler
-  const locationCounts = stores.reduce(
-    (acc, s) => {
-      acc[s.locationType] = (acc[s.locationType] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-
-  // Opening Alerts
-  const openingSoon = stores.filter(
-    (s) => getOpeningAlert(s.openingDate).isOpeningSoon
-  ).length;
-
-  const overdue = stores.filter(
-    (s) =>
-      getOpeningAlert(s.openingDate).isOverdue && s.projectStatus !== "acilis"
-  ).length;
-
-  // Upcoming Openings
-  const upcomingStores = [...stores]
-    .filter((s) => {
-      return (
-        getOpeningAlert(s.openingDate).daysUntilOpening > 0 &&
-        s.projectStatus !== "acilis"
-      );
-    })
-    .sort(
-      (a, b) =>
-        getOpeningAlert(a.openingDate).daysUntilOpening -
-        getOpeningAlert(b.openingDate).daysUntilOpening
-    )
-    .slice(0, 4);
-
-  // Recent Updates
-  const recentStores = [...stores]
-    .sort(
-      (a, b) =>
-        new Date(b.updatedAt ?? b.createdAt).getTime() -
-        new Date(a.updatedAt ?? a.createdAt).getTime()
-    )
-    .slice(0, 4);
-
-  // Financial calculations
-  // Para birimine göre ayrı toplanır (kur çevrimi yok)
-  const totalSpent = mergeMoneyTotals(
-    ...Object.values(storeSummaries).map((summary) => summary.materialTotals)
-  );
-
-  const formattedSpent = formatMoneyTotals(totalSpent);
-
-  return (
-    <div className="scrollbar-themed h-[calc(100vh-3.5rem)] overflow-y-auto">
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-zinc-100 sm:text-2xl">
-              Proje Dashboard
-            </h1>
-            <p className="mt-1 text-sm text-zinc-500">
-              Şantiyelerin genel durumu, bölgesel verileri ve bütçe analizi
-            </p>
-          </div>
-          <Link
-            href="/map"
-            className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-2 text-sm font-medium text-cyan-300 transition-all hover:bg-cyan-500/20"
-          >
-            Haritaya Git →
-          </Link>
-        </div>
-
-        {/* Financial Progress & Core Metrics */}
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            label="Toplam Proje"
-            value={stores.length}
-            icon={Store}
-            color="text-violet-400"
-          />
-          <MetricCard
-            label="Yakında Açılıyor"
-            value={openingSoon}
-            icon={Clock}
-            color="text-red-400"
-          />
-          <MetricCard
-            label="Geciken Açılış"
-            value={overdue}
-            icon={TrendingUp}
-            color="text-amber-400"
-          />
-          <MetricCard
-            label="Toplam Keşif Tutarı"
-            value={formattedSpent}
-            icon={Coins}
-            color="text-emerald-400"
-            isString
-          />
-        </div>
-
-        {/* Primary Distributions Grid */}
-        <div className="mb-6 grid gap-6 lg:grid-cols-2">
-          {/* Status Distribution */}
-          <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
-            <h2 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-violet-400" />
-              Durumlara Göre Dağılım
-            </h2>
-            <div className="mt-4 space-y-3">
-              {(Object.keys(projectStatusConfig) as ProjectStatus[]).map(
-                (status) => {
-                  const count = statusCounts[status] ?? 0;
-                  const pct = stores.length
-                    ? Math.round((count / stores.length) * 100)
-                    : 0;
-                  return (
-                    <div key={status} className="flex items-center gap-3">
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor: projectStatusConfig[status].marker,
-                        }}
-                      />
-                      <span className="w-24 shrink-0 text-xs text-zinc-400 sm:w-28 truncate">
-                        {getProjectStatusLabel(status, t)}
-                      </span>
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-800">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: projectStatusConfig[status].marker,
-                          }}
-                        />
-                      </div>
-                      <span className="w-8 shrink-0 text-right text-xs text-zinc-500 font-medium">
-                        {count} ({pct}%)
-                      </span>
-                    </div>
-                  );
-                }
-              )}
-            </div>
-          </section>
-
-          {/* Region Distribution */}
-          <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
-            <h2 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-cyan-400" />
-              Bölgelere Göre Dağılım
-            </h2>
-            <div className="mt-4 space-y-3">
-              {regions.map((region) => {
-                const count = regionCounts[region.name] ?? 0;
-                const pct = stores.length
-                  ? Math.round((count / stores.length) * 100)
-                  : 0;
-                return (
-                  <div key={region.id} className="flex items-center gap-3">
-                    <span className="w-24 shrink-0 text-xs text-zinc-400 sm:w-28 truncate">
-                      {region.name}
-                    </span>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-800">
-                      <div
-                        className="h-full rounded-full bg-cyan-500/80 transition-all"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span className="w-8 shrink-0 text-right text-xs text-zinc-500 font-medium">
-                      {count} ({pct}%)
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        </div>
-
-        {/* Secondary Content Grid */}
-        <div className="mb-6 grid gap-6 lg:grid-cols-2">
-          {/* Upcoming Openings */}
-          <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
-            <h2 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-rose-400" />
-              Yaklaşan Açılışlar
-            </h2>
-            <ul className="mt-4 space-y-2">
-              {upcomingStores.length === 0 && (
-                <li className="text-sm text-zinc-500 py-3 text-center">
-                  Yaklaşan açılış bulunmuyor
-                </li>
-              )}
-              {upcomingStores.map((store) => {
-                const diffDays = getOpeningAlert(store.openingDate).daysUntilOpening;
-                return (
-                  <li
-                    key={store.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2.5"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-zinc-300">
-                        {store.name}
-                      </p>
-                      <p className="text-xs text-zinc-500">{store.city}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-xs text-zinc-500">
-                        {store.openingDate}
-                      </span>
-                      <span className="rounded bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-400 border border-rose-500/20">
-                        {diffDays} gün kaldı
-                      </span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-
-          {/* Recently Updated */}
-          <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
-            <h2 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-emerald-400" />
-              Son Güncellenen Projeler
-            </h2>
-            <ul className="mt-4 space-y-2">
-              {recentStores.length === 0 && (
-                <li className="text-sm text-zinc-500 py-3 text-center">
-                  Henüz proje eklenmemiş
-                </li>
-              )}
-              {recentStores.map((store) => (
-                <li
-                  key={store.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2.5"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-zinc-300">
-                      {store.name}
-                    </p>
-                    <p className="text-xs text-zinc-500">{store.city}</p>
-                  </div>
-                  <span
-                    className="shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold border"
-                    style={{
-                      color: projectStatusConfig[store.projectStatus].marker,
-                      backgroundColor: `${projectStatusConfig[store.projectStatus].marker}10`,
-                      borderColor: `${projectStatusConfig[store.projectStatus].marker}30`,
-                    }}
-                  >
-                    {getProjectStatusLabel(store.projectStatus, t)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
-
-        {/* Location Type Distribution */}
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-5">
-          <h2 className="text-sm font-medium text-zinc-300 flex items-center gap-2 mb-4">
-            <Store className="h-4 w-4 text-amber-400" />
-            Saha Türüne Göre Dağılım
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {[...new Set([...locationTypes.map((type) => type.key), ...Object.keys(locationCounts)])].map((type) => {
-              const label = locationTypeLabel(type);
-              const count = locationCounts[type] ?? 0;
-              const pct = stores.length
-                ? Math.round((count / stores.length) * 100)
-                : 0;
-              return (
-                <div
-                  key={type}
-                  className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-4 flex flex-col justify-between"
-                >
-                  <div>
-                    <span className="text-xs text-zinc-500">{label}</span>
-                    <h3 className="text-xl font-semibold text-zinc-200 mt-1">
-                      {count} Proje
-                    </h3>
-                  </div>
-                  <div className="mt-4">
-                    <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-amber-500 rounded-full"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-zinc-500 mt-1 block">
-                      Toplam payı %{pct}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      </div>
-    </div>
-  );
+function greetingKey(hour: number) {
+  if (hour < 6) return "dashboard.greeting.night" as const;
+  if (hour < 12) return "dashboard.greeting.morning" as const;
+  if (hour < 18) return "dashboard.greeting.afternoon" as const;
+  return "dashboard.greeting.evening" as const;
 }
 
-type MetricCardProps = {
-  label: string;
-  value: number | string;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-  isString?: boolean;
-};
+export function UserDashboard() {
+  const { user } = useAuth();
+  const { t, dateLocale } = useI18n();
+  const { stores } = useStores();
+  const { regions } = useRegions();
+  const { storeSummaries, tickets } = useDb();
+  const { org, isModuleEnabled } = useSettings();
+  const [region, setRegion] = usePersistentState("dashboard", "region", "all");
 
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  color,
-}: MetricCardProps) {
+  const can = (module: AppModuleKey, enabledKey?: string) =>
+    canModule(user, module, "view") && (!enabledKey || isModuleEnabled(enabledKey));
+  const access = {
+    stores: can("stores") || can("map"),
+    approvals: can("approvals"),
+    reports: canAccessRoute(user, "reports"),
+    tickets: can("tickets", "tickets"),
+    hr: can("personnel") && isModuleEnabled("hr"),
+    inventory: can("inventory"),
+  };
+  const currency = org.defaults.currency;
+
+  // Bölge filtresi sahaları ve sahaya bağlı talepleri daraltır; sahasız talepler yalnızca "Tüm bölgeler"de sayılır
+  const scope = useMemo(() => {
+    const regionOf = (city: string) => findRegionForCity(city, regions)?.id ?? OTHER_REGION;
+    const scopedStores = region === "all" ? stores : stores.filter((store) => regionOf(store.city) === region);
+    const ids = new Set(scopedStores.map((store) => store.id));
+    return {
+      stores: scopedStores,
+      tickets: region === "all" ? tickets : tickets.filter((ticket) => ticket.storeId && ids.has(ticket.storeId)),
+      regionOf,
+    };
+  }, [region, regions, stores, tickets]);
+
+  const portfolio = useMemo(() => portfolioMetrics(scope.stores, storeSummaries), [scope.stores, storeSummaries]);
+  const ticketStats = useMemo(() => ticketMetrics(scope.tickets, user?.id), [scope.tickets, user?.id]);
+
+  const regionsWithOther = regions.length > 0 && stores.some((store) => scope.regionOf(store.city) === OTHER_REGION);
+  const now = new Date();
+  const firstName = user?.name?.split(" ")[0] ?? "";
+  const nextOpening = portfolio.openingNext30[0];
+
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 flex items-center justify-between gap-4">
-      <div>
-        <p className="text-xs text-zinc-500">{label}</p>
-        <p className="mt-1 text-xl font-semibold text-zinc-100">{value}</p>
+    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+      {/* Başlık */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-medium text-zinc-500">{format(now, "d MMMM yyyy, EEEE", { locale: dateLocale })}</p>
+          <h1 className="mt-1 text-xl font-semibold text-zinc-100 sm:text-2xl">
+            {t(greetingKey(now.getHours()))}
+            {firstName && `, ${firstName}`}
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            {[
+              t(portfolio.total === 1 ? "dashboard.summary.sitesOne" : "dashboard.summary.sitesOther", { count: portfolio.total }),
+              t(portfolio.active === 1 ? "dashboard.summary.activeOne" : "dashboard.summary.activeOther", { count: portfolio.active }),
+              t(portfolio.onSite === 1 ? "dashboard.summary.onSiteOne" : "dashboard.summary.onSiteOther", { count: portfolio.onSite }),
+            ].join(" · ")}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {regions.length > 0 && (
+            <Select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="h-9 w-auto min-w-[170px]"
+              aria-label={t("dashboard.regionFilter")}
+            >
+              <option value="all">{t("dashboard.allRegions")}</option>
+              {regions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+              {regionsWithOther && <option value={OTHER_REGION}>{t("dashboard.outsideRegions")}</option>}
+            </Select>
+          )}
+          {can("map") && (
+            <Link
+              href="/map"
+              className="flex h-9 items-center gap-2 rounded-lg border border-zinc-800 px-3 text-sm font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
+            >
+              <MapIcon className="h-4 w-4" />
+              {t("nav.map")}
+            </Link>
+          )}
+        </div>
       </div>
-      <div
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-950/60 border border-zinc-800 ${color}`}
-      >
-        <Icon className="h-5 w-5" />
+
+      {/* Ana göstergeler */}
+      <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <Kpi
+          label={t("dashboard.kpi.activeProjects")}
+          value={portfolio.active}
+          icon={HardHat}
+          hint={t("dashboard.kpi.activeHint", { onSite: portfolio.onSite, opened: portfolio.opened })}
+          href={access.stores ? "/stores" : undefined}
+        />
+        <Kpi
+          label={t("dashboard.kpi.openingIn30")}
+          value={portfolio.openingNext30.length}
+          icon={CalendarClock}
+          tone={portfolio.openingNext30.length > 0 ? "warning" : "default"}
+          hint={nextOpening ? t("dashboard.kpi.nextOpening", { name: nextOpening.name }) : t("dashboard.kpi.noPlannedOpening")}
+        />
+        <Kpi
+          label={t("dashboard.kpi.overdueOpenings")}
+          value={portfolio.overdue.length}
+          icon={AlertTriangle}
+          tone={portfolio.overdue.length > 0 ? "critical" : "good"}
+          hint={t("dashboard.kpi.overdueHint")}
+        />
+        <Kpi
+          label={t("dashboard.kpi.siteProgress")}
+          value={portfolio.onSiteAvgProgress === null ? "—" : t("dashboard.percent", { value: portfolio.onSiteAvgProgress })}
+          icon={Gauge}
+          hint={
+            portfolio.onSiteWithPlan > 0
+              ? t(portfolio.onSiteWithPlan === 1 ? "dashboard.kpi.progressHintOne" : "dashboard.kpi.progressHintOther", {
+                  count: portfolio.onSiteWithPlan,
+                })
+              : t("dashboard.kpi.noWorkPlan")
+          }
+        />
+        {access.tickets ? (
+          <Kpi
+            label={t("dashboard.kpi.openTickets")}
+            value={ticketStats.open.length}
+            icon={TicketIcon}
+            tone={ticketStats.byPriority.high > 0 ? "warning" : "default"}
+            hint={t("dashboard.kpi.ticketsHint", { high: ticketStats.byPriority.high, mine: ticketStats.mine.length })}
+            href="/tickets"
+          />
+        ) : (
+          <Kpi
+            label={t("dashboard.kpi.openedSites")}
+            value={portfolio.opened}
+            icon={CheckCircle2}
+            tone="good"
+            hint={t("dashboard.kpi.openedHint")}
+          />
+        )}
       </div>
+
+      <PortfolioSection stores={scope.stores} showReports={access.reports} showApprovals={access.approvals} />
+
+      <TrendsSection stores={scope.stores} tickets={access.tickets ? scope.tickets : null} currency={currency} />
+
+      <OperationsSection
+        tickets={access.tickets ? ticketStats : null}
+        showHr={access.hr}
+        showInventory={access.inventory}
+        storeName={(id) => stores.find((store) => store.id === id)?.name}
+      />
     </div>
   );
 }

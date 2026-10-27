@@ -14,6 +14,7 @@ import { isAllowedFileType } from "@/lib/file-types";
 import { supabase } from "@/lib/supabase";
 import type { TeamMessage } from "@/types";
 import { apiFetch } from "@/lib/api-client";
+import { t } from "@/i18n/runtime";
 
 export const TEAM_FILES_BUCKET = "team-files";
 export const TEAM_MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -148,17 +149,17 @@ export function TeamChatProvider({ children }: { children: React.ReactNode }) {
 
   const sendMessage = useCallback(
     async (peerId: string, body: string, file?: File | null): Promise<ActionResult> => {
-      if (!userId || !organizationId) return { ok: false, error: "Oturum bulunamadı." };
+      if (!userId || !organizationId) return { ok: false, error: t("system.teamChat.noSession") };
       const text = body.trim();
-      if (!text && !file) return { ok: false, error: "Boş mesaj gönderilemez." };
-      if (text.length > 4000) return { ok: false, error: "Mesaj en fazla 4000 karakter olabilir." };
+      if (!text && !file) return { ok: false, error: t("system.teamChat.emptyMessage") };
+      if (text.length > 4000) return { ok: false, error: t("system.teamChat.messageTooLong") };
 
       let attachment: Record<string, unknown> = {};
       let uploadedPath: string | null = null;
       if (file) {
-        if (!fileSharing) return { ok: false, error: "Dosya paylaşımı firma ayarlarından kapatılmış." };
-        if (!isAllowedFileType(file.name)) return { ok: false, error: "Bu dosya türü desteklenmiyor." };
-        if (file.size > TEAM_MAX_FILE_BYTES) return { ok: false, error: "Dosya en fazla 10 MB olabilir." };
+        if (!fileSharing) return { ok: false, error: t("system.teamChat.fileSharingDisabled") };
+        if (!isAllowedFileType(file.name)) return { ok: false, error: t("system.teamChat.fileTypeNotSupported") };
+        if (file.size > TEAM_MAX_FILE_BYTES) return { ok: false, error: t("system.teamChat.fileTooLarge") };
         const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
         uploadedPath = `${organizationId}/${userId}/${crypto.randomUUID()}-${safeName}`;
         const { error: uploadError } = await supabase.storage
@@ -166,7 +167,7 @@ export function TeamChatProvider({ children }: { children: React.ReactNode }) {
           .upload(uploadedPath, file, { upsert: false, contentType: file.type || undefined });
         if (uploadError) {
           console.error("Ekip dosyası yüklenemedi:", uploadError);
-          return { ok: false, error: "Dosya yüklenemedi." };
+          return { ok: false, error: t("system.teamChat.fileUploadFailed") };
         }
         attachment = {
           attachment_path: uploadedPath,
@@ -184,7 +185,7 @@ export function TeamChatProvider({ children }: { children: React.ReactNode }) {
       if (error || !data) {
         console.error("Ekip mesajı gönderilemedi:", error);
         if (uploadedPath) await supabase.storage.from(TEAM_FILES_BUCKET).remove([uploadedPath]);
-        return { ok: false, error: "Mesaj gönderilemedi." };
+        return { ok: false, error: t("system.teamChat.sendFailed") };
       }
       setMessages((current) => upsert(current, mapMessage(data)));
       return { ok: true };
@@ -217,7 +218,7 @@ export function TeamChatProvider({ children }: { children: React.ReactNode }) {
       method: "DELETE",
       body: JSON.stringify({ messageId }),
     });
-    if (!response.ok) return { ok: false, error: "Mesaj silinemedi." };
+    if (!response.ok) return { ok: false, error: t("system.teamChat.deleteMessageFailed") };
     removeLocally((message) => message.id === messageId);
     return { ok: true };
   }, []);
@@ -228,7 +229,7 @@ export function TeamChatProvider({ children }: { children: React.ReactNode }) {
         method: "DELETE",
         body: JSON.stringify({ peerId }),
       });
-      if (!response.ok) return { ok: false, error: "Sohbet silinemedi." };
+      if (!response.ok) return { ok: false, error: t("system.teamChat.clearConversationFailed") };
       removeLocally(
         (message) =>
           (message.senderId === peerId && message.recipientId === userId) ||

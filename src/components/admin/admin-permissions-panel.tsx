@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Plus, Shield, Trash2, Users } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { useT } from "@/contexts/i18n-context";
 import {
   CRUD_ACTION_LABELS,
   CRUD_ACTIONS,
@@ -14,7 +15,7 @@ import {
   normalizePermissions,
   setMatrixCell,
 } from "@/lib/permissions";
-import { ALL_ROLES, assignableRoles, getRoleLabel, newCustomRoleKey } from "@/lib/roles";
+import { ALL_ROLES, assignableRoles, getRoleLabel, isBuiltInRole, newCustomRoleKey, roleLabelOverride } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -43,12 +44,13 @@ function PermissionMatrixTable({
     value: boolean
   ) => void;
 }) {
+  const t = useT();
   return (
     <div className="overflow-x-auto rounded-lg border border-zinc-800">
       <table className="w-full min-w-[560px] text-sm">
         <thead className="bg-zinc-950/60 text-left text-xs text-zinc-500">
           <tr>
-            <th className="px-4 py-3 font-medium">Bölüm</th>
+            <th className="px-4 py-3 font-medium">{t("admin.permissions.section")}</th>
             {CRUD_ACTIONS.map((action) => (
               <th key={action} className="px-3 py-3 text-center font-medium">
                 {CRUD_ACTION_LABELS[action]}
@@ -99,6 +101,7 @@ function NewRoleModal({
   onClose: () => void;
   onCreate: (form: RoleForm) => void;
 }) {
+  const t = useT();
   const formId = useId();
   const [form, setForm] = useState<RoleForm>({ label: "", description: "", base: "store_manager" });
   const [error, setError] = useState("");
@@ -107,15 +110,15 @@ function NewRoleModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Yeni rol"
-      description="Rol, seçtiğiniz başlangıç rolünün yetkileriyle oluşturulur; sonra düzenleyebilirsiniz."
+      title={t("admin.permissions.newRole")}
+      description={t("admin.permissions.newRoleDescription")}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Vazgeç
+            {t("admin.permissions.dismiss")}
           </Button>
           <Button type="submit" form={formId} loading={saving}>
-            Rolü oluştur
+            {t("admin.permissions.createRole")}
           </Button>
         </>
       }
@@ -127,17 +130,17 @@ function NewRoleModal({
         onSubmit={(event) => {
           event.preventDefault();
           if (!form.label.trim()) {
-            setError("Rol adı zorunludur");
+            setError(t("admin.permissions.roleNameRequired"));
             return;
           }
           onCreate({ ...form, label: form.label.trim(), description: form.description.trim() });
         }}
       >
-        <FormField label="Rol adı" required error={error}>
+        <FormField label={t("admin.permissions.roleName")} required error={error}>
           <Input
             value={form.label}
             maxLength={40}
-            placeholder="ör. Usta, Tedarik"
+            placeholder={t("admin.permissions.roleNamePlaceholder")}
             aria-invalid={!!error}
             onChange={(e) => {
               setForm((prev) => ({ ...prev, label: e.target.value }));
@@ -145,19 +148,19 @@ function NewRoleModal({
             }}
           />
         </FormField>
-        <FormField label="Açıklama" hint="İsteğe bağlı; rol listesinde görünür.">
+        <FormField label={t("admin.permissions.description")} hint={t("admin.permissions.descriptionHint")}>
           <Input
             value={form.description}
             maxLength={120}
-            placeholder="ör. Sahada uygulama yapan ekip başı"
+            placeholder={t("admin.permissions.descriptionPlaceholder")}
             onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
           />
         </FormField>
-        <FormField label="Başlangıç yetkileri">
+        <FormField label={t("admin.permissions.basePermissions")}>
           <Select value={form.base} onChange={(e) => setForm((prev) => ({ ...prev, base: e.target.value as UserRole }))}>
             {roles.map((role) => (
               <option key={role} value={role}>
-                {roleLabel(role)} gibi
+                {t("admin.permissions.likeRole", { role: roleLabel(role) })}
               </option>
             ))}
           </Select>
@@ -180,6 +183,7 @@ function RoleListButton({
   active: boolean;
   onClick: () => void;
 }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -193,7 +197,7 @@ function RoleListButton({
         <span className="block truncate">{label}</span>
         {hint && <span className="mt-0.5 block truncate text-[10px] text-zinc-500">{hint}</span>}
       </span>
-      <span className="shrink-0 rounded-full bg-zinc-800/80 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400" title="Kullanıcı sayısı">
+      <span className="shrink-0 rounded-full bg-zinc-800/80 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400" title={t("admin.permissions.userCount")}>
         {count}
       </span>
     </button>
@@ -209,6 +213,7 @@ export function AdminPermissionsPanel() {
     updateOrganization,
     getRoleDefaultMatrix,
   } = useAuth();
+  const t = useT();
 
   const [tab, setTab] = useState<Tab>("roles");
   const [selectedRole, setSelectedRole] = useState<UserRole>("manager");
@@ -251,11 +256,12 @@ export function AdminPermissionsPanel() {
     setRoleDraft(getRoleDefaultMatrix(selectedRole));
     const custom = customRoles.find((role) => role.key === selectedRole);
     setRoleLabelDraft(
-      custom ? custom.label : organization?.roleLabels?.[selectedRole] ?? getRoleLabel(selectedRole)
+      // Yerleşik rolde yalnızca özel ad gösterilir; boşsa placeholder varsayılan adı gösterir
+      custom ? custom.label : isBuiltInRole(selectedRole) ? roleLabelOverride(selectedRole, organization) ?? "" : ""
     );
     setRoleDescriptionDraft(custom?.description ?? "");
     setApplyToUsers(false);
-  }, [selectedRole, getRoleDefaultMatrix, organization?.rolePermissionDefaults, organization?.roleLabels, customRoles]);
+  }, [selectedRole, getRoleDefaultMatrix, organization, customRoles]);
 
   useEffect(() => {
     if (selectedUser) {
@@ -272,12 +278,12 @@ export function AdminPermissionsPanel() {
 
   const saveRoleDefaults = async () => {
     if (!organization) {
-      flash("Organizasyon bulunamadı", "error");
+      flash(t("admin.permissions.orgNotFound"), "error");
       return;
     }
     const label = roleLabelDraft.trim();
     if (selectedCustom && !label) {
-      flash("Rol adı boş olamaz", "error");
+      flash(t("admin.permissions.roleNameEmpty"), "error");
       return;
     }
     setSaving(true);
@@ -296,10 +302,12 @@ export function AdminPermissionsPanel() {
         })
       : await updateOrganization({
           rolePermissionDefaults,
-          roleLabels: {
-            ...(organization.roleLabels ?? {}),
-            [selectedRole]: label || getRoleLabel(selectedRole),
-          },
+          // Boş ya da varsayılanla aynı ad kaydedilmez; böylece her dilde varsayılan ad görünür
+          roleLabels: Object.fromEntries(
+            Object.entries({ ...(organization.roleLabels ?? {}), [selectedRole]: label }).filter(
+              ([role, value]) => isBuiltInRole(role) && roleLabelOverride(role, { roleLabels: { [role]: value } })
+            )
+          ),
         });
     // İstenirse bu roldeki kullanıcıların yetkileri de rol şablonuna eşitlenir
     if (ok && applyToUsers) {
@@ -309,8 +317,15 @@ export function AdminPermissionsPanel() {
     }
     setSaving(false);
     setApplyToUsers(false);
-    if (!ok) flash("Kayıt başarısız", "error");
-    else flash(applyToUsers && selectedRoleUsers.length > 0 ? `Rol kaydedildi, ${selectedRoleUsers.length} kullanıcıya uygulandı` : "Rol kaydedildi");
+    if (!ok) flash(t("admin.permissions.saveFailed"), "error");
+    else
+      flash(
+        applyToUsers && selectedRoleUsers.length > 0
+          ? t(selectedRoleUsers.length === 1 ? "admin.permissions.roleSavedAppliedOne" : "admin.permissions.roleSavedAppliedOther", {
+              count: selectedRoleUsers.length,
+            })
+          : t("admin.permissions.roleSaved")
+      );
   };
 
   const createRole = async (form: RoleForm) => {
@@ -329,21 +344,21 @@ export function AdminPermissionsPanel() {
     });
     setSaving(false);
     if (!ok) {
-      flash("Rol oluşturulamadı", "error");
+      flash(t("admin.permissions.createFailed"), "error");
       return;
     }
     setNewRoleOpen(false);
     setSelectedRole(key);
-    flash(`"${form.label}" rolü oluşturuldu`);
+    flash(t("admin.permissions.roleCreated", { name: form.label }));
   };
 
   const deleteRole = async () => {
     if (!organization || !selectedCustom) return;
     if (selectedRoleUsers.length > 0) {
-      flash("Bu rolde kullanıcılar var; önce rollerini değiştirin", "error");
+      flash(t("admin.permissions.roleHasUsers"), "error");
       return;
     }
-    if (!confirm(`"${selectedCustom.label}" rolü silinsin mi?`)) return;
+    if (!confirm(t("admin.permissions.confirmDeleteRole", { name: selectedCustom.label }))) return;
     setSaving(true);
     // Rol şablonu da birlikte kaldırılır
     const { [selectedCustom.key]: _removed, ...rolePermissionDefaults } = organization.rolePermissionDefaults ?? {};
@@ -354,11 +369,11 @@ export function AdminPermissionsPanel() {
     });
     setSaving(false);
     if (!ok) {
-      flash("Rol silinemedi", "error");
+      flash(t("admin.permissions.deleteFailed"), "error");
       return;
     }
     setSelectedRole("manager");
-    flash("Rol silindi");
+    flash(t("admin.permissions.roleDeleted"));
   };
 
   const resetRoleToBuiltIn = () => {
@@ -370,7 +385,7 @@ export function AdminPermissionsPanel() {
     setSaving(true);
     await updateUserPermissions(selectedUserId, userDraft);
     setSaving(false);
-    flash("Kullanıcı yetkileri kaydedildi");
+    flash(t("admin.permissions.userSaved"));
   };
 
   const applyRoleToUserDraft = () => {
@@ -392,7 +407,7 @@ export function AdminPermissionsPanel() {
           )}
         >
           <Shield className="h-4 w-4" />
-          Roller
+          {t("admin.permissions.rolesTab")}
         </button>
         <button
           type="button"
@@ -405,7 +420,7 @@ export function AdminPermissionsPanel() {
           )}
         >
           <Users className="h-4 w-4" />
-          Kullanıcı yetkileri
+          {t("admin.permissions.usersTab")}
         </button>
       </div>
 
@@ -420,15 +435,15 @@ export function AdminPermissionsPanel() {
           <div className="space-y-5 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
             <div>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="text-sm font-medium text-zinc-300">Özel roller</h2>
+                <h2 className="text-sm font-medium text-zinc-300">{t("admin.permissions.customRoles")}</h2>
                 <Button size="sm" variant="outline" onClick={() => setNewRoleOpen(true)}>
                   <Plus className="h-3.5 w-3.5" />
-                  Yeni rol
+                  {t("admin.permissions.newRole")}
                 </Button>
               </div>
               {customRoles.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-zinc-800 px-3 py-3 text-xs text-zinc-500">
-                  Henüz özel rol yok. Usta, Tedarik gibi firmanıza özel roller ekleyebilirsiniz.
+                  {t("admin.permissions.noCustomRoles")}
                 </p>
               ) : (
                 <ul className="space-y-1">
@@ -447,13 +462,13 @@ export function AdminPermissionsPanel() {
               )}
             </div>
             <div>
-              <h2 className="mb-2 text-sm font-medium text-zinc-300">Yerleşik roller</h2>
+              <h2 className="mb-2 text-sm font-medium text-zinc-300">{t("admin.permissions.builtInRoles")}</h2>
               <ul className="space-y-1">
                 {EDITABLE_ROLES.map((role) => (
                   <li key={role}>
                     <RoleListButton
                       label={roleLabel(role)}
-                      hint={organization?.rolePermissionDefaults?.[role] ? "Özel şablon" : undefined}
+                      hint={organization?.rolePermissionDefaults?.[role] ? t("admin.permissions.customTemplate") : undefined}
                       count={usersOfRole(role).length}
                       active={selectedRole === role}
                       onClick={() => setSelectedRole(role)}
@@ -470,16 +485,16 @@ export function AdminPermissionsPanel() {
                 <h2 className="flex items-center gap-2 font-medium text-zinc-200">
                   {roleLabel(selectedRole)}
                   <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-normal text-zinc-400">
-                    {selectedCustom ? "Özel rol" : "Yerleşik rol"}
+                    {selectedCustom ? t("admin.permissions.customRole") : t("admin.permissions.builtInRole")}
                   </span>
                 </h2>
                 <p className="mt-1 max-w-xl text-xs text-zinc-500">
-                  Bu matris, bu role atanan yeni kullanıcılar ve “rol varsayılanını uygula” için kullanılır.{" "}
+                  {t("admin.permissions.matrixHint")}{" "}
                   {selectedCustom
-                    ? "Özel rollerin yalnızca bu yetkileri vardır; disiplin onayı veremezler."
+                    ? t("admin.permissions.customRoleHint")
                     : hasOrgOverride
-                      ? "Organizasyona özel şablon aktif."
-                      : "Şu an uygulama varsayılanı gösteriliyor; kaydedince organizasyona yazılır."}
+                      ? t("admin.permissions.orgTemplateActive")
+                      : t("admin.permissions.builtInShown")}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -489,38 +504,38 @@ export function AdminPermissionsPanel() {
                     variant="danger"
                     onClick={() => void deleteRole()}
                     disabled={saving || selectedRoleUsers.length > 0}
-                    title={selectedRoleUsers.length > 0 ? "Bu rolde kullanıcılar var; önce rollerini değiştirin" : undefined}
+                    title={selectedRoleUsers.length > 0 ? t("admin.permissions.roleHasUsers") : undefined}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    Rolü sil
+                    {t("admin.permissions.deleteRole")}
                   </Button>
                 ) : (
                   <Button size="sm" variant="outline" onClick={resetRoleToBuiltIn}>
-                    Uygulama varsayılanına dön
+                    {t("admin.permissions.resetToBuiltIn")}
                   </Button>
                 )}
                 <Button size="sm" onClick={() => void saveRoleDefaults()} loading={saving}>
-                  Rolü kaydet
+                  {t("admin.permissions.saveRole")}
                 </Button>
               </div>
             </div>
 
             <div className="mb-4 grid max-w-2xl gap-3 sm:grid-cols-2">
-              <FormField label={selectedCustom ? "Rol adı" : "Görünen ad"} required={!!selectedCustom}>
+              <FormField label={selectedCustom ? t("admin.permissions.roleName") : t("admin.permissions.displayName")} required={!!selectedCustom}>
                 <Input
                   value={roleLabelDraft}
                   maxLength={40}
                   onChange={(e) => setRoleLabelDraft(e.target.value)}
-                  placeholder={selectedCustom ? "ör. Usta" : getRoleLabel(selectedRole)}
+                  placeholder={selectedCustom ? t("admin.permissions.roleNameShortPlaceholder") : getRoleLabel(selectedRole)}
                 />
               </FormField>
               {selectedCustom && (
-                <FormField label="Açıklama">
+                <FormField label={t("admin.permissions.description")}>
                   <Input
                     value={roleDescriptionDraft}
                     maxLength={120}
                     onChange={(e) => setRoleDescriptionDraft(e.target.value)}
-                    placeholder="İsteğe bağlı"
+                    placeholder={t("admin.permissions.optional")}
                   />
                 </FormField>
               )}
@@ -544,9 +559,11 @@ export function AdminPermissionsPanel() {
                 className="mt-0.5 h-4 w-4 rounded border-zinc-600 bg-zinc-900 accent-cyan-500"
               />
               <span>
-                Kaydederken bu roldeki {selectedRoleUsers.length} kullanıcının yetkilerini de bu matrise eşitle
+                {t(selectedRoleUsers.length === 1 ? "admin.permissions.applyToUsersOne" : "admin.permissions.applyToUsersOther", {
+                  count: selectedRoleUsers.length,
+                })}
                 <span className="block text-xs text-zinc-600">
-                  İşaretlenmezse mevcut kullanıcıların kendi yetkileri değişmez.
+                  {t("admin.permissions.applyToUsersHint")}
                 </span>
               </span>
             </label>
@@ -567,17 +584,17 @@ export function AdminPermissionsPanel() {
         <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
             <h2 className="mb-3 text-sm font-medium text-zinc-300">
-              Kullanıcılar
+              {t("nav.users")}
             </h2>
             <ul className="space-y-1">
               {regularUsers.length === 0 && (
                 <li className="text-sm text-zinc-600">
-                  Kullanıcı yok.{" "}
+                  {t("admin.permissions.noUsers")}{" "}
                   <Link
                     href="/admin/users"
                     className="text-cyan-400 hover:underline"
                   >
-                    Ekle
+                    {t("common.add")}
                   </Link>
                 </li>
               )}
@@ -606,7 +623,7 @@ export function AdminPermissionsPanel() {
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
             {!selectedUser ? (
               <p className="text-sm text-zinc-600">
-                Yetki düzenlemek için kullanıcı seçin
+                {t("admin.permissions.selectUser")}
               </p>
             ) : (
               <>
@@ -622,8 +639,7 @@ export function AdminPermissionsPanel() {
                       {getRoleLabel(selectedUser.role, organization)} · {selectedUser.email}
                     </p>
                     <p className="mt-2 max-w-xl text-xs text-zinc-600">
-                      Kullanıcı matrisi kaydedilince rol şablonunu ezer. Rol
-                      varsayılanı sekmesindeki şablondan hızlıca doldurabilirsiniz.
+                      {t("admin.permissions.userMatrixHint")}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -632,10 +648,10 @@ export function AdminPermissionsPanel() {
                       variant="outline"
                       onClick={applyRoleToUserDraft}
                     >
-                      Rol varsayılanını uygula
+                      {t("admin.permissions.applyRoleDefault")}
                     </Button>
                     <Button size="sm" onClick={saveUser} loading={saving}>
-                      Kaydet
+                      {t("common.save")}
                     </Button>
                   </div>
                 </div>

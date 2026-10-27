@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/contexts/auth-context";
+import { useT } from "@/contexts/i18n-context";
+import type { TranslationKey } from "@/i18n";
 import { usePermissions } from "@/hooks/use-permissions";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useServerTable } from "@/hooks/use-server-table";
@@ -54,12 +56,12 @@ import { differenceInCalendarDays, parseISO } from "date-fns";
 
 type SortKey = "name" | "code" | "category" | "state" | "assignee";
 
-const SORT_OPTIONS: { key: SortKey; label: string; column: string }[] = [
-  { key: "name", label: "Ada göre", column: "name" },
-  { key: "code", label: "Demirbaş no'ya göre", column: "code" },
-  { key: "category", label: "Kategoriye göre", column: "category" },
-  { key: "state", label: "Duruma göre", column: "state" },
-  { key: "assignee", label: "Zimmetli kişiye göre", column: "assignee_name" },
+const SORT_OPTIONS: { key: SortKey; labelKey: TranslationKey; column: string }[] = [
+  { key: "name", labelKey: "inventory.page.sortByName", column: "name" },
+  { key: "code", labelKey: "inventory.page.sortByCode", column: "code" },
+  { key: "category", labelKey: "inventory.page.sortByCategory", column: "category" },
+  { key: "state", labelKey: "inventory.page.sortByState", column: "state" },
+  { key: "assignee", labelKey: "inventory.page.sortByAssignee", column: "assignee_name" },
 ];
 const SORT_COLUMNS = Object.fromEntries(SORT_OPTIONS.map((option) => [option.key, option.column])) as Record<SortKey, string>;
 
@@ -89,6 +91,7 @@ function InventoryRow({
   canView: boolean;
   onAction: (dialog: Dialog | { kind: "delete"; item: InventoryItem }) => void;
 }) {
+  const t = useT();
   const assignment = item.assignment;
   const overdue = isOverdue(item);
   const details = [CATEGORY_LABELS[item.category], item.brand, item.serialNo].filter(Boolean).join(" · ");
@@ -117,7 +120,12 @@ function InventoryRow({
                   : "border-amber-500/25 bg-amber-500/10 text-amber-400"
               )}
             >
-              {vehicleDoc.label}: {vehicleDays < 0 ? `${-vehicleDays} gün geçti` : vehicleDays === 0 ? "bugün bitiyor" : `${vehicleDays} gün kaldı`}
+              {vehicleDoc.label}:{" "}
+              {vehicleDays < 0
+                ? t(vehicleDays === -1 ? "inventory.row.daysOverdueOne" : "inventory.row.daysOverdueOther", { count: -vehicleDays })
+                : vehicleDays === 0
+                  ? t("inventory.row.expiresToday")
+                  : t(vehicleDays === 1 ? "inventory.row.daysLeftOne" : "inventory.row.daysLeftOther", { count: vehicleDays })}
             </span>
           )}
         </div>
@@ -126,7 +134,7 @@ function InventoryRow({
       {/* Zimmet */}
       <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Durum</p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">{t("inventory.row.status")}</p>
           <span className={cn("mt-1 inline-flex rounded-full border px-2 py-0.5 text-xs font-medium", STATE_STYLES[item.state])}>
             {STATE_LABELS[item.state]}
           </span>
@@ -134,7 +142,7 @@ function InventoryRow({
         <div className="flex min-w-0 items-start gap-2.5">
           <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
           <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Zimmetli</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">{t("inventory.row.assignee")}</p>
             <p className={cn("mt-0.5 truncate text-sm", assignment ? "text-zinc-200" : "text-zinc-600")}>
               {assignment ? assignment.assigneeName : "—"}
             </p>
@@ -149,13 +157,13 @@ function InventoryRow({
         <div className="flex min-w-0 items-start gap-2.5">
           <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
           <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Zimmet / teslim</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">{t("inventory.row.assignmentDates")}</p>
             {assignment ? (
               <p className="mt-0.5 truncate text-sm text-zinc-300">
                 {formatDay(assignment.assignedAt)}
                 {assignment.expectedReturn && (
                   <span className={cn("block text-xs", overdue ? "font-medium text-red-400" : "text-zinc-500")}>
-                    {overdue ? "Teslim gecikti · " : "Teslim · "}
+                    {overdue ? t("inventory.row.returnOverdue") : t("inventory.row.returnDue")}
                     {formatDay(assignment.expectedReturn)}
                   </span>
                 )}
@@ -173,32 +181,32 @@ function InventoryRow({
           assignment ? (
             <Button size="sm" variant="outline" onClick={() => onAction({ kind: "return", item })}>
               <ArrowDownToLine className="h-3.5 w-3.5" />
-              Teslim al
+              {t("inventory.row.return")}
             </Button>
           ) : (
-            <Button size="sm" onClick={() => onAction({ kind: "assign", item })} disabled={item.state === "maintenance"} title={item.state === "maintenance" ? "Bakımdaki eşya zimmetlenemez" : undefined}>
+            <Button size="sm" onClick={() => onAction({ kind: "assign", item })} disabled={item.state === "maintenance"} title={item.state === "maintenance" ? t("inventory.row.maintenanceCantAssign") : undefined}>
               <UserRoundPlus className="h-3.5 w-3.5" />
-              Zimmetle
+              {t("inventory.row.assign")}
             </Button>
           )
         )}
         {canEdit && assignment && (
-          <IconButton label="Zimmeti düzenle" onClick={() => onAction({ kind: "assign", item })}>
+          <IconButton label={t("inventory.row.editAssignment")} onClick={() => onAction({ kind: "assign", item })}>
             <UserRound className="h-4 w-4" />
           </IconButton>
         )}
         {canView && (
-          <IconButton label="Zimmet geçmişi" onClick={() => onAction({ kind: "history", item })}>
+          <IconButton label={t("inventory.row.history")} onClick={() => onAction({ kind: "history", item })}>
             <History className="h-4 w-4" />
           </IconButton>
         )}
         {canEdit && (
-          <IconButton label="Düzenle" onClick={() => onAction({ kind: "item", item })}>
+          <IconButton label={t("inventory.row.edit")} onClick={() => onAction({ kind: "item", item })}>
             <Pencil className="h-4 w-4" />
           </IconButton>
         )}
         {canDelete && (
-          <IconButton label="Sil" danger onClick={() => onAction({ kind: "delete", item })}>
+          <IconButton label={t("inventory.row.delete")} danger onClick={() => onAction({ kind: "delete", item })}>
             <Trash2 className="h-4 w-4" />
           </IconButton>
         )}
@@ -235,6 +243,7 @@ function IconButton({
 }
 
 function InventoryContent() {
+  const t = useT();
   const { user } = useAuth();
   const { canView, canAdd, canEdit, canDelete } = usePermissions("inventory");
   const [query, setQuery] = usePersistentState("inventory", "query", "");
@@ -307,14 +316,14 @@ function InventoryContent() {
   };
 
   const remove = async (item: InventoryItem) => {
-    if (!confirm(`"${item.name}" ve zimmet geçmişi silinsin mi?`)) return;
+    if (!confirm(t("inventory.page.deleteConfirm", { name: item.name }))) return;
     try {
       await deleteInventoryItem(item.id);
       log("delete", `Envanter silindi: ${item.name}`, item);
       setVersion((current) => current + 1);
     } catch (err) {
       console.error("Envanter silinemedi:", err);
-      setNotice(inventoryErrorMessage(err, "Envanter silinemedi."));
+      setNotice(inventoryErrorMessage(err, t("inventory.page.deleteFailed")));
     }
   };
 
@@ -324,17 +333,17 @@ function InventoryContent() {
     <div className="scrollbar-themed h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-100">{canView ? "Envanter" : "Zimmetimdekiler"}</h1>
+          <h1 className="text-xl font-semibold text-zinc-100">{canView ? t("inventory.page.title") : t("inventory.page.myTitle")}</h1>
           <p className="mt-1 text-sm text-zinc-500">
             {canView
-              ? "Ekipman ve araçlar, kimde olduğu ve zimmet geçmişi."
-              : "Size zimmetlenmiş ekipman ve araçlar. Teslim için envanter yetkilisine başvurun."}
+              ? t("inventory.page.description")
+              : t("inventory.page.myDescription")}
           </p>
         </div>
         {canAdd && (
           <Button onClick={() => open({ kind: "item", item: null })}>
             <Plus className="h-4 w-4" />
-            Yeni envanter
+            {t("inventory.page.add")}
           </Button>
         )}
       </div>
@@ -369,20 +378,20 @@ function InventoryContent() {
         <SearchInput
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ad, demirbaş no, seri no, kişi…"
-          aria-label="Envanterde ara"
+          placeholder={t("inventory.page.searchPlaceholder")}
+          aria-label={t("inventory.page.searchLabel")}
           containerClassName="flex-1 sm:max-w-sm"
         />
-        <Select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} className="w-auto min-w-[150px]" aria-label="Durum">
-          <option value="all">Tüm durumlar</option>
+        <Select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} className="w-auto min-w-[150px]" aria-label={t("inventory.page.statusFilter")}>
+          <option value="all">{t("inventory.page.allStatuses")}</option>
           {STAT_ORDER.map((state) => (
             <option key={state} value={state}>
               {STATE_LABELS[state]}
             </option>
           ))}
         </Select>
-        <Select value={category} onChange={(e) => setCategory(e.target.value)} className="w-auto min-w-[160px]" aria-label="Kategori">
-          <option value="all">Tüm kategoriler</option>
+        <Select value={category} onChange={(e) => setCategory(e.target.value)} className="w-auto min-w-[160px]" aria-label={t("inventory.page.categoryFilter")}>
+          <option value="all">{t("inventory.page.allCategories")}</option>
           {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
@@ -393,11 +402,11 @@ function InventoryContent() {
           value={table.sort.key}
           onChange={(e) => table.setSort({ key: e.target.value as SortKey, direction: "asc" })}
           className="w-auto min-w-[180px]"
-          aria-label="Sıralama"
+          aria-label={t("inventory.page.sortLabel")}
         >
           {SORT_OPTIONS.map((option) => (
             <option key={option.key} value={option.key}>
-              {option.label}
+              {t(option.labelKey)}
             </option>
           ))}
         </Select>
@@ -412,12 +421,12 @@ function InventoryContent() {
       ) : table.totalItems === 0 ? (
         <div className="rounded-xl border border-dashed border-zinc-800 px-4 py-12 text-center text-sm text-zinc-500">
           {filtered
-            ? "Filtreyle eşleşen envanter yok."
+            ? t("inventory.page.emptyFiltered")
             : canView
               ? canAdd
-                ? "Henüz envanter yok. “Yeni envanter” ile ekipman ya da araç ekleyin."
-                : "Henüz envanter yok."
-              : "Üzerinize zimmetli eşya yok."}
+                ? t("inventory.page.emptyCanAdd")
+                : t("inventory.page.empty")
+              : t("inventory.page.emptyMine")}
         </div>
       ) : (
         <ul className={cn("flex flex-col gap-3", table.isLoading && "opacity-60")}>
@@ -461,8 +470,8 @@ function InventoryContent() {
                 else await createInventoryItem(input);
                 log(dialog.item ? "update" : "create", `Envanter ${dialog.item ? "güncellendi" : "eklendi"}: ${input.name}`, dialog.item);
               },
-              dialog.item ? "Envanter güncellendi." : "Envanter eklendi.",
-              "Envanter kaydedilemedi."
+              dialog.item ? t("inventory.page.updated") : t("inventory.page.created"),
+              t("inventory.page.saveFailed")
             )
           }
         />
@@ -486,8 +495,10 @@ function InventoryContent() {
                   dialog.item
                 );
               },
-              dialog.item.assignment ? "Zimmet güncellendi." : `${dialog.item.name} zimmetlendi.`,
-              "Zimmet kaydedilemedi."
+              dialog.item.assignment
+                ? t("inventory.page.assignmentUpdated")
+                : t("inventory.page.assigned", { name: dialog.item.name }),
+              t("inventory.page.assignmentFailed")
             )
           }
         />
@@ -506,8 +517,8 @@ function InventoryContent() {
                 });
                 log("return", `Teslim alındı: ${dialog.item.name} ← ${dialog.item.assignment!.assigneeName}`, dialog.item);
               },
-              `${dialog.item.name} teslim alındı.`,
-              "Teslim kaydedilemedi."
+              t("inventory.page.returned", { name: dialog.item.name }),
+              t("inventory.page.returnFailed")
             )
           }
         />

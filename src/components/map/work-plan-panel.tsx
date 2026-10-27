@@ -12,7 +12,6 @@ import {
   parseISO,
   startOfMonth,
 } from "date-fns";
-import { tr } from "date-fns/locale";
 import { TruncateWithTooltip } from "@/components/ui/truncate-with-tooltip";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
@@ -34,9 +33,11 @@ import { useRowSelection } from "@/hooks/use-row-selection";
 import { cn } from "@/lib/utils";
 import { WorkPlanImportMenu } from "@/components/map/work-plan-import-menu";
 import { WorkPlanFormModal, type WorkPlanFormValues } from "@/components/map/work-plan-form-modal";
-import type { ParsedWorkPlanRow } from "@/lib/excel-work-plan";
+import { responsibleLabel, type ParsedWorkPlanRow } from "@/lib/excel-work-plan";
 import type { StoreWorkPlanItem, WorkPlanStatus } from "@/types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import { useI18n, useT } from "@/contexts/i18n-context";
+import { getDateLocale, localizedRecord } from "@/i18n/runtime";
 
 type WorkPlanPanelProps = {
   storeId: string;
@@ -48,11 +49,11 @@ type WorkPlanPanelProps = {
 const SORT_COLUMNS = { seq: "seq" };
 const INITIAL_SORT: SortState<"seq"> = { key: "seq", direction: "asc" };
 
-const statusLabels: Record<WorkPlanStatus, string> = {
-  yapilacak: "Yapılacak",
-  devam_ediyor: "Devam ediyor",
-  tamamlandi: "Tamamlandı",
-};
+const statusLabels: Record<WorkPlanStatus, string> = localizedRecord({
+  yapilacak: "site.workPlan.status.yapilacak",
+  devam_ediyor: "site.workPlan.status.devam_ediyor",
+  tamamlandi: "site.workPlan.status.tamamlandi",
+});
 
 const statusColors: Record<WorkPlanStatus, string> = {
   yapilacak: "bg-sky-500/10 text-sky-400 border-sky-500/20",
@@ -63,10 +64,11 @@ const statusColors: Record<WorkPlanStatus, string> = {
 function formatDateSafe(dateStr: string) {
   if (!dateStr) return "-";
   const date = parseISO(dateStr);
-  return isValid(date) ? format(date, "d MMM yyyy", { locale: tr }) : dateStr;
+  return isValid(date) ? format(date, "d MMM yyyy", { locale: getDateLocale() }) : dateStr;
 }
 
 function WorkPlanGantt({ items }: { items: StoreWorkPlanItem[] }) {
+  const { t, dateLocale } = useI18n();
   const scheduled = items.filter((item) => {
     if (!item.startDate) return false;
     const start = parseISO(item.startDate);
@@ -76,7 +78,7 @@ function WorkPlanGantt({ items }: { items: StoreWorkPlanItem[] }) {
   if (scheduled.length === 0) {
     return (
       <div className="px-4 py-10 text-center text-sm text-zinc-500">
-        Gantt görünümü için başlangıç tarihi olan iş kalemi ekleyin.
+        {t("site.workPlan.ganttEmpty")}
       </div>
     );
   }
@@ -115,7 +117,7 @@ function WorkPlanGantt({ items }: { items: StoreWorkPlanItem[] }) {
         y1: predecessorIndex * 44 + 22,
         x2: (targetDay / totalDays) * timelineWidth,
         y2: successorIndex * 44 + 22,
-        label: `${dependency.type}, ${dependency.lagHours} saat`,
+        label: t("site.workPlan.dependencyLabel", { type: dependency.type, hours: dependency.lagHours }),
       }];
     })
   );
@@ -132,7 +134,7 @@ function WorkPlanGantt({ items }: { items: StoreWorkPlanItem[] }) {
       <div className="min-w-max">
         <div className="flex border-b border-zinc-800 bg-zinc-950/60">
           <div className="sticky left-0 z-10 w-64 shrink-0 border-r border-zinc-800 bg-zinc-950 px-4 py-3 text-xs font-medium text-zinc-500">
-            İş kalemi
+            {t("site.workPlan.item")}
           </div>
           <div className="flex shrink-0" style={{ width: timelineWidth }}>
             {months.map((month) => (
@@ -141,7 +143,7 @@ function WorkPlanGantt({ items }: { items: StoreWorkPlanItem[] }) {
                 className="border-r border-zinc-800 px-2 py-3 text-xs font-medium text-zinc-400"
                 style={{ width: `${monthWidth(month) * timelineWidth}px` }}
               >
-                {format(month, "MMM yyyy", { locale: tr })}
+                {format(month, "MMM yyyy", { locale: dateLocale })}
               </div>
             ))}
           </div>
@@ -152,7 +154,7 @@ function WorkPlanGantt({ items }: { items: StoreWorkPlanItem[] }) {
           className="pointer-events-none absolute left-64 top-0 z-0 overflow-visible text-amber-500"
           width={timelineWidth}
           height={scheduled.length * 44}
-          aria-label="Görev bağımlılıkları"
+          aria-label={t("site.workPlan.dependencies")}
         >
           <defs>
             <marker id="gantt-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
@@ -198,7 +200,7 @@ function WorkPlanGantt({ items }: { items: StoreWorkPlanItem[] }) {
                     {item.description}
                   </span>
                   <span className="block truncate text-[10px] text-zinc-600">
-                    {[item.activityCode, item.wbsCode].filter(Boolean).join(" · ") || format(startDate, "d MMM", { locale: tr })}
+                    {[item.activityCode, item.wbsCode].filter(Boolean).join(" · ") || format(startDate, "d MMM", { locale: dateLocale })}
                   </span>
                 </div>
               </div>
@@ -233,7 +235,9 @@ function WorkPlanGantt({ items }: { items: StoreWorkPlanItem[] }) {
       </div>
       {scheduled.length < items.length && (
         <p className="border-t border-zinc-800 px-4 py-2 text-xs text-zinc-500">
-          {items.length - scheduled.length} iş kalemi tarih olmadığı için zaman çizelgesinde gösterilmiyor.
+          {t(items.length - scheduled.length === 1 ? "site.workPlan.unscheduledOne" : "site.workPlan.unscheduledOther", {
+            count: items.length - scheduled.length,
+          })}
         </p>
       )}
     </div>
@@ -246,6 +250,7 @@ export function WorkPlanPanel({
   onDelete,
   onImport,
 }: WorkPlanPanelProps) {
+  const t = useT();
   const { addWorkPlanItem, updateWorkPlanItem, getDetailVersion } = useStoreData();
   const { storeSummaries } = useDb();
   const summary = storeSummaries[storeId] ?? EMPTY_SUMMARY;
@@ -287,7 +292,7 @@ export function WorkPlanPanel({
 
   const handleBulkDelete = async () => {
     const count = selection.selectedCount;
-    if (count === 0 || !confirm(`${count} iş kalemi silinsin mi?`)) return;
+    if (count === 0 || !confirm(t(count === 1 ? "site.workPlan.confirmDeleteOne" : "site.workPlan.confirmDeleteOther", { count }))) return;
     setDeleting(true);
     try {
       const ids = selection.allMatching
@@ -333,13 +338,13 @@ export function WorkPlanPanel({
             aria-hidden
           />
           <CalendarRange className="h-4 w-4 text-emerald-400" />
-          <span className="text-sm font-medium text-zinc-200">İş Planı</span>
+          <span className="text-sm font-medium text-zinc-200">{t("site.workPlan.title")}</span>
           <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-xs text-emerald-300">
             {summary.workPlanCount}
           </span>
         </button>
         <div className="flex items-center gap-2">
-          <div className={`${expanded ? "inline-flex" : "hidden"} rounded-md border border-zinc-800 bg-zinc-950/50 p-0.5`} role="group" aria-label="İş planı görünümü">
+          <div className={`${expanded ? "inline-flex" : "hidden"} rounded-md border border-zinc-800 bg-zinc-950/50 p-0.5`} role="group" aria-label={t("site.workPlan.viewLabel")}>
             <button
               type="button"
               onClick={() => setViewMode("table")}
@@ -347,7 +352,7 @@ export function WorkPlanPanel({
               className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs ${viewMode === "table" ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
             >
               <List className="h-3.5 w-3.5" />
-              Tablo
+              {t("site.workPlan.table")}
             </button>
             <button
               type="button"
@@ -356,7 +361,7 @@ export function WorkPlanPanel({
               className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs ${viewMode === "gantt" ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
             >
               <CalendarRange className="h-3.5 w-3.5" />
-              Gantt
+              {t("site.workPlan.gantt")}
             </button>
           </div>
           {isEditing && (
@@ -364,7 +369,7 @@ export function WorkPlanPanel({
               <WorkPlanImportMenu existingCount={summary.workPlanCount} onImport={onImport} />
               <Button size="sm" onClick={() => openModal(null)}>
                 <Plus className="h-3.5 w-3.5" />
-                İş ekle
+                {t("site.workPlan.add")}
               </Button>
             </>
           )}
@@ -379,8 +384,8 @@ export function WorkPlanPanel({
                 <SearchInput
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="İş kalemi, kod, sorumlu ara…"
-                  aria-label="İş planında ara"
+                  placeholder={t("site.workPlan.searchPlaceholder")}
+                  aria-label={t("site.workPlan.searchLabel")}
                   containerClassName="max-w-sm"
                   className="h-9"
                 />
@@ -408,17 +413,17 @@ export function WorkPlanPanel({
                           checked={selection.isPageSelected}
                           indeterminate={selection.isPagePartiallySelected}
                           onChange={selection.togglePage}
-                          label="Bu sayfadaki iş kalemlerini seç"
+                          label={t("site.workPlan.selectPage")}
                         />
                       </th>
                     )}
-                    <th className="px-4 py-3 font-medium">İş kalemi</th>
-                    <th className="px-4 py-3 font-medium">Aktivite kodu</th>
-                    <th className="px-4 py-3 font-medium">Başlangıç</th>
-                    <th className="px-4 py-3 font-medium">Bitiş</th>
-                    <th className="px-4 py-3 font-medium">İlerleme</th>
-                    <th className="px-4 py-3 font-medium">Sorumlu</th>
-                    <th className="px-4 py-3 font-medium">Durum</th>
+                    <th className="px-4 py-3 font-medium">{t("site.workPlan.item")}</th>
+                    <th className="px-4 py-3 font-medium">{t("site.workPlan.activityCode")}</th>
+                    <th className="px-4 py-3 font-medium">{t("site.workPlan.start")}</th>
+                    <th className="px-4 py-3 font-medium">{t("site.workPlan.end")}</th>
+                    <th className="px-4 py-3 font-medium">{t("site.workPlan.progress")}</th>
+                    <th className="px-4 py-3 font-medium">{t("site.workPlan.responsible")}</th>
+                    <th className="px-4 py-3 font-medium">{t("site.workPlan.statusColumn")}</th>
                     {isEditing && <th className="w-20 px-4 py-3" />}
                   </tr>
                 </thead>
@@ -430,10 +435,10 @@ export function WorkPlanPanel({
                         className="px-4 py-10 text-center text-sm text-zinc-500"
                       >
                         {table.isLoading
-                          ? "Yükleniyor…"
+                          ? t("site.workPlan.loading")
                           : summary.workPlanCount === 0
-                            ? "Henüz iş planı yok."
-                            : "Aramayla eşleşen iş kalemi yok."}
+                            ? t("site.workPlan.empty")
+                            : t("site.workPlan.noMatch")}
                       </td>
                     </tr>
                   ) : (
@@ -452,7 +457,7 @@ export function WorkPlanPanel({
                               <SelectCheckbox
                                 checked={selection.isSelected(item.id)}
                                 onChange={() => selection.toggle(item.id)}
-                                label={`${item.description} seç`}
+                                label={t("site.workPlan.selectRow", { name: item.description })}
                               />
                             </td>
                           )}
@@ -478,7 +483,7 @@ export function WorkPlanPanel({
                             </div>
                           </td>
                           <td className="whitespace-nowrap px-4 py-3 text-zinc-400">
-                            {item.responsible || "-"}
+                            {item.responsible ? responsibleLabel(item.responsible) : "-"}
                           </td>
                           <td className="px-4 py-3">
                             <span
@@ -494,7 +499,7 @@ export function WorkPlanPanel({
                                   type="button"
                                   onClick={() => openModal(item)}
                                   className="text-zinc-500 hover:text-cyan-400"
-                                  aria-label="Düzenle"
+                                  aria-label={t("common.edit")}
                                 >
                                   <Edit2 className="h-4 w-4" />
                                 </button>
@@ -502,7 +507,7 @@ export function WorkPlanPanel({
                                   type="button"
                                   onClick={() => void onDelete([item.id])}
                                   className="text-zinc-500 hover:text-red-400"
-                                  aria-label="Sil"
+                                  aria-label={t("common.delete")}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </button>
@@ -534,7 +539,7 @@ export function WorkPlanPanel({
           </>
         ) : (
           fullPlan.isLoading ? (
-            <p className="px-4 py-10 text-center text-sm text-zinc-500">Yükleniyor…</p>
+            <p className="px-4 py-10 text-center text-sm text-zinc-500">{t("site.workPlan.loading")}</p>
           ) : (
             <WorkPlanGantt items={fullPlan.items} />
           )

@@ -2,9 +2,10 @@
 
 import { useCallback, useMemo } from "react";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import { Filter, Trash2 } from "lucide-react";
 import { useActivityLogs } from "@/hooks/use-activity-logs";
+import { useI18n } from "@/contexts/i18n-context";
+import { localizedRecord } from "@/i18n/runtime";
 import { useTableState } from "@/hooks/use-table-state";
 import { clearActivityLogs } from "@/lib/activity-log";
 import { Button } from "@/components/ui/button";
@@ -16,28 +17,28 @@ import type { ActivityCategory, ActivityLogEntry } from "@/types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { Select } from "@/components/ui/select";
 
-const CATEGORY_LABELS: Record<ActivityCategory, string> = {
-  auth: "Oturum",
-  user: "Kullanıcı",
-  permission: "Yetki",
-  region: "Bölge",
-  store: "Konum",
-  system: "Sistem",
-  ticket: "Tadilat Talebi",
-  contract: "Sözleşme",
-  payment: "Hakediş",
-  invoice: "Fatura",
-  approval: "Onay",
-  organization: "Organizasyon",
-  profile: "Profil",
-  budget: "Bütçe",
-  note: "Not",
-  file: "Dosya",
-  material: "Keşif",
-  workplan: "İş programı",
-  inventory: "Envanter",
-  hr: "İnsan Kaynakları",
-};
+const CATEGORY_LABELS: Record<ActivityCategory, string> = localizedRecord({
+  auth: "admin.logs.categories.auth",
+  user: "admin.logs.categories.user",
+  permission: "admin.logs.categories.permission",
+  region: "admin.logs.categories.region",
+  store: "admin.logs.categories.store",
+  system: "admin.logs.categories.system",
+  ticket: "admin.logs.categories.ticket",
+  contract: "admin.logs.categories.contract",
+  payment: "admin.logs.categories.payment",
+  invoice: "admin.logs.categories.invoice",
+  approval: "admin.logs.categories.approval",
+  organization: "admin.logs.categories.organization",
+  profile: "admin.logs.categories.profile",
+  budget: "admin.logs.categories.budget",
+  note: "admin.logs.categories.note",
+  file: "admin.logs.categories.file",
+  material: "admin.logs.categories.material",
+  workplan: "admin.logs.categories.workplan",
+  inventory: "admin.logs.categories.inventory",
+  hr: "admin.logs.categories.hr",
+});
 
 const CATEGORY_COLORS: Record<ActivityCategory, string> = {
   auth: "text-cyan-400 bg-cyan-500/10",
@@ -71,6 +72,7 @@ type SortKey =
 
 export function AdminLogsPanel() {
   const logs = useActivityLogs();
+  const { t, dateLocale } = useI18n();
   const [category, setCategory] = usePersistentState<ActivityCategory | "all">("admin-logs", "category", "all");
 
   const filtered = useMemo(() => {
@@ -91,7 +93,7 @@ export function AdminLogsPanel() {
   });
 
   const handleClear = () => {
-    if (confirm("Tüm aktivite logları silinsin mi?")) {
+    if (confirm(t("admin.logs.confirmClear"))) {
       clearActivityLogs();
     }
   };
@@ -106,22 +108,22 @@ export function AdminLogsPanel() {
             onChange={(e) =>
               setCategory(e.target.value as ActivityCategory | "all")
             }
-            aria-label="Kategori"
+            aria-label={t("admin.logs.category")}
             className="h-9 w-auto min-w-[180px]"
           >
-            <option value="all">Tüm kategoriler</option>
+            <option value="all">{t("admin.logs.allCategories")}</option>
             {(Object.keys(CATEGORY_LABELS) as ActivityCategory[]).map((c) => (
               <option key={c} value={c}>
                 {CATEGORY_LABELS[c]}
               </option>
             ))}
           </Select>
-          <span className="text-xs text-zinc-600">{filtered.length} kayıt</span>
+          <span className="text-xs text-zinc-600">{t(filtered.length === 1 ? "admin.logs.recordsOne" : "admin.logs.recordsOther", { count: filtered.length })}</span>
         </div>
         {logs.length > 0 && (
           <Button size="sm" variant="ghost" onClick={handleClear}>
             <Trash2 className="h-3.5 w-3.5" />
-            Logları temizle
+            {t("admin.logs.clear")}
           </Button>
         )}
       </div>
@@ -133,35 +135,35 @@ export function AdminLogsPanel() {
               <tr>
                 <SortableTh
                   columnKey="createdAt"
-                  label="Tarih"
+                  label={t("admin.logs.columns.date")}
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}
                 />
                 <SortableTh
                   columnKey="category"
-                  label="Kategori"
+                  label={t("admin.logs.category")}
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}
                 />
                 <SortableTh
                   columnKey="action"
-                  label="İşlem"
+                  label={t("admin.logs.columns.action")}
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}
                 />
                 <SortableTh
                   columnKey="message"
-                  label="Detay"
+                  label={t("admin.logs.columns.detail")}
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}
                 />
                 <SortableTh
                   columnKey="actorName"
-                  label="Kullanıcı"
+                  label={t("admin.logs.columns.user")}
                   activeKey={table.sort.key}
                   direction={table.sort.direction}
                   onToggle={table.toggleSort}
@@ -175,7 +177,7 @@ export function AdminLogsPanel() {
                     colSpan={5}
                     className="px-4 py-10 text-center text-zinc-600"
                   >
-                    Henüz log kaydı yok
+                    {t("admin.logs.empty")}
                   </td>
                 </tr>
               )}
@@ -186,7 +188,7 @@ export function AdminLogsPanel() {
                 >
                   <td className="whitespace-nowrap px-4 py-3 text-xs text-zinc-500">
                     {format(parseISO(log.createdAt), "d MMM yyyy, HH:mm", {
-                      locale: tr,
+                      locale: dateLocale,
                     })}
                   </td>
                   <td className="px-4 py-3">

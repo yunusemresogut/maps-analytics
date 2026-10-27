@@ -14,6 +14,7 @@ import { logActivity } from "@/lib/activity-log";
 import { isAllowedFileType } from "@/lib/file-types";
 import { chunk } from "@/lib/supabase-query";
 import { roundMoney } from "@/lib/currency";
+import { t } from "@/i18n/runtime";
 import { fetchStoreSummary, fetchStoreWorkPlan } from "@/lib/store-details";
 import type { ParsedMaterialRow } from "@/lib/excel-materials";
 import type { ParsedWorkPlanPredecessor, ParsedWorkPlanRow } from "@/lib/excel-work-plan";
@@ -238,11 +239,11 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
 
   const addFile = useCallback(
     async (storeId: string, file: File) => {
-      if (!user) return { success: false, error: "Giriş gerekli" };
+      if (!user) return { success: false, error: t("system.storeData.loginRequired") };
       if (!isAllowedFileType(file.name)) {
         return {
           success: false,
-          error: "Desteklenmeyen dosya türü",
+          error: t("system.storeData.unsupportedFileType"),
         };
       }
 
@@ -320,7 +321,7 @@ export function StoreDataProvider({ children }: { children: React.ReactNode }) {
         return { success: true };
       } catch (err: any) {
         console.error("File upload error:", err);
-        return { success: false, error: err.message || "Dosya yüklenemedi" };
+        return { success: false, error: err.message || t("system.storeData.uploadFailed") };
       }
     },
     [user, data, setData]

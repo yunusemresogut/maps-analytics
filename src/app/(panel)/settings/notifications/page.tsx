@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
+import { useT } from "@/contexts/i18n-context";
 import { useSettings } from "@/contexts/settings-context";
 import { canModule } from "@/lib/permissions";
 import {
@@ -31,6 +32,7 @@ function canSeeModule(user: User, module: NotificationModule) {
 
 export default function NotificationSettingsPage() {
   const { user } = useAuth();
+  const t = useT();
   const { org, prefs, updatePreferences } = useSettings();
   const { state, run } = useAutoSave();
   const [desktopError, setDesktopError] = useState("");
@@ -47,13 +49,13 @@ export default function NotificationSettingsPage() {
     setDesktopError("");
     if (enabled) {
       if (!("Notification" in window)) {
-        setDesktopError("Tarayıcınız masaüstü bildirimlerini desteklemiyor.");
+        setDesktopError(t("settings.notifications.desktopUnsupported"));
         return;
       }
       const permission =
         Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
       if (permission !== "granted") {
-        setDesktopError("Tarayıcı bildirim izni verilmedi. İzni tarayıcının site ayarlarından açabilirsiniz.");
+        setDesktopError(t("settings.notifications.desktopDenied"));
         return;
       }
     }
@@ -67,15 +69,15 @@ export default function NotificationSettingsPage() {
   return (
     <div className="space-y-6">
       <SettingsPageHeader
-        title="Bildirimler"
-        description="Hangi modüllerden bildirim alacağınızı seçin. Değişiklikler anında kaydedilir."
+        title={t("notifications.title")}
+        description={t("settings.notifications.description")}
         status={state}
       />
 
-      <SettingsSection title="Masaüstü bildirimleri" description="Uygulama arka plandayken yeni bildirimler işletim sistemi bildirimi olarak da gösterilir.">
+      <SettingsSection title={t("settings.notifications.desktopTitle")} description={t("settings.notifications.desktopDescription")}>
         <SwitchRow
-          label="Masaüstü bildirimi göster"
-          description={desktopError || "Bu ayar her cihazda tarayıcı izni gerektirir."}
+          label={t("settings.notifications.desktopShow")}
+          description={desktopError || t("settings.notifications.desktopHint")}
           checked={prefs.notifications.desktop}
           onChange={(enabled) => void setDesktop(enabled)}
         />
@@ -87,8 +89,8 @@ export default function NotificationSettingsPage() {
         return (
           <SettingsSection key={module.key} title={module.label}>
             <SwitchRow
-              label={`${module.label} bildirimleri`}
-              description="Kapatırsanız aşağıdaki zorunlu olmayan bildirimlerin tümü kapanır."
+              label={t("settings.notifications.moduleToggle", { name: module.label })}
+              description={t("settings.notifications.moduleToggleDescription")}
               checked={moduleOn}
               onChange={(enabled) => void setModule(module.key, enabled)}
             />
@@ -105,9 +107,9 @@ export default function NotificationSettingsPage() {
                   disabled={!moduleOn && status !== "mandatory"}
                   lockedReason={
                     status === "mandatory"
-                      ? "Firma tarafından zorunlu"
+                      ? t("settings.notifications.mandatoryByOrg")
                       : status === "disabled_by_org"
-                        ? "Firma tarafından kapalı"
+                        ? t("settings.notifications.disabledByOrg")
                         : undefined
                   }
                 />

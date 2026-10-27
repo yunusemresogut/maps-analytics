@@ -1,0 +1,122 @@
+import { defineMessages } from "@/i18n/define";
+
+export const api = defineMessages(
+  {
+    common: {
+      unexpectedServerError: "Beklenmeyen bir sunucu hatası",
+      forbidden: "Bu işlem için yetkiniz yok.",
+      unauthorized: "Yetkisiz.",
+    },
+    session: {
+      notFound: "Oturum bulunamadı.",
+      invalid: "Oturum geçersiz.",
+      ended: "Oturum sonlandırılmış. Lütfen tekrar giriş yapın.",
+      profileNotFound: "Kullanıcı profili bulunamadı.",
+      restricted: "Hesabınız kısıtlanmış.",
+    },
+    validation: {
+      invalidEmail: "Geçerli bir e-posta adresi girin",
+      passwordTooShort: "Şifre en az 6 karakter olmalıdır",
+    },
+    users: {
+      requiredFields: "E-posta, şifre ve isim zorunludur",
+      adminOnlyViaRegister: "Admin rolü yalnızca kayıt ile oluşturulabilir",
+      roleNotDefined: "Seçilen rol bu firmada tanımlı değil",
+      createFailed: "Kullanıcı oluşturulamadı. Lütfen tekrar deneyin.",
+      idRequired: "Kullanıcı ID zorunludur",
+      notFound: "Kullanıcı bulunamadı.",
+      cannotEditSelf: "Kendi rolünüzü, yetkinizi veya giriş bilgilerinizi buradan değiştiremezsiniz.",
+      adminNotEditable: "Admin kullanıcılar düzenlenemez.",
+      nameEmpty: "İsim boş olamaz",
+      adminRoleNotAssignable: "Admin rolü bu ekrandan verilemez",
+      invalidAvatarUrl: "Geçersiz profil fotoğrafı adresi",
+      invalidRestricted: "Geçersiz kısıt değeri",
+      cannotDeleteSelf: "Kendi hesabınızı silemezsiniz.",
+      adminNotDeletable: "Admin kullanıcılar silinemez.",
+    },
+    register: {
+      requiredFields: "Ad, e-posta, şifre ve firma adı zorunludur",
+      organizationCreateFailed: "Organizasyon oluşturulamadı",
+      accountCreateFailed: "Hesap oluşturulamadı. Lütfen biraz sonra tekrar deneyin.",
+      failed: "Kayıt başarısız",
+    },
+    geocode: {
+      invalidCoordinates: "Geçersiz koordinat",
+    },
+    team: {
+      cleanupFailed: "Temizlik başarısız.",
+      noMessageSpecified: "Silinecek mesaj belirtilmedi.",
+      deleteFailed: "Mesajlar silinemedi.",
+    },
+    assistant: {
+      notConfigured: "Asistan henüz yapılandırılmadı (GEMINI_API_KEY eksik).",
+      invalidRequest: "Geçersiz istek.",
+      noMessages: "Mesaj bulunamadı.",
+      lastMessageMustBeUser: "Son mesaj kullanıcıdan gelmeli.",
+      aborted: "İstek iptal edildi.",
+      quotaExceeded: "Ücretsiz kullanım limiti doldu. Bir süre sonra tekrar deneyin.",
+      invalidConfig: "Asistan yapılandırması geçersiz. API anahtarını kontrol edin.",
+      overloaded: "Yapay zekâ servisi şu anda çok yoğun. Birkaç saniye sonra tekrar deneyin.",
+      unavailable: "Asistan şu anda yanıt veremiyor. Lütfen tekrar deneyin.",
+    },
+  },
+  {
+    common: {
+      unexpectedServerError: "An unexpected server error occurred",
+      forbidden: "You don't have permission to perform this action.",
+      unauthorized: "Unauthorized.",
+    },
+    session: {
+      notFound: "No session found.",
+      invalid: "Your session is invalid.",
+      ended: "Your session has ended. Please sign in again.",
+      profileNotFound: "User profile not found.",
+      restricted: "Your account has been restricted.",
+    },
+    validation: {
+      invalidEmail: "Enter a valid email address",
+      passwordTooShort: "Password must be at least 6 characters",
+    },
+    users: {
+      requiredFields: "Email, password and name are required",
+      adminOnlyViaRegister: "The admin role can only be created through sign-up",
+      roleNotDefined: "The selected role is not defined for this company",
+      createFailed: "The user could not be created. Please try again.",
+      idRequired: "User ID is required",
+      notFound: "User not found.",
+      cannotEditSelf: "You can't change your own role, permissions or sign-in details here.",
+      adminNotEditable: "Admin users can't be edited.",
+      nameEmpty: "Name can't be empty",
+      adminRoleNotAssignable: "The admin role can't be assigned from this screen",
+      invalidAvatarUrl: "Invalid profile photo URL",
+      invalidRestricted: "Invalid restriction value",
+      cannotDeleteSelf: "You can't delete your own account.",
+      adminNotDeletable: "Admin users can't be deleted.",
+    },
+    register: {
+      requiredFields: "Name, email, password and company name are required",
+      organizationCreateFailed: "The organization could not be created",
+      accountCreateFailed: "The account could not be created. Please try again shortly.",
+      failed: "Sign-up failed",
+    },
+    geocode: {
+      invalidCoordinates: "Invalid coordinates",
+    },
+    team: {
+      cleanupFailed: "Cleanup failed.",
+      noMessageSpecified: "No message specified for deletion.",
+      deleteFailed: "Messages could not be deleted.",
+    },
+    assistant: {
+      notConfigured: "The assistant is not configured yet (GEMINI_API_KEY is missing).",
+      invalidRequest: "Invalid request.",
+      noMessages: "No message found.",
+      lastMessageMustBeUser: "The last message must come from the user.",
+      aborted: "The request was cancelled.",
+      quotaExceeded: "The free usage limit has been reached. Please try again later.",
+      invalidConfig: "The assistant configuration is invalid. Check the API key.",
+      overloaded: "The AI service is very busy right now. Please try again in a few seconds.",
+      unavailable: "The assistant can't respond right now. Please try again.",
+    },
+  }
+);

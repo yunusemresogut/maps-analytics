@@ -7,6 +7,7 @@ import { AuthGuard } from "@/components/auth/auth-guard";
 import { ModuleFormShell } from "@/components/modules/module-form-shell";
 import { PendingAttachments } from "@/components/modules/pending-attachments";
 import { useAuth } from "@/contexts/auth-context";
+import { useT } from "@/contexts/i18n-context";
 import { uploadModuleAttachments } from "@/lib/upload-module-attachment";
 import { useModules } from "@/contexts/modules-context";
 import { useDb } from "@/contexts/db-context";
@@ -17,17 +18,11 @@ import { Select } from "@/components/ui/select";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useSettings } from "@/contexts/settings-context";
 import type { CurrencyCode } from "@/lib/currency";
-import { encodePaymentPeriod } from "@/lib/module-finance";
+import { encodePaymentPeriod, PAYMENT_STATUS_LABELS } from "@/lib/module-finance";
 import type { ProgressPaymentStatus } from "@/types";
 
-const STATUS_TR: Record<ProgressPaymentStatus, string> = {
-  draft: "Taslak",
-  submitted: "Gönderildi",
-  approved: "Onaylandı",
-  paid: "Ödendi",
-};
-
 function NewPaymentContent() {
+  const t = useT();
   const router = useRouter();
   const { createPayment } = useModules();
   const { contracts } = useDb();
@@ -56,7 +51,7 @@ function NewPaymentContent() {
   };
 
   if (!canAdd) {
-    return <div className="flex h-full items-center justify-center text-sm text-zinc-500">Ekleme yetkiniz yok</div>;
+    return <div className="flex h-full items-center justify-center text-sm text-zinc-500">{t("finance.shared.noAddPermission")}</div>;
   }
 
   const onContractChange = (id: string) => {
@@ -71,11 +66,11 @@ function NewPaymentContent() {
     if (createdId) return;
     setShowErrors(true);
     if (invalid.contract || invalid.title || invalid.start || !periodEnd) {
-      setSaveError("Başlık, sözleşme ve dönem tarihleri zorunludur.");
+      setSaveError(t("finance.payments.requiredFields"));
       return;
     }
     if (periodEnd < periodStart) {
-      setSaveError("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+      setSaveError(t("finance.shared.endBeforeStart"));
       return;
     }
     setSaveError("");
@@ -91,7 +86,7 @@ function NewPaymentContent() {
     });
     if (!id) {
       setSaving(false);
-      setSaveError("Hakediş oluşturulamadı. Bağlantınızı kontrol edip tekrar deneyin.");
+      setSaveError(t("finance.payments.createFailed"));
       return;
     }
     setCreatedId(id);
@@ -104,7 +99,7 @@ function NewPaymentContent() {
       });
       if (errors.length > 0) {
         setSaving(false);
-        setSaveError(`Hakediş kaydedildi ancak bazı ekler yüklenemedi: ${errors.join(" ")}`);
+        setSaveError(t("finance.payments.attachmentsFailed", { errors: errors.join(" ") }));
         return;
       }
     }
@@ -112,48 +107,48 @@ function NewPaymentContent() {
   };
 
   return (
-    <ModuleFormShell backHref="/progress-payments" backLabel="Hakedişler" title="Yeni hakediş" onSave={save} saving={saving} saveLabel="Oluştur" canSave={!createdId}>
+    <ModuleFormShell backHref="/progress-payments" backLabel={t("finance.payments.backLabel")} title={t("finance.payments.newTitle")} onSave={save} saving={saving} saveLabel={t("finance.shared.create")} canSave={!createdId}>
       {saveError && (
         <p role="alert" className="text-sm text-red-400">
           {saveError}
           {createdId && (
             <Link href={`/progress-payments/${createdId}/edit`} className="ml-2 underline underline-offset-2">
-              Hakedişi aç
+              {t("finance.payments.open")}
             </Link>
           )}
         </p>
       )}
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div>
-          <label className="text-xs text-zinc-500">Sözleşme *</label>
+          <label className="text-xs text-zinc-500">{t("finance.shared.contract")} *</label>
           <Select className="mt-1" value={contractId} onChange={(e) => onContractChange(e.target.value)} aria-invalid={showErrors && invalid.contract}>
-            <option value="">Seçiniz</option>
+            <option value="">{t("finance.shared.select")}</option>
             {contracts.filter((c) => c.status === "active" || c.status === "draft").map((c) => (
               <option key={c.id} value={c.id}>{c.code ? `${c.code} — ` : ""}{c.title}</option>
             ))}
           </Select>
         </div>
         <div>
-          <label className="text-xs text-zinc-500">Başlık *</label>
+          <label className="text-xs text-zinc-500">{t("finance.shared.title")} *</label>
           <Input className="mt-1" value={title} onChange={(e) => setTitle(e.target.value)} aria-invalid={showErrors && invalid.title} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Dönem başlangıcı *</label>
+            <label className="text-xs text-zinc-500">{t("finance.payments.periodStart")} *</label>
             <DatePicker className="mt-1" value={periodStart} onChange={setPeriodStart} aria-invalid={showErrors && invalid.start} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Dönem bitişi *</label>
+            <label className="text-xs text-zinc-500">{t("finance.payments.periodEnd")} *</label>
             <DatePicker className="mt-1" value={periodEnd} onChange={setPeriodEnd} min={periodStart || undefined} aria-invalid={showErrors && invalid.end} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Toplam hakediş</label>
+            <label className="text-xs text-zinc-500">{t("finance.payments.totalAmount")}</label>
             <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Durum</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.status")}</label>
             <Select className="mt-1" value={status} onChange={(e) => setStatus(e.target.value as ProgressPaymentStatus)}>
-              {Object.entries(STATUS_TR).map(([k, v]) => (
+              {Object.entries(PAYMENT_STATUS_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
             </Select>

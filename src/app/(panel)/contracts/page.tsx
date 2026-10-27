@@ -21,30 +21,24 @@ import { useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerTable } from "@/hooks/use-server-table";
 import { formatMoney } from "@/lib/currency";
+import { CONTRACT_STATUS_LABELS } from "@/lib/module-finance";
 import { cn } from "@/lib/utils";
 import type { Contract } from "@/types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 
-const STATUS_TR: Record<string, string> = {
-  draft: "Taslak",
-  active: "Aktif",
-  expired: "Süresi doldu",
-  cancelled: "İptal",
-  terminated: "Fesih",
-  completed: "Tamamlandı",
-};
-
 type SortKey = "code" | "title" | "storeName" | "partyName" | "amount" | "status" | "actions";
 
-const COLUMNS: DataTableColumn<SortKey>[] = [
-  { key: "code", label: "Kod" },
-  { key: "title", label: "Sözleşme" },
-  { key: "storeName", label: "Saha" },
-  { key: "partyName", label: "Taraf" },
-  { key: "amount", label: "Tutar" },
-  { key: "status", label: "Durum" },
-  { key: "actions", label: "" },
-];
+function getColumns(t: ReturnType<typeof useT>): DataTableColumn<SortKey>[] {
+  return [
+    { key: "code", label: t("finance.shared.code") },
+    { key: "title", label: t("finance.shared.contract") },
+    { key: "storeName", label: t("finance.shared.store") },
+    { key: "partyName", label: t("finance.shared.party") },
+    { key: "amount", label: t("finance.shared.amount") },
+    { key: "status", label: t("finance.shared.status") },
+    { key: "actions", label: "" },
+  ];
+}
 
 type ContractRow = Contract & { storeName: string };
 
@@ -91,28 +85,28 @@ function ContractsContent() {
   });
 
   const handleDelete = async (id: string, title: string) => {
-    if (!canDelete || !confirm(`"${title}" silinsin mi?`)) return;
+    if (!canDelete || !confirm(t("finance.shared.deleteNamedConfirm", { name: title }))) return;
     await deleteContract(id);
   };
 
   return (
     <ModuleTableShell
       title={t("modules.contractsTitle")}
-      description="Saha projelerine bağlı sözleşmeler."
+      description={t("finance.contracts.description")}
       headerAction={
         canAdd ? (
           <Button size="sm" onClick={() => router.push(newHref)}>
             <Plus className="h-3.5 w-3.5" />
-            Yeni
+            {t("finance.shared.new")}
           </Button>
         ) : undefined
       }
       toolbar={
         <>
-          <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Kod, taraf, saha…" aria-label="Sözleşmelerde ara" containerClassName="w-full max-w-sm" className="h-10" />
+          <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("finance.contracts.searchPlaceholder")} aria-label={t("finance.contracts.searchLabel")} containerClassName="w-full max-w-sm" className="h-10" />
           <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-auto min-w-[160px]">
-            <option value="all">Tüm durumlar</option>
-            {Object.entries(STATUS_TR).map(([k, v]) => (
+            <option value="all">{t("finance.shared.allStatuses")}</option>
+            {Object.entries(CONTRACT_STATUS_LABELS).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
           </Select>
@@ -122,7 +116,7 @@ function ContractsContent() {
         <TablePagination page={table.page} totalPages={table.totalPages} totalItems={table.totalItems} rangeStart={table.rangeStart} rangeEnd={table.rangeEnd} onPageChange={table.setPage} pageSize={table.pageSize} onPageSizeChange={table.setPageSize} />
       }
     >
-      <DataTable columns={COLUMNS} sortKey={table.sort.key} sortDirection={table.sort.direction} onSort={table.toggleSort}>
+      <DataTable columns={getColumns(t)} sortKey={table.sort.key} sortDirection={table.sort.direction} onSort={table.toggleSort}>
         {table.pageItems.map((item) => (
           <tr key={item.id} className={cn("text-zinc-300 hover:bg-zinc-900/50", item.status === "terminated" && "text-red-300/90")}>
             <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-cyan-400/90">{item.code ?? "—"}</td>
@@ -131,17 +125,17 @@ function ContractsContent() {
             <td className="max-w-[180px] px-4 py-3 text-zinc-400">{item.partyName}</td>
             <td className="whitespace-nowrap px-4 py-3">{formatMoney(item.amount, item.currency)}</td>
             <td className="px-4 py-3">
-              <StatusBadge value={item.status} label={STATUS_TR[item.status] ?? item.status} />
+              <StatusBadge value={item.status} label={CONTRACT_STATUS_LABELS[item.status] ?? item.status} />
             </td>
             <td className="whitespace-nowrap px-4 py-3">
               <div className="flex gap-1">
                 {canEdit && (
-                  <Link href={`/contracts/${item.id}/edit`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/20 hover:text-zinc-100" aria-label="Düzenle">
+                  <Link href={`/contracts/${item.id}/edit`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/20 hover:text-zinc-100" aria-label={t("common.edit")}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Link>
                 )}
                 {canDelete && (
-                  <Button size="icon" variant="ghost" onClick={() => handleDelete(item.id, item.title)} aria-label="Sil">
+                  <Button size="icon" variant="ghost" onClick={() => handleDelete(item.id, item.title)} aria-label={t("common.delete")}>
                     <Trash2 className="h-3.5 w-3.5 text-red-400/80" />
                   </Button>
                 )}
@@ -150,7 +144,7 @@ function ContractsContent() {
           </tr>
         ))}
         {!table.isLoading && table.totalItems === 0 && (
-          <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
+          <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-600">{t("finance.shared.noRecords")}</td></tr>
         )}
       </DataTable>
     </ModuleTableShell>

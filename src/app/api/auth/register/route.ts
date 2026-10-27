@@ -2,22 +2,24 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getAdminPermissions } from "@/lib/permissions";
 import { authErrorMessage } from "@/lib/auth-errors";
+import { localeFromRequest, serverTranslator } from "@/i18n/server";
 
 export async function POST(request: Request) {
+  const t = serverTranslator(localeFromRequest(request));
   try {
     const adminClient = getSupabaseAdmin();
     const { email, password, name, companyName } = await request.json();
 
     if (!email || !password || !name || !companyName) {
       return NextResponse.json(
-        { error: "Ad, e-posta, şifre ve firma adı zorunludur" },
+        { error: t("api.register.requiredFields") },
         { status: 400 }
       );
     }
 
     if (String(password).length < 6) {
       return NextResponse.json(
-        { error: "Şifre en az 6 karakter olmalıdır" },
+        { error: t("api.validation.passwordTooShort") },
         { status: 400 }
       );
     }
@@ -31,7 +33,7 @@ export async function POST(request: Request) {
 
     if (orgError || !org) {
       return NextResponse.json(
-        { error: orgError?.message || "Organizasyon oluşturulamadı" },
+        { error: orgError?.message || t("api.register.organizationCreateFailed") },
         { status: 500 }
       );
     }
@@ -53,7 +55,8 @@ export async function POST(request: Request) {
         {
           error: authErrorMessage(
             createError,
-            "Hesap oluşturulamadı. Lütfen biraz sonra tekrar deneyin."
+            t("api.register.accountCreateFailed"),
+            t
           ),
         },
         { status }
@@ -87,7 +90,7 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     console.error("Kayıt başarısız", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Kayıt başarısız" },
+      { error: error instanceof Error ? error.message : t("api.register.failed") },
       { status: 500 }
     );
   }

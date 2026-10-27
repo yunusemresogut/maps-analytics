@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { addMonths, format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
+// Aktivite logu Türkçe tutulur
+import { tr as trLocale } from "date-fns/locale";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n } from "@/contexts/i18n-context";
 import { useStores } from "@/contexts/stores-context";
 import { useSettings } from "@/contexts/settings-context";
 import { useMyPersonnelId } from "@/hooks/use-my-personnel";
@@ -46,6 +48,8 @@ import {
   fetchYearlyOvertime,
   lockTimesheetMonth,
   unlockTimesheetMonth,
+  formatDayCount,
+  formatHourCount,
   formatHours,
   hrErrorMessage,
   isSaturday,
@@ -64,13 +68,13 @@ import {
 import { DAILY_HOUR_OPTIONS } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
-const WEEKDAY_SHORT = ["Pz", "Pt", "Sa", "Ça", "Pe", "Cu", "Ct"];
 /** Hızlı giriş: seçili durum hücreye tıklayınca doğrudan yazılır; "clear" günü boşaltır */
 type Brush = "none" | "clear" | TimesheetStatus;
 
 const key = (personnelId: string, date: string) => `${personnelId}|${date}`;
 
 function TimesheetsContent() {
+  const { t, locale, dateLocale } = useI18n();
   const { user } = useAuth();
   const { stores } = useStores();
   const searchParams = useSearchParams();
@@ -96,7 +100,7 @@ function TimesheetsContent() {
   const [overtimeOutsideMonth, setOvertimeOutsideMonth] = useState<Record<string, number>>({});
   // Yükleme durumu, en son yüklenen aydan türetilir
   const [loadedMonth, setLoadedMonth] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState("");
+  const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [editing, setEditing] = useState<{ person: Personnel; date: string } | null>(null);
@@ -124,11 +128,11 @@ function TimesheetsContent() {
         const outside = { ...overtime };
         for (const row of rows) outside[row.personnelId] = (outside[row.personnelId] ?? 0) - row.overtimeHours;
         setOvertimeOutsideMonth(outside);
-        setLoadError("");
+        setLoadError(false);
       })
       .catch((err) => {
         console.error("Puantaj yüklenemedi:", err);
-        if (!cancelled) setLoadError("Puantaj yüklenemedi. Veritabanı güncellemesi (İK migration'ı) uygulanmamış olabilir.");
+        if (!cancelled) setLoadError(true);
       })
       .finally(() => !cancelled && setLoadedMonth(month));
     return () => {
@@ -148,14 +152,11 @@ function TimesheetsContent() {
   }, [month]);
 
   const toggleLock = async () => {
-    const label = format(parseISO(`${month}-01`), "MMMM yyyy", { locale: tr });
+    const label = format(parseISO(`${month}-01`), "MMMM yyyy", { locale: dateLocale });
+    const logLabel = format(parseISO(`${month}-01`), "MMMM yyyy", { locale: trLocale });
     if (monthLock) {
-      if (!confirm(`${label} puantajının kilidi açılsın mı? Ay yeniden düzenlenebilir hâle gelir.`)) return;
-    } else if (
-      !confirm(
-        `${label} puantajı kapatılsın mı?\n\nKapatılan aya puantaj yazılamaz, değiştirilemez; bu aya düşen izinler onaylanamaz ya da iptal edilemez. Kilidi yalnızca "puantaj sil" yetkisi olan açabilir.`
-      )
-    ) {
+      if (!confirm(t("hr.timesheets.unlockConfirm", { month: label }))) return;
+    } else if (!confirm(`${t("hr.timesheets.lockConfirm", { month: label })}\n\n${t("hr.timesheets.lockConfirmHint")}`)) {
       return;
     }
     setBusy(true);
@@ -163,18 +164,18 @@ function TimesheetsContent() {
       if (monthLock) await unlockTimesheetMonth(month);
       else await lockTimesheetMonth(month);
       setLock({ month, lock: await fetchTimesheetLock(month) });
-      log(`Puantaj ${monthLock ? "kilidi açıldı" : "kapatıldı"}: ${label}`);
-      flash("success", monthLock ? "Ayın kilidi açıldı." : "Ay kapatıldı.");
+      log(`Puantaj ${monthLock ? "kilidi açıldı" : "kapatıldı"}: ${logLabel}`);
+      flash("success", monthLock ? t("hr.timesheets.unlocked") : t("hr.timesheets.locked"));
     } catch (err) {
       console.error("Puantaj kilidi değiştirilemedi:", err);
-      flash("error", hrErrorMessage(err, "İşlem yapılamadı."));
+      flash("error", hrErrorMessage(err, t("hr.timesheets.actionFailed")));
     } finally {
       setBusy(false);
     }
   };
 
   const rows = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase("tr-TR");
+    const term = query.trim().toLocaleLowerCase(locale);
     return (personnel ?? []).filter(
       (person) =>
         activeInMonth(person, month) &&
@@ -183,10 +184,10 @@ function TimesheetsContent() {
         (!term ||
           [person.fullName, person.code, person.jobTitle, person.subcontractorCompany]
             .join(" ")
-            .toLocaleLowerCase("tr-TR")
+            .toLocaleLowerCase(locale)
             .includes(term))
     );
-  }, [personnel, month, storeFilter, typeFilter, query]);
+  }, [personnel, month, storeFilter, typeFilter, query, locale]);
 
   const storeName = useCallback((id?: string) => stores.find((store) => store.id === id)?.name, [stores]);
 
@@ -234,7 +235,7 @@ function TimesheetsContent() {
       applySaved(saved);
     } catch (err) {
       console.error("Puantaj kaydedilemedi:", err);
-      flash("error", hrErrorMessage(err, "Puantaj kaydedilemedi."));
+      flash("error", hrErrorMessage(err, t("hr.timesheets.saveFailed")));
     }
   };
 
@@ -249,13 +250,17 @@ function TimesheetsContent() {
       }
     }
     if (batch.length === 0) {
-      flash("success", "Doldurulacak boş gün yok.");
+      flash("success", t("hr.timesheets.nothingToFill"));
       return;
     }
     const scope = people.length === 1 ? people[0].fullName : `${people.length} personel`;
+    const scopeLabel = people.length === 1 ? people[0].fullName : t("hr.timesheets.personnelCount", { count: people.length });
     if (
       !confirm(
-        `${scope} için ${batch.length} boş gün doldurulsun mu?\n\nPazar günleri "Hafta tatili", diğer günler ${formatHours(dailyHours)} saat "Çalıştı" olarak yazılır. Mevcut kayıtlar değişmez.`
+        `${t(batch.length === 1 ? "hr.timesheets.fillConfirmOne" : "hr.timesheets.fillConfirmOther", { scope: scopeLabel, count: batch.length })}\n\n${t(
+          "hr.timesheets.fillConfirmHint",
+          { hours: formatHourCount(dailyHours) }
+        )}`
       )
     )
       return;
@@ -263,11 +268,11 @@ function TimesheetsContent() {
     try {
       const saved = await upsertTimesheetEntries(batch);
       applySaved(saved);
-      log(`Puantaj dolduruldu: ${scope}, ${format(parseISO(`${month}-01`), "MMMM yyyy", { locale: tr })}`);
-      flash("success", `${saved.length} gün dolduruldu.`);
+      log(`Puantaj dolduruldu: ${scope}, ${format(parseISO(`${month}-01`), "MMMM yyyy", { locale: trLocale })}`);
+      flash("success", t("hr.timesheets.filled", { days: formatDayCount(saved.length) }));
     } catch (err) {
       console.error("Puantaj doldurulamadı:", err);
-      flash("error", hrErrorMessage(err, "Puantaj doldurulamadı."));
+      flash("error", hrErrorMessage(err, t("hr.timesheets.fillFailed")));
     } finally {
       setBusy(false);
     }
@@ -283,23 +288,26 @@ function TimesheetsContent() {
       if (upserts.length === 0) {
         flash(
           "success",
-          reportCount === 0 ? "Bu ay isimli yoklama içeren günlük rapor yok." : "Raporlardaki tüm yoklamalar zaten puantajda."
+          reportCount === 0 ? t("hr.timesheets.noReports") : t("hr.timesheets.allImported")
         );
         return;
       }
       if (
         !confirm(
-          `${reportCount} günlük rapordan ${upserts.length} gün puantaja aktarılsın mı?\n\nYalnızca boş günler doldurulur; elle girilen ve izin günleri değişmez.`
+          `${t(reportCount === 1 ? "hr.timesheets.importConfirmOne" : "hr.timesheets.importConfirmOther", {
+            count: reportCount,
+            days: formatDayCount(upserts.length),
+          })}\n\n${t("hr.timesheets.importConfirmHint")}`
         )
       )
         return;
       const saved = await upsertTimesheetEntries(upserts);
       applySaved(saved);
-      log(`Puantaj raporlardan aktarıldı: ${format(parseISO(`${month}-01`), "MMMM yyyy", { locale: tr })}, ${saved.length} gün`);
-      flash("success", `${saved.length} gün raporlardan aktarıldı.`);
+      log(`Puantaj raporlardan aktarıldı: ${format(parseISO(`${month}-01`), "MMMM yyyy", { locale: trLocale })}, ${saved.length} gün`);
+      flash("success", t("hr.timesheets.imported", { days: formatDayCount(saved.length) }));
     } catch (err) {
       console.error("Raporlardan aktarılamadı:", err);
-      flash("error", hrErrorMessage(err, "Raporlardan aktarılamadı."));
+      flash("error", hrErrorMessage(err, t("hr.timesheets.importFailed")));
     } finally {
       setBusy(false);
     }
@@ -320,7 +328,7 @@ function TimesheetsContent() {
   if (!canView && myLoaded && !myPersonnelId) {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-sm text-zinc-500">
-        Hesabınız bir personel kartına bağlı değil. İnsan kaynaklarına başvurun.
+        {t("hr.personnelList.notLinked")}
       </div>
     );
   }
@@ -331,22 +339,22 @@ function TimesheetsContent() {
     <div className="scrollbar-themed h-full overflow-y-auto p-4 sm:p-6 lg:p-8">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-100">{canView ? "Puantaj" : "Puantajım"}</h1>
+          <h1 className="text-xl font-semibold text-zinc-100">{canView ? t("hr.personnelDetail.timesheet") : t("hr.timesheets.myTitle")}</h1>
           <p className="mt-1 text-sm text-zinc-500">
             {canView
-              ? "Aylık devam cetveli: çalışılan günler, izin, rapor ve fazla mesai."
-              : "Size ait puantaj kayıtları. Hatalı gün varsa insan kaynaklarına bildirin."}
+              ? t("hr.timesheets.description")
+              : t("hr.timesheets.myDescription")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center rounded-lg border border-zinc-800 bg-zinc-900/60">
-            <button type="button" aria-label="Önceki ay" onClick={() => changeMonth(-1)} className="p-2 text-zinc-400 hover:text-zinc-100">
+            <button type="button" aria-label={t("hr.common.previousMonth")} onClick={() => changeMonth(-1)} className="p-2 text-zinc-400 hover:text-zinc-100">
               <ChevronLeft className="h-4 w-4" />
             </button>
             <span className="min-w-[130px] text-center text-sm font-medium capitalize text-zinc-100">
-              {format(parseISO(`${month}-01`), "MMMM yyyy", { locale: tr })}
+              {format(parseISO(`${month}-01`), "MMMM yyyy", { locale: dateLocale })}
             </span>
-            <button type="button" aria-label="Sonraki ay" onClick={() => changeMonth(1)} className="p-2 text-zinc-400 hover:text-zinc-100">
+            <button type="button" aria-label={t("hr.common.nextMonth")} onClick={() => changeMonth(1)} className="p-2 text-zinc-400 hover:text-zinc-100">
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
@@ -354,7 +362,7 @@ function TimesheetsContent() {
             canDelete && (
               <Button variant="outline" disabled={busy} onClick={() => void toggleLock()}>
                 <LockOpen className="h-4 w-4" />
-                Kilidi aç
+                {t("hr.timesheets.unlock")}
               </Button>
             )
           ) : (
@@ -362,7 +370,7 @@ function TimesheetsContent() {
             lock?.month === month && (
               <Button variant="outline" disabled={busy} onClick={() => void toggleLock()}>
                 <Lock className="h-4 w-4" />
-                Ayı kapat
+                {t("hr.timesheets.lock")}
               </Button>
             )
           )}
@@ -389,8 +397,10 @@ function TimesheetsContent() {
       {monthLock && (
         <p className="mb-3 flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/60 px-4 py-2.5 text-sm text-zinc-300">
           <Lock className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden />
-          Bu ayın puantajı {monthLock.lockedByName || "—"} tarafından{" "}
-          {format(parseISO(monthLock.lockedAt), "d MMM yyyy HH:mm", { locale: tr })} tarihinde kapatıldı; değişiklik yapılamaz.
+          {t("hr.timesheets.lockedNotice", {
+            name: monthLock.lockedByName || "—",
+            date: format(parseISO(monthLock.lockedAt), "d MMM yyyy HH:mm", { locale: dateLocale }),
+          })}
         </p>
       )}
 
@@ -399,21 +409,21 @@ function TimesheetsContent() {
           <SearchInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ad, sicil no, unvan, taşeron…"
-            aria-label="Personelde ara"
+            placeholder={t("hr.timesheets.searchPlaceholder")}
+            aria-label={t("hr.personnelList.searchLabel")}
             containerClassName="flex-1 sm:max-w-xs"
           />
-          <Select value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)} className="w-auto min-w-[160px]" aria-label="Görev yeri">
-            <option value="all">Tüm görev yerleri</option>
-            <option value="none">Merkez</option>
+          <Select value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)} className="w-auto min-w-[160px]" aria-label={t("hr.personnelList.location")}>
+            <option value="all">{t("hr.timesheets.allLocations")}</option>
+            <option value="none">{t("hr.personnelList.headOffice")}</option>
             {stores.map((store) => (
               <option key={store.id} value={store.id}>
                 {store.name}
               </option>
             ))}
           </Select>
-          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-auto min-w-[170px]" aria-label="Çalışma tipi">
-            <option value="all">Tüm çalışma tipleri</option>
+          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-auto min-w-[170px]" aria-label={t("hr.common.employmentType")}>
+            <option value="all">{t("hr.personnelList.allTypes")}</option>
             {Object.entries(EMPLOYMENT_TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -426,26 +436,26 @@ function TimesheetsContent() {
                 value={dailyHours}
                 onChange={(e) => setDailyHours(Number(e.target.value))}
                 className="w-auto min-w-[130px]"
-                aria-label="Günlük çalışma saati"
+                aria-label={t("hr.timesheets.dailyHours")}
               >
                 {DAILY_HOUR_OPTIONS.map((hours) => (
                   <option key={hours} value={hours}>
-                    Günlük {formatHours(hours)} sa
+                    {t("hr.timesheets.dailyHoursOption", { hours: formatHours(hours) })}
                   </option>
                 ))}
               </Select>
               <Button variant="outline" disabled={busy || rows.length === 0} onClick={() => void fillEmpty(rows)}>
                 <WandSparkles className="h-4 w-4" />
-                Boş günleri doldur
+                {t("hr.timesheets.fillEmpty")}
               </Button>
               <Button
                 variant="outline"
                 disabled={busy}
                 onClick={() => void importFromReports()}
-                title="Günlük şantiye raporlarındaki isimli yoklamayı boş günlere aktarır"
+                title={t("hr.timesheets.importHint")}
               >
                 <ClipboardList className="h-4 w-4" />
-                Raporlardan aktar
+                {t("hr.timesheets.import")}
               </Button>
             </>
           )}
@@ -454,7 +464,7 @@ function TimesheetsContent() {
 
       {canWrite && (
         <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2">
-          <span className="mr-1 text-xs text-zinc-500">Hızlı giriş:</span>
+          <span className="mr-1 text-xs text-zinc-500">{t("hr.timesheets.quickEntry")}</span>
           <button
             type="button"
             onClick={() => setBrush("none")}
@@ -463,10 +473,10 @@ function TimesheetsContent() {
               "inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs",
               brush === "none" ? "bg-cyan-500/15 text-cyan-300 ring-1 ring-cyan-500/30" : "text-zinc-400 hover:bg-zinc-800"
             )}
-            title="Hücreye tıklayınca ayrıntı penceresi açılır"
+            title={t("hr.timesheets.detailedHint")}
           >
             <MousePointerClick className="h-3.5 w-3.5" />
-            Ayrıntılı
+            {t("hr.timesheets.detailed")}
           </button>
           {TIMESHEET_STATUSES.map((status) => (
             <button
@@ -495,7 +505,7 @@ function TimesheetsContent() {
             )}
           >
             <Eraser className="h-3.5 w-3.5" />
-            Temizle
+            {t("hr.timesheets.clear")}
           </button>
         </div>
       )}
@@ -523,7 +533,7 @@ function TimesheetsContent() {
       )}
       {loadError && (
         <p role="alert" className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
-          {loadError}
+          {t("hr.timesheets.loadFailed")}
         </p>
       )}
 
@@ -534,17 +544,17 @@ function TimesheetsContent() {
           {(personnel ?? []).length === 0 ? (
             canView ? (
               <>
-                Henüz personel yok.{" "}
+                {t("hr.personnelList.empty")}{" "}
                 <Link href="/hr/personnel" className="text-cyan-400 hover:underline">
-                  Personel ekleyin
+                  {t("hr.timesheets.addPersonnel")}
                 </Link>
                 .
               </>
             ) : (
-              "Puantaj kaydı yok."
+              t("hr.timesheets.noEntries")
             )
           ) : (
-            "Bu ayda çalışan ve filtreyle eşleşen personel yok."
+            t("hr.timesheets.noMatch")
           )}
         </div>
       ) : (
@@ -553,7 +563,7 @@ function TimesheetsContent() {
             <thead>
               <tr className="bg-zinc-950/80 text-zinc-500">
                 <th className="sticky left-0 z-10 min-w-[200px] border-b border-r border-zinc-800 bg-zinc-950 px-3 py-2 text-left font-medium">
-                  Personel
+                  {t("hr.leaveForm.personnel")}
                 </th>
                 {days.map((day) => (
                   <th
@@ -565,23 +575,23 @@ function TimesheetsContent() {
                     )}
                   >
                     <div>{Number(day.slice(8))}</div>
-                    <div className="text-[9px] font-normal opacity-70">{WEEKDAY_SHORT[parseISO(day).getDay()]}</div>
+                    <div className="text-[9px] font-normal opacity-70">{t("hr.timesheets.weekdays").split(",")[parseISO(day).getDay()]}</div>
                   </th>
                 ))}
-                <th className="border-b border-l border-zinc-800 px-2 py-2 text-right font-medium" title="Çalışılan gün">
-                  Gün
+                <th className="border-b border-l border-zinc-800 px-2 py-2 text-right font-medium" title={t("hr.lib.timesheetExport.workedDays")}>
+                  {t("hr.timesheets.colDays")}
                 </th>
-                <th className="border-b border-zinc-800 px-2 py-2 text-right font-medium" title="Fazla mesai (saat)">
-                  FM
+                <th className="border-b border-zinc-800 px-2 py-2 text-right font-medium" title={t("hr.lib.timesheetExport.overtime")}>
+                  {t("hr.timesheets.colOvertime")}
                 </th>
-                <th className="border-b border-zinc-800 px-2 py-2 text-right font-medium" title="İzin (yıllık + diğer)">
-                  İzin
+                <th className="border-b border-zinc-800 px-2 py-2 text-right font-medium" title={t("hr.timesheets.colLeaveTitle")}>
+                  {t("hr.timesheets.colLeave")}
                 </th>
-                <th className="border-b border-zinc-800 px-2 py-2 text-right font-medium" title="Rapor">
-                  Rap.
+                <th className="border-b border-zinc-800 px-2 py-2 text-right font-medium" title={t("hr.lib.timesheetExport.sick")}>
+                  {t("hr.timesheets.colSick")}
                 </th>
-                <th className="border-b border-zinc-800 px-2 py-2 text-right font-medium" title="Devamsızlık">
-                  Dev.
+                <th className="border-b border-zinc-800 px-2 py-2 text-right font-medium" title={t("hr.timesheets.colAbsentTitle")}>
+                  {t("hr.timesheets.colAbsent")}
                 </th>
               </tr>
             </thead>
@@ -607,8 +617,8 @@ function TimesheetsContent() {
                           </p>
                         </div>
                         {overLimit && (
-                          <span title={`${year} fazla mesai: ${formatHours(yearOvertime)} saat — yıllık 270 saat sınırı aşıldı`}>
-                            <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" aria-label="Yıllık fazla mesai sınırı aşıldı" />
+                          <span title={t("hr.timesheets.overtimeLimitTitle", { year, hours: formatHourCount(yearOvertime) })}>
+                            <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" aria-label={t("hr.timesheets.overtimeLimit")} />
                           </span>
                         )}
                         {canWrite && (
@@ -616,8 +626,8 @@ function TimesheetsContent() {
                             type="button"
                             onClick={() => void fillEmpty([person])}
                             disabled={busy}
-                            title="Bu kişinin boş günlerini doldur"
-                            aria-label={`${person.fullName} boş günleri doldur`}
+                            title={t("hr.timesheets.fillPersonTitle")}
+                            aria-label={t("hr.timesheets.fillPersonLabel", { name: person.fullName })}
                             className="rounded p-1 text-zinc-600 opacity-0 hover:bg-zinc-800 hover:text-zinc-200 group-hover:opacity-100 focus:opacity-100"
                           >
                             <WandSparkles className="h-3.5 w-3.5" />
@@ -631,19 +641,19 @@ function TimesheetsContent() {
                       const meta = entry ? TIMESHEET_STATUS[entry.status] : null;
                       const tooLong = entry && WORKING_STATUSES.includes(entry.status) && entry.hours + entry.overtimeHours > MAX_DAILY_HOURS;
                       const title = !employed
-                        ? "Giriş-çıkış tarihleri dışında"
+                        ? t("hr.timesheets.outsideEmployment")
                         : entry
                           ? [
                               meta!.label,
-                              WORKING_STATUSES.includes(entry.status) && `${formatHours(entry.hours)} sa`,
-                              entry.overtimeHours > 0 && `+${formatHours(entry.overtimeHours)} sa FM`,
+                              WORKING_STATUSES.includes(entry.status) && t("hr.common.hoursShort", { hours: formatHours(entry.hours) }),
+                              entry.overtimeHours > 0 && t("hr.timesheets.overtimeCell", { hours: formatHours(entry.overtimeHours) }),
                               storeName(entry.storeId),
-                              entry.leaveRequestId && "İzin talebinden",
+                              entry.leaveRequestId && t("hr.timesheets.fromLeaveRequest"),
                               entry.notes,
                             ]
                               .filter(Boolean)
                               .join(" · ")
-                          : "Boş";
+                          : t("hr.timesheets.empty");
                       return (
                         <td
                           key={day}
@@ -697,8 +707,7 @@ function TimesheetsContent() {
 
       {canWrite && rows.length > 0 && (
         <p className="mt-3 text-xs text-zinc-500">
-          Sarı nokta fazla mesai olan günü, kırmızı çerçeve günlük 11 saati aşan çalışmayı gösterir. Taralı günler personelin giriş-çıkış
-          tarihleri dışındadır.
+          {t("hr.timesheets.legend")}
         </p>
       )}
 
@@ -719,7 +728,7 @@ function TimesheetsContent() {
                       applySaved([], [editingEntry]);
                       setEditing(null);
                     })
-                    .catch((err) => setSubmit({ saving: false, error: hrErrorMessage(err, "Gün temizlenemedi.") }));
+                    .catch((err) => setSubmit({ saving: false, error: hrErrorMessage(err, t("hr.timesheets.clearFailed")) }));
                 }
               : undefined
           }
@@ -732,7 +741,7 @@ function TimesheetsContent() {
               })
               .catch((err) => {
                 console.error("Puantaj kaydedilemedi:", err);
-                setSubmit({ saving: false, error: hrErrorMessage(err, "Puantaj kaydedilemedi.") });
+                setSubmit({ saving: false, error: hrErrorMessage(err, t("hr.timesheets.saveFailed")) });
               });
           }}
         />

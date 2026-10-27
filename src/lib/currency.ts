@@ -1,3 +1,5 @@
+import { t } from "@/i18n/runtime";
+
 /**
  * Para birimleri ve tutar biçimi. Tutar girilen her kayıt kendi para birimini
  * taşır; kur çevrimi yoktur. Farklı birimdeki tutarlar birbirine eklenmez,
@@ -12,12 +14,12 @@ export type CurrencyCode = (typeof CURRENCY_CODES)[number];
 export const DEFAULT_CURRENCY: CurrencyCode = "TRY";
 
 /** locale: tutarın o birimde alışılmış yazımı (ayraçlar, simgenin yeri) */
-export const CURRENCIES: Record<CurrencyCode, { label: string; symbol: string; locale: string }> = {
-  TRY: { label: "Türk lirası", symbol: "₺", locale: "tr-TR" },
-  USD: { label: "ABD doları", symbol: "$", locale: "en-US" },
-  EUR: { label: "Euro", symbol: "€", locale: "de-DE" },
-  GBP: { label: "İngiliz sterlini", symbol: "£", locale: "en-GB" },
-  CHF: { label: "İsviçre frangı", symbol: "CHF", locale: "de-CH" },
+export const CURRENCIES: Record<CurrencyCode, { readonly label: string; symbol: string; locale: string }> = {
+  TRY: { get label() { return t("shell.currency.TRY"); }, symbol: "₺", locale: "tr-TR" },
+  USD: { get label() { return t("shell.currency.USD"); }, symbol: "$", locale: "en-US" },
+  EUR: { get label() { return t("shell.currency.EUR"); }, symbol: "€", locale: "de-DE" },
+  GBP: { get label() { return t("shell.currency.GBP"); }, symbol: "£", locale: "en-GB" },
+  CHF: { get label() { return t("shell.currency.CHF"); }, symbol: "CHF", locale: "de-CH" },
 };
 
 export function isCurrencyCode(value: unknown): value is CurrencyCode {
@@ -165,4 +167,14 @@ export function formatMoneyTotals(totals: MoneyTotals, fallback: CurrencyCode = 
   const entries = moneyEntries(totals);
   if (entries.length === 0) return formatMoney(0, fallback);
   return entries.map(([currency, amount]) => formatMoney(amount, currency)).join(" + ");
+}
+
+/** Grafik etiketleri için kısa yazım: ₺1,2 Mn · $350 B */
+export function formatMoneyCompact(amount: number, currency: CurrencyCode = DEFAULT_CURRENCY): string {
+  return new Intl.NumberFormat(CURRENCIES[currency].locale, {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(roundMoney(amount));
 }

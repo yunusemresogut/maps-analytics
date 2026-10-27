@@ -114,18 +114,18 @@ export function StoreFormFields({
 
   return (
     <div className="space-y-3">
-      <FormField label="Saha Adı" required error={errors.name}>
+      <FormField label={t("site.fields.name")} required error={errors.name}>
         <Input
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
-          placeholder="Saha adı..."
+          placeholder={t("site.fields.namePlaceholder")}
           readOnly={readOnly}
           aria-invalid={!!errors.name}
         />
       </FormField>
 
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Durum" required>
+        <FormField label={t("site.fields.status")} required>
           <Select
             value={form.projectStatus}
             onChange={(e) =>
@@ -140,7 +140,7 @@ export function StoreFormFields({
             ))}
           </Select>
         </FormField>
-        <FormField label="Saha Türü" required>
+        <FormField label={t("site.fields.locationType")} required>
           <Select
             value={form.locationType}
             onChange={(e) =>
@@ -159,7 +159,7 @@ export function StoreFormFields({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Açılış Tarihi" required error={errors.openingDate}>
+        <FormField label={t("site.fields.openingDate")} required error={errors.openingDate}>
           <DatePicker
             value={form.openingDate}
             onChange={(value) => set("openingDate", value)}
@@ -168,7 +168,7 @@ export function StoreFormFields({
             aria-invalid={!!errors.openingDate}
           />
         </FormField>
-        <FormField label="Kabul Tarihi" error={errors.acceptanceDate}>
+        <FormField label={t("site.fields.acceptanceDate")} error={errors.acceptanceDate}>
           <DatePicker
             value={form.acceptanceDate}
             onChange={(value) => set("acceptanceDate", value)}
@@ -178,26 +178,26 @@ export function StoreFormFields({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Yüklenici Firma">
+        <FormField label={t("site.fields.contractor")}>
           <Input
             value={form.contractorCompany}
             onChange={(e) => set("contractorCompany", e.target.value)}
-            placeholder="Firma adı"
+            placeholder={t("site.fields.contractorPlaceholder")}
             readOnly={readOnly}
           />
         </FormField>
-        <FormField label="Şantiye Şefi">
+        <FormField label={t("site.fields.siteManager")}>
           <Input
             value={form.siteManager}
             onChange={(e) => set("siteManager", e.target.value)}
-            placeholder="Ad Soyad"
+            placeholder={t("site.fields.siteManagerPlaceholder")}
             readOnly={readOnly}
           />
         </FormField>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Brüt m²" required error={errors.grossM2}>
+        <FormField label={t("site.fields.grossM2")} required error={errors.grossM2}>
           <Input
             type="number"
             min={0}
@@ -208,7 +208,7 @@ export function StoreFormFields({
             aria-invalid={!!errors.grossM2}
           />
         </FormField>
-        <FormField label="Kat Sayısı" required error={errors.floorCount}>
+        <FormField label={t("site.fields.floorCount")} required error={errors.floorCount}>
           <Input
             type="number"
             min={1}
@@ -221,7 +221,7 @@ export function StoreFormFields({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Telefon" error={errors.phone}>
+        <FormField label={t("site.fields.phone")} error={errors.phone}>
           <Input
             value={form.phone}
             onChange={(e) => set("phone", e.target.value)}

@@ -2,6 +2,7 @@ import { addYears, differenceInYears, eachDayOfInterval, format, getDay, parseIS
 import { supabase } from "@/lib/supabase";
 import { fetchAllRows } from "@/lib/supabase-query";
 import type { EmploymentType } from "@/lib/hr";
+import { localizedRecord } from "@/i18n/runtime";
 
 /**
  * İzin talepleri (supabase/migrations/20261028090000_hr_leaves.sql).
@@ -14,28 +15,27 @@ export const LEAVES_SOURCE = "leave_requests_list";
 export type LeaveType = "annual" | "excused" | "sick" | "unpaid";
 export type LeaveStatus = "pending_manager" | "pending_hr" | "approved" | "rejected" | "cancelled";
 
-export const LEAVE_TYPE_LABELS: Record<LeaveType, string> = {
-  annual: "Yıllık izin",
-  excused: "Mazeret izni (ücretli)",
-  sick: "Rapor (hastalık / iş kazası)",
-  unpaid: "Ücretsiz izin",
-};
+export const LEAVE_TYPE_LABELS: Record<LeaveType, string> = localizedRecord({
+  annual: "hr.leaveType.annual",
+  excused: "hr.leaveType.excused",
+  sick: "hr.leaveType.sick",
+  unpaid: "hr.leaveType.unpaid",
+});
 
 /** Formda gösterilen kısa yasal bilgi */
-export const LEAVE_TYPE_HINTS: Partial<Record<LeaveType, string>> = {
-  excused:
-    "İş Kanunu ek md. 2: evlenme 3 gün, eşin doğumu 5 gün, ana-baba, eş, kardeş ya da çocuğun ölümü 3 gün ücretli izin.",
-  sick: "Açıklamaya teşhis ya da hastalık bilgisi yazmayın; rapor tarihi ve süresi yeterlidir.",
-  unpaid: "Ücretsiz izin süresince SGK primi yatmaz; personelin yazılı talebinin alınması önerilir.",
-};
+export const LEAVE_TYPE_HINTS: Partial<Record<LeaveType, string>> = localizedRecord({
+  excused: "hr.leaveTypeHint.excused",
+  sick: "hr.leaveTypeHint.sick",
+  unpaid: "hr.leaveTypeHint.unpaid",
+});
 
-export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = {
-  pending_manager: "Yönetici onayında",
-  pending_hr: "İK onayında",
-  approved: "Onaylandı",
-  rejected: "Reddedildi",
-  cancelled: "İptal edildi",
-};
+export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = localizedRecord({
+  pending_manager: "hr.leaveStatus.pending_manager",
+  pending_hr: "hr.leaveStatus.pending_hr",
+  approved: "hr.leaveStatus.approved",
+  rejected: "hr.leaveStatus.rejected",
+  cancelled: "hr.leaveStatus.cancelled",
+});
 
 export const LEAVE_STATUS_STYLES: Record<LeaveStatus, string> = {
   pending_manager: "bg-amber-500/10 text-amber-400 border-amber-500/25",

@@ -203,7 +203,7 @@ export function AppSidebar() {
         {item.routeKey === "team" && totalUnread > 0 && (
           <span
             className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-semibold text-brand-on tabular-nums"
-            aria-label={`${totalUnread} okunmamış mesaj`}
+            aria-label={t(totalUnread === 1 ? "shell.sidebar.unreadOne" : "shell.sidebar.unreadOther", { count: totalUnread })}
           >
             {totalUnread > 99 ? "99+" : totalUnread}
           </span>
@@ -298,7 +298,7 @@ export function AppSidebar() {
           {adminItems.length > 0 && (
             <>
               <p className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
-                Admin
+                {t("shell.sidebar.adminSection")}
               </p>
               {adminItems.map(renderLink)}
             </>
@@ -310,7 +310,7 @@ export function AppSidebar() {
             <Link
               href="/settings/profile"
               onClick={handleNavClick}
-              title="Profil ve ayarlar"
+              title={t("shell.sidebar.profileSettings")}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-zinc-900",
                 pathname.startsWith("/settings")
@@ -331,7 +331,7 @@ export function AppSidebar() {
                   {getRoleLabel(user.role as UserRole, organization)}
                 </p>
               </div>
-              <Settings className="h-4 w-4 shrink-0 text-zinc-500" aria-label="Ayarlar" />
+              <Settings className="h-4 w-4 shrink-0 text-zinc-500" aria-label={t("shell.sidebar.settings")} />
             </Link>
           ) : (
             <div className="flex items-center gap-3 px-2 py-2">

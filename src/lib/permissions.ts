@@ -14,6 +14,7 @@ import {
   isEngineer,
   normalizeRole,
 } from "@/lib/roles";
+import { localizedRecord, t } from "@/i18n/runtime";
 
 /** Kayıtlı matrisin geçerli sayılması için bulunması gereken modüller */
 const CORE_MODULE_KEYS: AppModuleKey[] = [
@@ -42,23 +43,24 @@ export const MODULE_KEYS: AppModuleKey[] = [
   "hrRequests",
 ];
 
-export const MODULE_LABELS: Record<AppModuleKey, string> = {
-  map: "Harita",
-  stores: "Sahalar",
-  projects: "Projeler",
-  approvals: "Onaylar",
-  tickets: "Tadilat Talepleri",
-  contracts: "Sözleşmeler",
-  progressPayments: "Hakediş",
-  invoices: "Faturalar",
-  inventory: "Envanter",
-  personnel: "Personel ve belgeler",
-  personnelPrivate: "Özlük bilgileri (hassas)",
-  timesheets: "Puantaj",
-  leaves: "İzinler (İK onayı)",
-  announcements: "Duyurular (yayınlama)",
-  hrRequests: "Personel talepleri (İK)",
-};
+/** Etiketler her okunuşta seçili dile çevrilir (admin.modules.<key>) */
+export const MODULE_LABELS: Record<AppModuleKey, string> = localizedRecord({
+  map: "admin.modules.map",
+  stores: "admin.modules.stores",
+  projects: "admin.modules.projects",
+  approvals: "admin.modules.approvals",
+  tickets: "admin.modules.tickets",
+  contracts: "admin.modules.contracts",
+  progressPayments: "admin.modules.progressPayments",
+  invoices: "admin.modules.invoices",
+  inventory: "admin.modules.inventory",
+  personnel: "admin.modules.personnel",
+  personnelPrivate: "admin.modules.personnelPrivate",
+  timesheets: "admin.modules.timesheets",
+  leaves: "admin.modules.leaves",
+  announcements: "admin.modules.announcements",
+  hrRequests: "admin.modules.hrRequests",
+});
 
 export const CRUD_ACTIONS: PermissionAction[] = [
   "view",
@@ -67,12 +69,12 @@ export const CRUD_ACTIONS: PermissionAction[] = [
   "delete",
 ];
 
-export const CRUD_ACTION_LABELS: Record<PermissionAction, string> = {
-  view: "Görüntüle",
-  add: "Ekle",
-  edit: "Düzenle",
-  delete: "Sil",
-};
+export const CRUD_ACTION_LABELS: Record<PermissionAction, string> = localizedRecord({
+  view: "admin.crud.view",
+  add: "admin.crud.add",
+  edit: "admin.crud.edit",
+  delete: "admin.crud.delete",
+});
 
 export const NONE_CRUD: ModuleCrud = {
   view: false,
@@ -441,14 +443,23 @@ export function setMatrixCell(
 }
 
 export const PERMISSION_PRESETS = {
-  full: { label: "Tam Yetki (tüm modüller)", matrix: () => defaultMatrixForRole("admin") },
+  full: {
+    get label() {
+      return t("admin.presets.full");
+    },
+    matrix: () => defaultMatrixForRole("admin"),
+  },
   default: {
-    label: "Varsayılan CRUD",
+    get label() {
+      return t("admin.presets.default");
+    },
     // unused — UI uses role defaults
     matrix: () => defaultMatrixForRole("manager"),
   },
   viewOnly: {
-    label: "Sadece görüntüleme",
+    get label() {
+      return t("admin.presets.viewOnly");
+    },
     matrix: () => {
       const m = emptyMatrix();
       setModules(m, MODULE_KEYS, VIEW_ONLY_CRUD);

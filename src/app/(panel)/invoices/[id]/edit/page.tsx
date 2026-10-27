@@ -14,15 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { MoneyInput } from "@/components/ui/money-input";
 import { DEFAULT_CURRENCY, formatMoney, type CurrencyCode } from "@/lib/currency";
-import { calculateVat, inferVatRate, VAT_RATE_OPTIONS } from "@/lib/module-finance";
+import { calculateVat, inferVatRate, INVOICE_STATUS_LABELS, VAT_RATE_OPTIONS } from "@/lib/module-finance";
 import type { InvoiceStatus } from "@/types";
 
-const STATUS_TR: Record<InvoiceStatus, string> = {
-  draft: "Taslak",
-  issued: "Kesildi",
-  paid: "Ödendi",
-  cancelled: "İptal",
-};
 
 function EditInvoiceContent({ id }: { id: string }) {
   const router = useRouter();
@@ -59,7 +53,7 @@ function EditInvoiceContent({ id }: { id: string }) {
     if (!canEdit) return;
     setShowErrors(true);
     if (invalid.payment || invalid.number || invalid.amount) {
-      setSaveError("Fatura numarası, hakediş ve sıfırdan büyük tutar zorunludur.");
+      setSaveError(t("finance.invoices.requiredFields"));
       return;
     }
     setSaveError("");
@@ -75,66 +69,66 @@ function EditInvoiceContent({ id }: { id: string }) {
     });
     setSaving(false);
     if (ok) router.push("/invoices");
-    else setSaveError("Fatura kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.");
+    else setSaveError(t("finance.invoices.saveFailed"));
   };
 
   const remove = async () => {
-    if (!canDelete || !confirm("Fatura silinsin mi?")) return;
+    if (!canDelete || !confirm(t("finance.invoices.deleteConfirm"))) return;
     const ok = await deleteInvoice(id);
     if (ok) router.push("/invoices");
-    else setSaveError("Fatura silinemedi. Tekrar deneyin.");
+    else setSaveError(t("finance.invoices.deleteFailed"));
   };
 
   return (
-    <ModuleFormShell backHref="/invoices" backLabel="Faturalar" title={invoiceNumber || "Fatura düzenle"} onSave={save} onDelete={remove} saving={saving} canSave={canEdit} canDelete={canDelete}>
+    <ModuleFormShell backHref="/invoices" backLabel={t("finance.invoices.title")} title={invoiceNumber || t("finance.invoices.editTitle")} onSave={save} onDelete={remove} saving={saving} canSave={canEdit} canDelete={canDelete}>
       {saveError && <p role="alert" className="text-sm text-red-400">{saveError}</p>}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400">
-        Toplam {formatMoney(invoice.amount + invoice.taxAmount, invoice.currency)}
+        {t("finance.invoices.summary", { total: formatMoney(invoice.amount + invoice.taxAmount, invoice.currency) })}
         {payment && (
           <Link href={`/progress-payments/${payment.id}/edit`} className="mt-1 block text-cyan-400 hover:underline">
-            Hakediş: {payment.title}
+            {t("finance.shared.paymentLink", { name: payment.title })}
           </Link>
         )}
       </div>
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div>
-          <label className="text-xs text-zinc-500">Hakediş *</label>
+          <label className="text-xs text-zinc-500">{t("finance.shared.progressPayment")} *</label>
           <Select className="mt-1" value={progressPaymentId} onChange={(e) => setProgressPaymentId(e.target.value)} disabled={!canEdit} aria-invalid={showErrors && invalid.payment}>
-            <option value="">Seçiniz</option>
+            <option value="">{t("finance.shared.select")}</option>
             {progressPayments.map((p) => (
               <option key={p.id} value={p.id}>{p.title}</option>
             ))}
           </Select>
         </div>
         <div>
-          <label className="text-xs text-zinc-500">Fatura no *</label>
+          <label className="text-xs text-zinc-500">{t("finance.invoices.invoiceNumber")} *</label>
           <Input className="mt-1" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} disabled={!canEdit} aria-invalid={showErrors && invalid.number} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-zinc-500">Tutar (KDV hariç) *</label>
+            <label className="text-xs text-zinc-500">{t("finance.invoices.amountExclVat")} *</label>
             <MoneyInput className="mt-1" value={amount} onValueChange={setAmount} currency={currency} onCurrencyChange={setCurrency} disabled={!canEdit} aria-invalid={showErrors && invalid.amount} />
           </div>
           <div>
-            <label className="text-xs text-zinc-500">KDV oranı</label>
+            <label className="text-xs text-zinc-500">{t("finance.invoices.vatRate")}</label>
             <Select className="mt-1" value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))} disabled={!canEdit}>
-              {isCustomVatRate && <option value={vatRate}>Özel (%{vatRate})</option>}
-              {VAT_RATE_OPTIONS.map((rate) => <option key={rate} value={rate}>%{rate}</option>)}
+              {isCustomVatRate && <option value={vatRate}>{t("finance.invoices.customVatRate", { rate: vatRate })}</option>}
+              {VAT_RATE_OPTIONS.map((rate) => <option key={rate} value={rate}>{t("finance.invoices.vatRateOption", { rate })}</option>)}
             </Select>
           </div>
           {currencyMismatch && (
             <p className="sm:col-span-2 text-xs text-amber-400/90">
-              Sözleşme {contractCurrency} cinsinden. Kur çevrimi yapılmadığı için {currency} fatura, sözleşme ilerlemesine sayılmaz.
+              {t("finance.invoices.currencyMismatch", { contractCurrency: contractCurrency ?? "", currency })}
             </p>
           )}
           <div className="sm:col-span-2 flex flex-wrap gap-x-6 gap-y-2 border-t border-zinc-800 pt-3 text-sm">
-            <p className="text-zinc-500">KDV: <span className="font-medium text-zinc-200">{formatMoney(taxAmount, currency)}</span></p>
-            <p className="text-zinc-500">Toplam: <span className="font-semibold text-zinc-100">{formatMoney(amountValue + taxAmount, currency)}</span></p>
+            <p className="text-zinc-500">{t("finance.invoices.vat")} <span className="font-medium text-zinc-200">{formatMoney(taxAmount, currency)}</span></p>
+            <p className="text-zinc-500">{t("finance.invoices.totalLabel")} <span className="font-semibold text-zinc-100">{formatMoney(amountValue + taxAmount, currency)}</span></p>
           </div>
           <div>
-            <label className="text-xs text-zinc-500">Durum</label>
+            <label className="text-xs text-zinc-500">{t("finance.shared.status")}</label>
             <Select className="mt-1" value={status} onChange={(e) => setStatus(e.target.value as InvoiceStatus)} disabled={!canEdit}>
-              {Object.entries(STATUS_TR).map(([k, v]) => (
+              {Object.entries(INVOICE_STATUS_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
             </Select>

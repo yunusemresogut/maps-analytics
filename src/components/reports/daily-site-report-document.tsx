@@ -1,11 +1,13 @@
 import { format, isValid, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import {
   ATTENDANCE_STATUS_LABELS,
   attendancePresent,
   crewTotal,
   type DailySiteReport,
+  weatherLabel,
 } from "@/lib/daily-site-report";
+import { useI18n } from "@/contexts/i18n-context";
+import { getDateLocale, t } from "@/i18n/runtime";
 import type { Store } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +21,7 @@ const BRAND = "#2f55a8";
 
 function formatReportDate(value: string): string {
   const date = parseISO(value);
-  return isValid(date) ? format(date, "d MMMM yyyy, EEEE", { locale: tr }) : "—";
+  return isValid(date) ? format(date, "d MMMM yyyy, EEEE", { locale: getDateLocale() }) : "—";
 }
 
 function InfoCell({ label, value, className }: { label: string; value?: string; className?: string }) {
@@ -49,7 +51,7 @@ function TextBlock({ value }: { value: string }) {
   return value.trim() ? (
     <p className="whitespace-pre-wrap">{value.trim()}</p>
   ) : (
-    <p className="text-neutral-400">Belirtilmedi</p>
+    <p className="text-neutral-400">{t("reports.document.notSpecified")}</p>
   );
 }
 
@@ -66,9 +68,10 @@ export function DailySiteReportDocument({
   organizationName,
   className,
 }: DailySiteReportDocumentProps) {
+  const { t } = useI18n();
   const crew = report.crew.filter((row) => row.trade.trim() || row.count);
   const location = store ? [store.address, store.district, store.city].filter(Boolean).join(", ") : "";
-  const weather = [report.weather, report.temperature.trim() && `${report.temperature.trim()} °C`]
+  const weather = [report.weather && weatherLabel(report.weather), report.temperature.trim() && `${report.temperature.trim()} °C`]
     .filter(Boolean)
     .join(" · ");
 
@@ -82,38 +85,38 @@ export function DailySiteReportDocument({
       <header className="flex items-start justify-between gap-6 border-b-4 pb-3" style={{ borderColor: BRAND }}>
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-            {organizationName || "Şantiye"}
+            {organizationName || t("reports.document.siteFallback")}
           </p>
           <h1 className="mt-1 text-[20px] font-bold tracking-tight" style={{ color: BRAND }}>
-            Günlük Şantiye Raporu
+            {t("reports.document.title")}
           </h1>
         </div>
         <div className="text-right text-[11px] text-neutral-700">
           <div className="font-semibold text-neutral-900">{formatReportDate(report.date)}</div>
-          <div className="mt-0.5">{store?.name ?? "Şantiye seçilmedi"}</div>
+          <div className="mt-0.5">{store?.name ?? t("reports.document.noSite")}</div>
         </div>
       </header>
 
       <div className="mt-4 grid grid-cols-2 border-l border-t border-neutral-300">
-        <InfoCell label="Saha" value={store?.name} />
-        <InfoCell label="Tarih" value={formatReportDate(report.date)} />
-        <InfoCell label="Adres" value={location} className="col-span-2" />
-        <InfoCell label="Yüklenici firma" value={report.contractor} />
-        <InfoCell label="Hava durumu" value={weather} />
-        <InfoCell label="Şantiye şefi" value={report.siteManager} />
-        <InfoCell label="Hazırlayan" value={report.preparedBy} />
+        <InfoCell label={t("reports.document.site")} value={store?.name} />
+        <InfoCell label={t("reports.document.date")} value={formatReportDate(report.date)} />
+        <InfoCell label={t("reports.document.address")} value={location} className="col-span-2" />
+        <InfoCell label={t("reports.editor.contractor")} value={report.contractor} />
+        <InfoCell label={t("reports.editor.weather")} value={weather} />
+        <InfoCell label={t("reports.editor.siteManager")} value={report.siteManager} />
+        <InfoCell label={t("reports.editor.preparedBy")} value={report.preparedBy} />
       </div>
 
-      <Section title="Sahadaki personel">
-        {crew.length === 0 && report.attendance.length === 0 && <p className="text-neutral-400">Belirtilmedi</p>}
+      <Section title={t("reports.editor.personnelOnSite")}>
+        {crew.length === 0 && report.attendance.length === 0 && <p className="text-neutral-400">{t("reports.document.notSpecified")}</p>}
         {report.attendance.length > 0 && (
           <table className="mb-2 w-full border-collapse text-[11px]">
             <thead>
               <tr className="bg-neutral-100 text-left text-[9px] uppercase tracking-wide text-neutral-600">
-                <th className="border border-neutral-300 px-2 py-1 font-semibold">Ad soyad</th>
-                <th className="border border-neutral-300 px-2 py-1 font-semibold">Görev</th>
-                <th className="w-24 border border-neutral-300 px-2 py-1 font-semibold">Durum</th>
-                <th className="w-24 border border-neutral-300 px-2 py-1 text-right font-semibold">Fazla mesai</th>
+                <th className="border border-neutral-300 px-2 py-1 font-semibold">{t("reports.document.fullName")}</th>
+                <th className="border border-neutral-300 px-2 py-1 font-semibold">{t("reports.document.jobTitle")}</th>
+                <th className="w-24 border border-neutral-300 px-2 py-1 font-semibold">{t("common.status")}</th>
+                <th className="w-24 border border-neutral-300 px-2 py-1 text-right font-semibold">{t("reports.attendance.overtime")}</th>
               </tr>
             </thead>
             <tbody>
@@ -123,16 +126,16 @@ export function DailySiteReportDocument({
                   <td className="border border-neutral-300 px-2 py-1">{row.jobTitle || "—"}</td>
                   <td className="border border-neutral-300 px-2 py-1">{ATTENDANCE_STATUS_LABELS[row.status]}</td>
                   <td className="border border-neutral-300 px-2 py-1 text-right tabular-nums">
-                    {row.status !== "absent" && row.overtimeHours > 0 ? `${row.overtimeHours} sa` : "—"}
+                    {row.status !== "absent" && row.overtimeHours > 0 ? t("reports.document.hours", { count: row.overtimeHours }) : "—"}
                   </td>
                 </tr>
               ))}
               <tr className="font-semibold">
                 <td colSpan={3} className="border border-neutral-300 px-2 py-1 text-right">
-                  Sahada
+                  {t("reports.document.onSite")}
                 </td>
                 <td className="border border-neutral-300 px-2 py-1 text-right tabular-nums">
-                  {attendancePresent(report.attendance)} kişi
+                  {t(attendancePresent(report.attendance) === 1 ? "reports.document.peopleOne" : "reports.document.peopleOther", { count: attendancePresent(report.attendance) })}
                 </td>
               </tr>
             </tbody>
@@ -142,8 +145,8 @@ export function DailySiteReportDocument({
           <table className="w-full border-collapse text-[11px]">
             <thead>
               <tr className="bg-neutral-100 text-left text-[9px] uppercase tracking-wide text-neutral-600">
-                <th className="border border-neutral-300 px-2 py-1 font-semibold">Ekip / Meslek</th>
-                <th className="w-24 border border-neutral-300 px-2 py-1 text-right font-semibold">Kişi</th>
+                <th className="border border-neutral-300 px-2 py-1 font-semibold">{t("reports.document.crewTrade")}</th>
+                <th className="w-24 border border-neutral-300 px-2 py-1 text-right font-semibold">{t("reports.editor.people")}</th>
               </tr>
             </thead>
             <tbody>
@@ -154,7 +157,7 @@ export function DailySiteReportDocument({
                 </tr>
               ))}
               <tr className="font-semibold">
-                <td className="border border-neutral-300 px-2 py-1 text-right">Toplam</td>
+                <td className="border border-neutral-300 px-2 py-1 text-right">{t("reports.document.total")}</td>
                 <td className="border border-neutral-300 px-2 py-1 text-right tabular-nums">{crewTotal(crew)}</td>
               </tr>
             </tbody>
@@ -162,37 +165,37 @@ export function DailySiteReportDocument({
         )}
       </Section>
 
-      <Section title="Bugün yapılan işler">
+      <Section title={t("reports.editor.worksDone")}>
         <TextBlock value={report.worksDone} />
       </Section>
-      <Section title="Gelen malzeme ve ekipman">
+      <Section title={t("reports.editor.materialsReceived")}>
         <TextBlock value={report.materialsReceived} />
       </Section>
-      <Section title="Sorunlar, gecikmeler ve talepler">
+      <Section title={t("reports.editor.issues")}>
         <TextBlock value={report.issues} />
       </Section>
-      <Section title="İş güvenliği">
+      <Section title={t("reports.editor.safety")}>
         <TextBlock value={report.safetyNotes} />
       </Section>
-      <Section title="Yarın planlanan işler">
+      <Section title={t("reports.editor.tomorrowPlan")}>
         <TextBlock value={report.tomorrowPlan} />
       </Section>
 
       <div className="mt-8 grid grid-cols-2 gap-8 break-inside-avoid text-[10px] text-neutral-600">
         {[
-          { label: "Hazırlayan", name: report.preparedBy },
-          { label: "Şantiye şefi", name: report.siteManager },
+          { label: t("reports.editor.preparedBy"), name: report.preparedBy },
+          { label: t("reports.editor.siteManager"), name: report.siteManager },
         ].map((signer) => (
           <div key={signer.label}>
             <div className="h-12 border-b border-neutral-400" />
             <div className="mt-1 font-semibold text-neutral-800">{signer.name.trim() || " "}</div>
-            <div>{signer.label} · İmza</div>
+            <div>{signer.label} · {t("reports.document.signature")}</div>
           </div>
         ))}
       </div>
 
       {report.photos.length > 0 && (
-        <Section title={`Fotoğraflar (${report.photos.length})`}>
+        <Section title={t("reports.editor.photosTitle", { count: report.photos.length })}>
           <div className="grid grid-cols-2 gap-3">
             {report.photos.map((photo, index) => (
               <figure key={photo.id} className="break-inside-avoid">

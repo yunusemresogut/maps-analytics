@@ -1,4 +1,6 @@
 import { getRequestCaller } from "@/lib/server-auth";
+import { localeFromRequest, serverTranslator } from "@/i18n/server";
+import type { Locale } from "@/i18n";
 
 // Ücretsiz katmanda modeller zaman zaman "yoğun talep" (503) ya da kota (429)
 // döndürür; sırayla yedek modeller denenir. Kotalar model başına ayrıdır.
@@ -16,18 +18,30 @@ const MAX_CONTEXT_CHARS = 60000;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
-const SYSTEM_PROMPT = `Sen "Koordine" adlı saha ve proje operasyonları uygulamasının asistanısın.
+// Cevap dili kullanıcının seçtiği arayüz dilini izler; firma verisi her zaman Türkçe etiketlerle gelir
+const LANGUAGE_RULES: Record<Locale, string> = {
+  tr: "- Her zaman Türkçe, kısa ve net cevap ver. Gerekirse madde işaretleri ve **kalın** vurgu kullan.",
+  en: [
+    "- Kullanıcı arayüzü İngilizce: kullanıcı hangi dilde yazarsa yazsın her zaman İngilizce (English), kısa ve net cevap ver. Gerekirse madde işaretleri ve **kalın** vurgu kullan.",
+    "- Firma verisindeki Türkçe etiketleri ve durum adlarını cevapta İngilizce karşılıklarıyla yaz (Saha → Site, Şantiye → Construction, İhale → Tender, Açılış → Opening, Hakediş → Progress payment, Fatura → Invoice, Keşif → Estimate, İş planı → Work plan, Tadilat talebi → Renovation request). Saha, kalem ve kişi adları gibi kullanıcı verilerini çevirme.",
+    "- Action bloğundaki JSON anahtarlarını ve enum değerlerini (ör. proje, santiye, yapilacak) aynen koru; yalnızca bloğun önündeki açıklamayı İngilizce yaz.",
+  ].join("\n"),
+};
+
+function systemPrompt(locale: Locale): string {
+  return `Sen "Koordine" adlı saha ve proje operasyonları uygulamasının asistanısın.
 Uygulamada "saha", firmanın takip ettiği her lokasyondur (mağaza, şantiye, şube, bina vb.); kullanıcı "mağaza" ya da "şantiye" dese de sahayı kastettiğini varsay.
 Kullanıcılar saha açılışlarını, proje durumlarını (Proje, İhale, Şantiye, Açılış, Hakediş, Fatura), iş planlarını, keşifleri (malzeme listeleri), sözleşmeleri, hakedişleri, faturaları ve tadilat taleplerini takip eder.
 
 Kurallar:
-- Her zaman Türkçe, kısa ve net cevap ver. Gerekirse madde işaretleri ve **kalın** vurgu kullan.
+${LANGUAGE_RULES[locale]}
 - Sayısal sorularda yalnızca aşağıdaki "Firma verisi" bölümüne dayan; veri yoksa bunu açıkça söyle, uydurma.
 - "Malzeme" ile "keşif kalemi" aynı şeydir; kullanıcı hangisini derse desin keşif verisini kullan.
 - Saha ve keşif kalemi adlarını büyük/küçük harf ve ek farklarına (örn. "Yunus Mağaza'sındaki") takılmadan eşleştir.
 - Tutarları verideki kendi para birimiyle (TRY, USD, EUR, GBP, CHF) yaz; kur çevrimi yapma, farklı birimdeki tutarları toplamak yerine birim başına ayrı ver. Tarihleri gün ay yıl biçiminde yaz.
 - Riskleri ve öncelikleri yorumlarken gerekçesini veriyle göster.
 - Uygulamanın nasıl kullanılacağı sorulursa genel yönlendirme yap.`;
+}
 
 const ACTIONS_DISABLED_PROMPT = `# Kayıt ekleme
 Bu firmada asistanla kayıt ekleme kapalı. Kullanıcı kayıt eklemek isterse bunu uygulamadaki ilgili sayfadan yapması gerektiğini söyle; asla \`\`\`action bloğu üretme.`;
@@ -70,17 +84,19 @@ export async function POST(request: Request) {
   // Yalnızca giriş yapmış, aktif oturumu olan kullanıcılar: API anahtarının kötüye kullanımını önler
   const auth = await getRequestCaller(request);
   if (!auth.ok) return auth.response;
+  const locale = localeFromRequest(request);
+  const t = serverTranslator(locale);
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return errorResponse("Asistan henüz yapılandırılmadı (GEMINI_API_KEY eksik).", 503);
+    return errorResponse(t("api.assistant.notConfigured"), 503);
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return errorResponse("Geçersiz istek.", 400);
+    return errorResponse(t("api.assistant.invalidRequest"), 400);
   }
   const { messages, context, allowActions } = (body ?? {}) as {
     messages?: unknown;
@@ -88,13 +104,13 @@ export async function POST(request: Request) {
     allowActions?: unknown;
   };
   if (!Array.isArray(messages) || messages.length === 0 || !messages.every(isChatMessage)) {
-    return errorResponse("Mesaj bulunamadı.", 400);
+    return errorResponse(t("api.assistant.noMessages"), 400);
   }
   const history = messages
     .slice(-MAX_MESSAGES)
     .map((message) => ({ ...message, content: message.content.slice(0, MAX_MESSAGE_CHARS) }));
   if (history[history.length - 1].role !== "user") {
-    return errorResponse("Son mesaj kullanıcıdan gelmeli.", 400);
+    return errorResponse(t("api.assistant.lastMessageMustBeUser"), 400);
   }
   const contextText = typeof context === "string" ? context.slice(0, MAX_CONTEXT_CHARS) : "";
 
@@ -102,7 +118,7 @@ export async function POST(request: Request) {
     systemInstruction: {
       parts: [
         {
-          text: `${SYSTEM_PROMPT}\n\n${allowActions === false ? ACTIONS_DISABLED_PROMPT : ACTIONS_PROMPT}\n\n# Firma verisi\n${contextText || "Veri yok."}`,
+          text: `${systemPrompt(locale)}\n\n${allowActions === false ? ACTIONS_DISABLED_PROMPT : ACTIONS_PROMPT}\n\n# Firma verisi\n${contextText || "Veri yok."}`,
         },
       ],
     },
@@ -119,7 +135,7 @@ export async function POST(request: Request) {
   attempts: for (const model of GEMINI_MODELS) {
     // Her model için bir kez kısa beklemeyle yeniden dene
     for (let attempt = 0; attempt < 2; attempt++) {
-      if (request.signal.aborted) return errorResponse("İstek iptal edildi.", 499);
+      if (request.signal.aborted) return errorResponse(t("api.assistant.aborted"), 499);
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
         {
@@ -145,18 +161,18 @@ export async function POST(request: Request) {
 
   if (!geminiResponse?.body) {
     if (lastStatus === 429) {
-      return errorResponse("Ücretsiz kullanım limiti doldu. Bir süre sonra tekrar deneyin.", 429);
+      return errorResponse(t("api.assistant.quotaExceeded"), 429);
     }
     if (lastStatus === 400 || lastStatus === 403 || lastStatus === 404) {
-      return errorResponse("Asistan yapılandırması geçersiz. API anahtarını kontrol edin.", 502);
+      return errorResponse(t("api.assistant.invalidConfig"), 502);
     }
     if (lastStatus === 503 || lastStatus === 500 || lastStatus === 504) {
       return errorResponse(
-        "Yapay zekâ servisi şu anda çok yoğun. Birkaç saniye sonra tekrar deneyin.",
+        t("api.assistant.overloaded"),
         503
       );
     }
-    return errorResponse("Asistan şu anda yanıt veremiyor. Lütfen tekrar deneyin.", 502);
+    return errorResponse(t("api.assistant.unavailable"), 502);
   }
 
   // Gemini SSE akışını düz metin akışına çevir

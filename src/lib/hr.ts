@@ -4,6 +4,7 @@ import { fetchAllRows } from "@/lib/supabase-query";
 import { getFileMimeType, isAllowedFileType } from "@/lib/file-types";
 import { attendanceRows } from "@/lib/site-reports";
 import type { ReportAttendance } from "@/lib/daily-site-report";
+import { getLocale, localizedRecord, t } from "@/i18n/runtime";
 
 /**
  * İnsan Kaynakları: personel kartları, özlük, belge / sertifika ve puantaj
@@ -28,27 +29,27 @@ export const CERTIFICATE_EXPIRING_DAYS = 30;
 export type EmploymentType = "office" | "salaried" | "daily" | "subcontractor";
 export type PersonnelState = "active" | "left";
 
-export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {
-  office: "Ofis personeli",
-  salaried: "Maaşlı işçi",
-  daily: "Günlük (yevmiyeli) işçi",
-  subcontractor: "Taşeron personeli",
-};
+export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = localizedRecord({
+  office: "hr.employmentType.office",
+  salaried: "hr.employmentType.salaried",
+  daily: "hr.employmentType.daily",
+  subcontractor: "hr.employmentType.subcontractor",
+});
 
-export const PERSONNEL_STATE_LABELS: Record<PersonnelState, string> = {
-  active: "Çalışıyor",
-  left: "Ayrıldı",
-};
+export const PERSONNEL_STATE_LABELS: Record<PersonnelState, string> = localizedRecord({
+  active: "hr.personnelState.active",
+  left: "hr.personnelState.left",
+});
 
 /** Personelin en kötü belge durumu (personnel_list.document_state) */
 export type DocumentState = "expired" | "expiring" | "pending" | "ok";
 
-export const DOCUMENT_STATE_LABELS: Record<DocumentState, string> = {
-  expired: "Süresi geçmiş belge",
-  expiring: "Belgesi bitiyor",
-  pending: "Onay bekleyen belge",
-  ok: "Belgeler tamam",
-};
+export const DOCUMENT_STATE_LABELS: Record<DocumentState, string> = localizedRecord({
+  expired: "hr.documentState.expired",
+  expiring: "hr.documentState.expiring",
+  pending: "hr.documentState.pending",
+  ok: "hr.documentState.ok",
+});
 
 export type PersonnelInput = {
   code: string;
@@ -111,17 +112,17 @@ export type CertificateType =
 
 export type CertificateValidity = "expired" | "expiring" | "valid" | "permanent";
 
-export const CERTIFICATE_TYPE_LABELS: Record<CertificateType, string> = {
-  isg_training: "İSG eğitimi",
-  health_check: "Sağlık muayenesi (işe giriş / periyodik)",
-  myk: "Mesleki yeterlilik belgesi (MYK)",
-  height_work: "Yüksekte çalışma eğitimi",
-  operator: "İş makinesi operatör belgesi",
-  driver_license: "Sürücü belgesi / SRC / psikoteknik",
-  first_aid: "İlk yardım sertifikası",
-  emergency_team: "Acil durum ekibi eğitimi",
-  other: "Diğer",
-};
+export const CERTIFICATE_TYPE_LABELS: Record<CertificateType, string> = localizedRecord({
+  isg_training: "hr.certificateType.isg_training",
+  health_check: "hr.certificateType.health_check",
+  myk: "hr.certificateType.myk",
+  height_work: "hr.certificateType.height_work",
+  operator: "hr.certificateType.operator",
+  driver_license: "hr.certificateType.driver_license",
+  first_aid: "hr.certificateType.first_aid",
+  emergency_team: "hr.certificateType.emergency_team",
+  other: "hr.certificateType.other",
+});
 
 /**
  * Çok tehlikeli sınıf (inşaat) için önerilen geçerlilik (ay). Yalnızca bitiş
@@ -136,12 +137,12 @@ export const CERTIFICATE_DEFAULT_MONTHS: Partial<Record<CertificateType, number>
   first_aid: 36,
 };
 
-export const VALIDITY_LABELS: Record<CertificateValidity, string> = {
-  expired: "Süresi geçti",
-  expiring: "Yakında bitiyor",
-  valid: "Geçerli",
-  permanent: "Süresiz",
-};
+export const VALIDITY_LABELS: Record<CertificateValidity, string> = localizedRecord({
+  expired: "hr.validity.expired",
+  expiring: "hr.validity.expiring",
+  valid: "hr.validity.valid",
+  permanent: "hr.validity.permanent",
+});
 
 export const VALIDITY_STYLES: Record<CertificateValidity, string> = {
   expired: "bg-red-500/10 text-red-400 border-red-500/25",
@@ -192,18 +193,33 @@ export type TimesheetStatus =
   | "weekly_rest"
   | "public_holiday";
 
-/** Puantaj cetvelinde kullanılan kısa kod, ad ve renk */
-export const TIMESHEET_STATUS: Record<TimesheetStatus, { code: string; label: string; style: string }> = {
-  worked: { code: "X", label: "Çalıştı", style: "bg-emerald-500/15 text-emerald-300" },
-  half_day: { code: "Y", label: "Yarım gün", style: "bg-teal-500/15 text-teal-300" },
-  annual_leave: { code: "İ", label: "Yıllık izin", style: "bg-sky-500/15 text-sky-300" },
-  excused_leave: { code: "M", label: "Mazeret izni", style: "bg-indigo-500/15 text-indigo-300" },
-  sick_leave: { code: "R", label: "Raporlu", style: "bg-violet-500/15 text-violet-300" },
-  unpaid_leave: { code: "Ü", label: "Ücretsiz izin", style: "bg-zinc-700/50 text-zinc-300" },
-  absent: { code: "D", label: "Devamsız", style: "bg-red-500/15 text-red-300" },
-  weekly_rest: { code: "H", label: "Hafta tatili", style: "bg-zinc-800 text-zinc-400" },
-  public_holiday: { code: "RT", label: "Resmi tatil", style: "bg-amber-500/15 text-amber-300" },
+const TIMESHEET_STATUS_STYLES: Record<TimesheetStatus, string> = {
+  worked: "bg-emerald-500/15 text-emerald-300",
+  half_day: "bg-teal-500/15 text-teal-300",
+  annual_leave: "bg-sky-500/15 text-sky-300",
+  excused_leave: "bg-indigo-500/15 text-indigo-300",
+  sick_leave: "bg-violet-500/15 text-violet-300",
+  unpaid_leave: "bg-zinc-700/50 text-zinc-300",
+  absent: "bg-red-500/15 text-red-300",
+  weekly_rest: "bg-zinc-800 text-zinc-400",
+  public_holiday: "bg-amber-500/15 text-amber-300",
 };
+
+/** Puantaj cetvelinde kullanılan kısa kod, ad ve renk (kod ve ad seçili dile göre okunur) */
+export const TIMESHEET_STATUS = Object.fromEntries(
+  (Object.keys(TIMESHEET_STATUS_STYLES) as TimesheetStatus[]).map((status) => [
+    status,
+    {
+      get code() {
+        return t(`hr.timesheetStatus.${status}.code`);
+      },
+      get label() {
+        return t(`hr.timesheetStatus.${status}.label`);
+      },
+      style: TIMESHEET_STATUS_STYLES[status],
+    },
+  ])
+) as Record<TimesheetStatus, { readonly code: string; readonly label: string; style: string }>;
 
 export const TIMESHEET_STATUSES = Object.keys(TIMESHEET_STATUS) as TimesheetStatus[];
 
@@ -396,6 +412,9 @@ export function maskNationalId(value: string): string {
   return value ? `•••••••${value.slice(-4)}` : "";
 }
 
+/** Dosya işlemlerinin kullanıcıya olduğu gibi gösterilen hataları */
+class HrFileError extends Error {}
+
 /** Postgres hatalarını kullanıcıya anlaşılır mesaja çevirir */
 export function hrErrorMessage(error: unknown, fallback: string): string {
   const code = (error as { code?: string } | null)?.code;
@@ -406,12 +425,12 @@ export function hrErrorMessage(error: unknown, fallback: string): string {
     return message;
   }
   if (code === "23505") {
-    if (message.includes("personnel_user_idx")) return "Bu kullanıcı zaten başka bir personel kartına bağlı.";
-    return "Bu kayıt zaten var.";
+    if (message.includes("personnel_user_idx")) return t("hr.lib.errors.userAlreadyLinked");
+    return t("hr.lib.errors.duplicate");
   }
-  if (code === "42501") return "Bu işlem için yetkiniz yok.";
-  if (code === "23514") return "Girilen bilgileri kontrol edin (tarih sırası, TC kimlik no biçimi ya da saat toplamı).";
-  if (error instanceof Error && error.message.startsWith("Dosya")) return error.message;
+  if (code === "42501") return t("hr.lib.errors.forbidden");
+  if (code === "23514") return t("hr.lib.errors.checkInput");
+  if (error instanceof HrFileError) return error.message;
   return fallback;
 }
 
@@ -483,7 +502,7 @@ async function removeHrFiles(paths: string[]) {
   if (paths.length === 0) return;
   const { data, error } = await supabase.storage.from(HR_FILES_BUCKET).remove(paths);
   if (error || (data ?? []).length < paths.length) {
-    throw new Error("Dosya silinemedi: belgeye ait dosyayı silme yetkiniz yok (sağlık raporları için özlük yetkisi gerekir).");
+    throw new HrFileError(t("hr.lib.errors.fileDeleteForbidden"));
   }
 }
 
@@ -606,8 +625,8 @@ function fileObjectPath(organizationId: string, personnelId: string, certificate
 }
 
 export function validateHrFile(file: File): string | null {
-  if (!isAllowedFileType(file.name)) return `"${file.name}": bu dosya türü desteklenmiyor.`;
-  if (file.size > MAX_HR_FILE_BYTES) return `"${file.name}": dosya 20 MB sınırını aşıyor.`;
+  if (!isAllowedFileType(file.name)) return t("hr.lib.errors.fileTypeNotSupported", { name: file.name });
+  if (file.size > MAX_HR_FILE_BYTES) return t("hr.lib.errors.fileTooLarge", { name: file.name });
   return null;
 }
 
@@ -620,7 +639,7 @@ async function attachCertificateFile(
   const { error: uploadError } = await supabase.storage
     .from(HR_FILES_BUCKET)
     .upload(path, file, { upsert: false, contentType: getFileMimeType(file) });
-  if (uploadError) throw new Error(`Dosya yüklenemedi: ${uploadError.message}`);
+  if (uploadError) throw new HrFileError(t("hr.lib.errors.fileUploadFailed", { message: uploadError.message }));
   const { error } = await supabase
     .from("personnel_certificates")
     .update({ file_path: path, file_name: file.name })
@@ -676,7 +695,7 @@ export async function getCertificateFileUrl(path: string, download?: string): Pr
   const { data, error } = await supabase.storage
     .from(HR_FILES_BUCKET)
     .createSignedUrl(path, 60 * 5, { download: download ?? false });
-  if (error || !data?.signedUrl) throw error ?? new Error("Dosya açılamadı");
+  if (error || !data?.signedUrl) throw error ?? new HrFileError(t("hr.lib.errors.fileOpenFailed"));
   return data.signedUrl;
 }
 
@@ -950,7 +969,19 @@ export function summarizeTimesheet(entries: TimesheetEntry[]): TimesheetSummary 
 }
 
 export function formatHours(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(".", ",");
+  if (Number.isInteger(value)) return String(value);
+  const fixed = value.toFixed(1);
+  return getLocale() === "en" ? fixed : fixed.replace(".", ",");
+}
+
+/** "3 gün" / "3 days" (yarım günler dahil) */
+export function formatDayCount(value: number) {
+  return t(value === 1 ? "hr.units.dayOne" : "hr.units.dayOther", { count: formatHours(value) });
+}
+
+/** "8 saat" / "8 hours" */
+export function formatHourCount(value: number) {
+  return t(value === 1 ? "hr.units.hourOne" : "hr.units.hourOther", { count: formatHours(value) });
 }
 
 /** Aylık puantaj cetvelini Excel'e aktarır (bordro için) */
@@ -966,20 +997,20 @@ export async function exportTimesheetXlsx(options: {
   const byKey = new Map(entries.map((entry) => [`${entry.personnelId}|${entry.workDate}`, entry]));
 
   const header = [
-    "Sicil no",
-    "Ad soyad",
-    "Çalışma tipi",
-    "Taşeron firma",
-    "Görev yeri",
+    t("hr.lib.timesheetExport.code"),
+    t("hr.lib.timesheetExport.fullName"),
+    t("hr.lib.timesheetExport.employmentType"),
+    t("hr.lib.timesheetExport.subcontractor"),
+    t("hr.lib.timesheetExport.location"),
     ...days.map((day) => Number(day.slice(8))),
-    "Çalışılan gün",
-    "Çalışma saati",
-    "Fazla mesai (saat)",
-    "Yıllık izin",
-    "Diğer izin",
-    "Rapor",
-    "Devamsız",
-    "Hafta / resmi tatil",
+    t("hr.lib.timesheetExport.workedDays"),
+    t("hr.lib.timesheetExport.hours"),
+    t("hr.lib.timesheetExport.overtime"),
+    t("hr.lib.timesheetExport.annualLeave"),
+    t("hr.lib.timesheetExport.otherLeave"),
+    t("hr.lib.timesheetExport.sick"),
+    t("hr.lib.timesheetExport.absent"),
+    t("hr.lib.timesheetExport.rest"),
   ];
   const rows = personnel.map((person) => {
     const own = entries.filter((entry) => entry.personnelId === person.id);
@@ -1006,19 +1037,19 @@ export async function exportTimesheetXlsx(options: {
   });
   const legend = [
     [],
-    ["Kodlar"],
+    [t("hr.lib.timesheetExport.codes")],
     ...TIMESHEET_STATUSES.map((status) => [TIMESHEET_STATUS[status].code, TIMESHEET_STATUS[status].label]),
   ];
 
   const sheet = XLSX.utils.aoa_to_sheet([header, ...rows, ...legend]);
   sheet["!cols"] = [{ wch: 10 }, { wch: 24 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, ...days.map(() => ({ wch: 4 }))];
   const book = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(book, sheet, `Puantaj ${month}`);
+  XLSX.utils.book_append_sheet(book, sheet, t("hr.lib.timesheetExport.sheetName", { month }));
   const buffer = XLSX.write(book, { bookType: "xlsx", type: "array" });
   const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `puantaj_${month}.xlsx`;
+  link.download = t("hr.lib.timesheetExport.fileName", { month });
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }

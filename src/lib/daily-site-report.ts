@@ -1,3 +1,4 @@
+import { localizedRecord, t } from "@/i18n/runtime";
 import type { StoreWorkPlanItem } from "@/types";
 
 /**
@@ -6,18 +7,34 @@ import type { StoreWorkPlanItem } from "@/types";
  * tarayıcının yazdırma penceresinden alınır.
  */
 
+/** Kayıtta Türkçe değer saklanır; ekranda weatherLabel ile seçili dile çevrilir */
 export const WEATHER_OPTIONS = ["Açık", "Parçalı bulutlu", "Bulutlu", "Yağmurlu", "Karlı", "Rüzgârlı", "Sisli"] as const;
+
+const WEATHER_LABELS = localizedRecord<(typeof WEATHER_OPTIONS)[number]>({
+  Açık: "reports.weather.clear",
+  "Parçalı bulutlu": "reports.weather.partlyCloudy",
+  Bulutlu: "reports.weather.cloudy",
+  Yağmurlu: "reports.weather.rainy",
+  Karlı: "reports.weather.snowy",
+  Rüzgârlı: "reports.weather.windy",
+  Sisli: "reports.weather.foggy",
+});
+
+/** Kayıtlı hava durumu değerinin görünen adı; bilinmeyen değer olduğu gibi döner */
+export function weatherLabel(value: string): string {
+  return (WEATHER_LABELS as Record<string, string>)[value] ?? value;
+}
 
 export type ReportCrewRow = { id: string; trade: string; count: number | null };
 
 /** İsimli yoklamada seçilebilen durumlar (puantaj durumlarının sahada belirlenenleri) */
 export type AttendanceStatus = "worked" | "half_day" | "absent";
 
-export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
-  worked: "Çalıştı",
-  half_day: "Yarım gün",
-  absent: "Gelmedi",
-};
+export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = localizedRecord({
+  worked: "reports.attendance.status.worked",
+  half_day: "reports.attendance.status.halfDay",
+  absent: "reports.attendance.status.absent",
+});
 
 /** İsimli yoklama satırı; kayıtta puantaja işlenir (src/lib/hr.ts) */
 export type ReportAttendance = {
@@ -106,7 +123,7 @@ export function workPlanLinesForDate(items: StoreWorkPlanItem[], date: string): 
     .map((item) => `• ${item.description} (%${Math.round(item.percentComplete)})`);
 }
 
-/** PDF dosya adı olarak da kullanılan başlık, örn. Gunluk-Santiye-Raporu-Kadikoy-2026-10-20 */
+/** PDF dosya adı olarak da kullanılan başlık, örn. Gunluk-Santiye-Raporu-Kadikoy-2026-10-20 (İngilizcede Daily-Site-Report-...) */
 export function reportFileName(storeName: string, date: string): string {
   const slug = storeName
     .normalize("NFD")
@@ -115,5 +132,5 @@ export function reportFileName(storeName: string, date: string): string {
     .replace(/İ/g, "I")
     .replace(/[^A-Za-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  return ["Gunluk-Santiye-Raporu", slug, date].filter(Boolean).join("-");
+  return [t("reports.document.fileNamePrefix"), slug, date].filter(Boolean).join("-");
 }

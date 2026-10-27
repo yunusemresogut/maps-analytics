@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { ALL_TURKEY_CITIES } from "@/data/regions";
+import { useT } from "@/contexts/i18n-context";
 import { useRegions } from "@/contexts/regions-context";
 import { TablePagination } from "@/components/modules/module-table";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ export function AdminRegionsPanel() {
     addCityToRegion,
     removeCityFromRegion,
   } = useRegions();
+  const t = useT();
 
   const [newName, setNewName] = useState("");
   const [selectedCity, setSelectedCity] = useState<Record<string, string>>({});
@@ -66,14 +68,14 @@ export function AdminRegionsPanel() {
         className="flex gap-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4"
       >
         <Input
-          placeholder="Yeni bölge adı"
+          placeholder={t("admin.regions.newName")}
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           className="flex-1"
         />
         <Button type="submit">
           <Plus className="h-4 w-4" />
-          Bölge Ekle
+          {t("admin.regions.add")}
         </Button>
       </form>
 
@@ -86,8 +88,8 @@ export function AdminRegionsPanel() {
           }}
           className="h-9 w-auto min-w-[160px]"
         >
-          <option value="name">Ada göre</option>
-          <option value="cities">Şehir sayısına göre</option>
+          <option value="name">{t("admin.regions.sortByName")}</option>
+          <option value="cities">{t("admin.regions.sortByCities")}</option>
         </Select>
       </div>
 
@@ -105,14 +107,14 @@ export function AdminRegionsPanel() {
                 />
                 <h3 className="font-medium text-zinc-200">{region.name}</h3>
                 <span className="text-xs text-zinc-600">
-                  ({region.cities.length} şehir)
+                  ({t(region.cities.length === 1 ? "admin.regions.citiesOne" : "admin.regions.citiesOther", { count: region.cities.length })})
                 </span>
               </div>
               <Button
                 size="icon"
                 variant="ghost"
                 onClick={() => {
-                  if (confirm(`"${region.name}" silinsin mi?`)) {
+                  if (confirm(t("admin.regions.confirmDelete", { name: region.name }))) {
                     deleteRegion(region.id);
                   }
                 }}
@@ -132,7 +134,7 @@ export function AdminRegionsPanel() {
                 }
                 className="flex-1"
               >
-                <option value="">Şehir ekle...</option>
+                <option value="">{t("admin.regions.addCity")}</option>
                 {ALL_TURKEY_CITIES.filter(
                   (c) => !region.cities.includes(c)
                 ).map((city) => (
@@ -152,7 +154,7 @@ export function AdminRegionsPanel() {
                   }
                 }}
               >
-                Ekle
+                {t("common.add")}
               </Button>
             </div>
 
@@ -167,14 +169,14 @@ export function AdminRegionsPanel() {
                     type="button"
                     onClick={() => removeCityFromRegion(region.id, city)}
                     className="text-zinc-500 hover:text-red-400"
-                    aria-label={`${city} kaldır`}
+                    aria-label={t("admin.regions.removeCity", { name: city })}
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </span>
               ))}
               {region.cities.length === 0 && (
-                <span className="text-xs text-zinc-600">Şehir yok</span>
+                <span className="text-xs text-zinc-600">{t("admin.regions.noCities")}</span>
               )}
             </div>
           </div>

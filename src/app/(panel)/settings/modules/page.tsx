@@ -1,6 +1,7 @@
 "use client";
 
 import { AuthGuard } from "@/components/auth/auth-guard";
+import { useI18n } from "@/contexts/i18n-context";
 import { useSettings } from "@/contexts/settings-context";
 import { DAILY_HOUR_OPTIONS, TOGGLEABLE_MODULES } from "@/lib/settings";
 import { Select } from "@/components/ui/select";
@@ -15,20 +16,21 @@ import {
 const RETENTION_OPTIONS = [1, 3, 7, 14, 30];
 
 function ModulesContent() {
+  const { t, locale } = useI18n();
   const { org, updateOrgSettings } = useSettings();
   const { state, run } = useAutoSave();
 
   return (
     <div className="space-y-6">
       <SettingsPageHeader
-        title="Modüller ve özellikler"
-        description="Firmanızda kullanılmayan modülleri kapatın ve ekip sohbeti ile asistanı yapılandırın."
+        title={t("pageTitle.settingsModules")}
+        description={t("settings.modules.description")}
         status={state}
       />
 
       <SettingsSection
-        title="Modüller"
-        description="Kapatılan modül tüm kullanıcılar için menüden kalkar, sayfaları açılmaz ve bildirim üretmez. Kayıtlar silinmez."
+        title={t("settings.modules.modulesTitle")}
+        description={t("settings.modules.modulesDescription")}
       >
         {TOGGLEABLE_MODULES.map((module) => (
           <SwitchRow
@@ -42,13 +44,13 @@ function ModulesContent() {
       </SettingsSection>
 
       {org.modules.team && (
-        <SettingsSection title="Ekip sohbeti">
+        <SettingsSection title={t("settings.modules.teamChat")}>
           <SettingRow
-            label="Mesaj saklama süresi"
-            description="Bu süreyi dolduran mesajlar ve dosyalar kalıcı olarak silinir. Süreyi kısaltmak eski mesajları hemen gizler."
+            label={t("settings.modules.retention")}
+            description={t("settings.modules.retentionDescription")}
           >
             <Select
-              aria-label="Mesaj saklama süresi"
+              aria-label={t("settings.modules.retention")}
               value={org.team.retentionDays}
               onChange={(e) =>
                 void run(() => updateOrgSettings({ team: { retentionDays: Number(e.target.value) } }))
@@ -57,14 +59,14 @@ function ModulesContent() {
             >
               {RETENTION_OPTIONS.map((days) => (
                 <option key={days} value={days}>
-                  {days} gün
+                  {t(days === 1 ? "settings.common.dayOne" : "settings.common.dayOther", { count: days })}
                 </option>
               ))}
             </Select>
           </SettingRow>
           <SwitchRow
-            label="Dosya paylaşımı"
-            description="Kapatılırsa sohbette dosya gönderilemez (en fazla 10 MB)"
+            label={t("settings.modules.fileSharing")}
+            description={t("settings.modules.fileSharingDescription")}
             checked={org.team.fileSharing}
             onChange={(enabled) => void run(() => updateOrgSettings({ team: { fileSharing: enabled } }))}
           />
@@ -72,26 +74,26 @@ function ModulesContent() {
       )}
 
       {org.modules.hr && (
-        <SettingsSection title="İnsan kaynakları">
+        <SettingsSection title={t("settings.modules.hr")}>
           <SwitchRow
-            label="Cumartesi iş günü"
-            description="Açıksa Cumartesi izinden düşülür ve izin onaylanınca puantaja izin olarak yazılır. Kapalıysa (5 günlük çalışma) Cumartesi izin gününe sayılmaz."
+            label={t("settings.modules.saturdayWorking")}
+            description={t("settings.modules.saturdayWorkingDescription")}
             checked={org.hr.saturdayWorking}
             onChange={(enabled) => void run(() => updateOrgSettings({ hr: { saturdayWorking: enabled } }))}
           />
           <SettingRow
-            label="Günlük çalışma saati"
-            description="Puantaj ve günlük rapor yoklamasında “Çalıştı” günü için varsayılan normal çalışma saati"
+            label={t("settings.modules.dailyHours")}
+            description={t("settings.modules.dailyHoursDescription")}
           >
             <Select
-              aria-label="Günlük çalışma saati"
+              aria-label={t("settings.modules.dailyHours")}
               value={org.hr.dailyHours}
               onChange={(e) => void run(() => updateOrgSettings({ hr: { dailyHours: Number(e.target.value) } }))}
               className="h-9 w-32"
             >
               {DAILY_HOUR_OPTIONS.map((hours) => (
                 <option key={hours} value={hours}>
-                  {String(hours).replace(".", ",")} saat
+                  {t("settings.modules.hoursValue", { hours: locale === "en" ? String(hours) : String(hours).replace(".", ",") })}
                 </option>
               ))}
             </Select>
@@ -99,16 +101,16 @@ function ModulesContent() {
         </SettingsSection>
       )}
 
-      <SettingsSection title="Asistan" description="Sayfanın altındaki “Maps'e Sor” yapay zekâ asistanı">
+      <SettingsSection title={t("settings.modules.assistant")} description={t("settings.modules.assistantDescription")}>
         <SwitchRow
-          label="Asistanı etkinleştir"
-          description="Kapatılırsa asistan hiçbir kullanıcıya gösterilmez"
+          label={t("settings.modules.assistantEnabled")}
+          description={t("settings.modules.assistantEnabledDescription")}
           checked={org.assistant.enabled}
           onChange={(enabled) => void run(() => updateOrgSettings({ assistant: { enabled } }))}
         />
         <SwitchRow
-          label="Asistanla kayıt ekleme"
-          description="Saha, tadilat talebi, iş planı ve keşif kalemlerinin sohbetten (önizleme ve onayla) eklenmesine izin verir. Kullanıcı yetkileri yine geçerlidir."
+          label={t("settings.modules.assistantActions")}
+          description={t("settings.modules.assistantActionsDescription")}
           checked={org.assistant.allowActions}
           disabled={!org.assistant.enabled}
           indent

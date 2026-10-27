@@ -21,27 +21,24 @@ import { useT } from "@/contexts/i18n-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useServerTable } from "@/hooks/use-server-table";
 import { formatMoney } from "@/lib/currency";
+import { INVOICE_STATUS_LABELS } from "@/lib/module-finance";
 import type { Invoice } from "@/types";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 
-const STATUS_TR: Record<string, string> = {
-  draft: "Taslak",
-  issued: "Kesildi",
-  paid: "Ödendi",
-  cancelled: "İptal",
-};
 
 type SortKey = "invoiceNumber" | "storeName" | "paymentTitle" | "amount" | "total" | "status" | "actions";
 
-const COLUMNS: DataTableColumn<SortKey>[] = [
-  { key: "invoiceNumber", label: "Fatura No" },
-  { key: "storeName", label: "Saha" },
-  { key: "paymentTitle", label: "Hakediş" },
-  { key: "amount", label: "Tutar" },
-  { key: "total", label: "Toplam" },
-  { key: "status", label: "Durum" },
-  { key: "actions", label: "" },
-];
+function getColumns(t: ReturnType<typeof useT>): DataTableColumn<SortKey>[] {
+  return [
+    { key: "invoiceNumber", label: t("finance.invoices.invoiceNumberColumn") },
+    { key: "storeName", label: t("finance.shared.store") },
+    { key: "paymentTitle", label: t("finance.shared.progressPayment") },
+    { key: "amount", label: t("finance.shared.amount") },
+    { key: "total", label: t("finance.shared.total") },
+    { key: "status", label: t("finance.shared.status") },
+    { key: "actions", label: "" },
+  ];
+}
 
 type InvoiceRow = Invoice & { storeName: string; paymentTitle: string; total: number };
 
@@ -92,28 +89,28 @@ function InvoicesContent() {
   });
 
   const handleDelete = async (id: string, label: string) => {
-    if (!canDelete || !confirm(`"${label}" silinsin mi?`)) return;
+    if (!canDelete || !confirm(t("finance.shared.deleteNamedConfirm", { name: label }))) return;
     await deleteInvoice(id);
   };
 
   return (
     <ModuleTableShell
       title={t("modules.invoicesTitle")}
-      description="Hakedişe bağlı faturalar."
+      description={t("finance.invoices.description")}
       headerAction={
         canAdd ? (
           <Button size="sm" onClick={() => router.push("/invoices/new")}>
             <Plus className="h-3.5 w-3.5" />
-            Yeni
+            {t("finance.shared.new")}
           </Button>
         ) : undefined
       }
       toolbar={
         <>
-          <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Fatura no, saha…" aria-label="Faturalarda ara" containerClassName="w-full max-w-sm" className="h-10" />
+          <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("finance.invoices.searchPlaceholder")} aria-label={t("finance.invoices.searchLabel")} containerClassName="w-full max-w-sm" className="h-10" />
           <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 w-auto min-w-[160px]">
-            <option value="all">Tüm durumlar</option>
-            {Object.entries(STATUS_TR).map(([k, v]) => (
+            <option value="all">{t("finance.shared.allStatuses")}</option>
+            {Object.entries(INVOICE_STATUS_LABELS).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
           </Select>
@@ -123,7 +120,7 @@ function InvoicesContent() {
         <TablePagination page={table.page} totalPages={table.totalPages} totalItems={table.totalItems} rangeStart={table.rangeStart} rangeEnd={table.rangeEnd} onPageChange={table.setPage} pageSize={table.pageSize} onPageSizeChange={table.setPageSize} />
       }
     >
-      <DataTable columns={COLUMNS} sortKey={table.sort.key} sortDirection={table.sort.direction} onSort={table.toggleSort} minWidthClassName="min-w-[720px]">
+      <DataTable columns={getColumns(t)} sortKey={table.sort.key} sortDirection={table.sort.direction} onSort={table.toggleSort} minWidthClassName="min-w-[720px]">
         {table.pageItems.map((item) => (
           <tr key={item.id} className="text-zinc-300 hover:bg-zinc-900/50">
             <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-cyan-400/90">{item.invoiceNumber}</td>
@@ -131,16 +128,16 @@ function InvoicesContent() {
             <td className="whitespace-nowrap px-4 py-3 text-zinc-400">{item.paymentTitle}</td>
             <td className="whitespace-nowrap px-4 py-3">{formatMoney(item.amount, item.currency)}</td>
             <td className="whitespace-nowrap px-4 py-3 font-medium text-zinc-100">{formatMoney(item.total, item.currency)}</td>
-            <td className="px-4 py-3"><StatusBadge value={item.status} label={STATUS_TR[item.status] ?? item.status} /></td>
+            <td className="px-4 py-3"><StatusBadge value={item.status} label={INVOICE_STATUS_LABELS[item.status] ?? item.status} /></td>
             <td className="whitespace-nowrap px-4 py-3">
               <div className="flex gap-1">
                 {canEdit && (
-                  <Link href={`/invoices/${item.id}/edit`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/20 hover:text-zinc-100" aria-label="Düzenle">
+                  <Link href={`/invoices/${item.id}/edit`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800/20 hover:text-zinc-100" aria-label={t("common.edit")}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Link>
                 )}
                 {canDelete && (
-                  <Button size="icon" variant="ghost" onClick={() => handleDelete(item.id, item.invoiceNumber)} aria-label="Sil">
+                  <Button size="icon" variant="ghost" onClick={() => handleDelete(item.id, item.invoiceNumber)} aria-label={t("common.delete")}>
                     <Trash2 className="h-3.5 w-3.5 text-red-400/80" />
                   </Button>
                 )}
@@ -149,7 +146,7 @@ function InvoicesContent() {
           </tr>
         ))}
         {!table.isLoading && table.totalItems === 0 && (
-          <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-600">Kayıt bulunamadı.</td></tr>
+          <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-zinc-600">{t("finance.shared.noRecords")}</td></tr>
         )}
       </DataTable>
     </ModuleTableShell>

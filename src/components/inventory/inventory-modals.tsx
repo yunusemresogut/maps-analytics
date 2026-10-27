@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
+import { getDateLocale } from "@/i18n/runtime";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FormField } from "@/components/ui/form-field";
@@ -11,6 +11,7 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n, useT } from "@/contexts/i18n-context";
 import { useStores } from "@/contexts/stores-context";
 import {
   CATEGORY_LABELS,
@@ -31,7 +32,7 @@ import { cn } from "@/lib/utils";
 const today = () => format(new Date(), "yyyy-MM-dd");
 
 export function formatDay(value?: string) {
-  return value ? format(parseISO(value), "d MMM yyyy", { locale: tr }) : "—";
+  return value ? format(parseISO(value), "d MMM yyyy", { locale: getDateLocale() }) : "—";
 }
 
 function ErrorText({ message }: { message: string }) {
@@ -57,6 +58,7 @@ export function InventoryItemModal({
   onSubmit: (input: InventoryItemInput) => void;
 }) {
   const formId = useId();
+  const t = useT();
   const [form, setForm] = useState<InventoryItemInput>({
     code: item?.code ?? "",
     name: item?.name ?? "",
@@ -80,15 +82,15 @@ export function InventoryItemModal({
       open
       onClose={onClose}
       className="sm:max-w-2xl"
-      title={item ? "Envanteri düzenle" : "Yeni envanter"}
-      description="Ekipman, araç ya da alet bilgilerini girin."
+      title={item ? t("inventory.itemModal.editTitle") : t("inventory.itemModal.newTitle")}
+      description={t("inventory.itemModal.description")}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Vazgeç
+            {t("common.cancel")}
           </Button>
           <Button type="submit" form={formId} loading={state.saving}>
-            {item ? "Kaydet" : "Ekle"}
+            {item ? t("inventory.itemModal.save") : t("inventory.itemModal.add")}
           </Button>
         </>
       }
@@ -100,7 +102,7 @@ export function InventoryItemModal({
         onSubmit={(event) => {
           event.preventDefault();
           if (!form.name.trim()) {
-            setNameError("Ad zorunludur");
+            setNameError(t("inventory.itemModal.nameRequired"));
             return;
           }
           onSubmit(form);
@@ -108,21 +110,21 @@ export function InventoryItemModal({
       >
         <ErrorText message={state.error} />
         <div className="grid gap-4 sm:grid-cols-3">
-          <FormField label="Demirbaş no">
-            <Input value={form.code} onChange={(e) => set("code", e.target.value)} placeholder="ör. DMR-0012" className="font-mono" />
+          <FormField label={t("inventory.itemModal.code")}>
+            <Input value={form.code} onChange={(e) => set("code", e.target.value)} placeholder={t("inventory.itemModal.codePlaceholder")} className="font-mono" />
           </FormField>
-          <FormField label="Ad" required error={nameError} className="sm:col-span-2">
+          <FormField label={t("inventory.itemModal.name")} required error={nameError} className="sm:col-span-2">
             <Input
               value={form.name}
               aria-invalid={!!nameError}
-              placeholder="ör. Kırıcı delici, Ford Transit"
+              placeholder={t("inventory.itemModal.namePlaceholder")}
               onChange={(e) => {
                 set("name", e.target.value);
                 if (nameError) setNameError("");
               }}
             />
           </FormField>
-          <FormField label="Kategori">
+          <FormField label={t("inventory.itemModal.category")}>
             <Select value={form.category} onChange={(e) => set("category", e.target.value as InventoryCategory)}>
               {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -131,10 +133,10 @@ export function InventoryItemModal({
               ))}
             </Select>
           </FormField>
-          <FormField label="Marka / model">
+          <FormField label={t("inventory.itemModal.brand")}>
             <Input value={form.brand} onChange={(e) => set("brand", e.target.value)} />
           </FormField>
-          <FormField label={form.category === "vehicle" ? "Plaka" : "Seri no"}>
+          <FormField label={form.category === "vehicle" ? t("inventory.itemModal.plate") : t("inventory.itemModal.serialNo")}>
             <Input
               value={form.serialNo}
               onChange={(e) => set("serialNo", e.target.value)}
@@ -142,7 +144,7 @@ export function InventoryItemModal({
               placeholder={form.category === "vehicle" ? "34 ABC 123" : undefined}
             />
           </FormField>
-          <FormField label="Durum">
+          <FormField label={t("inventory.itemModal.status")}>
             <Select value={form.status} onChange={(e) => set("status", e.target.value as InventoryStatus)}>
               {Object.entries(STATUS_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -151,25 +153,25 @@ export function InventoryItemModal({
               ))}
             </Select>
           </FormField>
-          <FormField label="Alış tarihi">
+          <FormField label={t("inventory.itemModal.purchaseDate")}>
             <DatePicker value={form.purchaseDate} onChange={(value) => set("purchaseDate", value)} />
           </FormField>
         </div>
         {form.category === "vehicle" && (
           <div className="grid gap-4 rounded-lg border border-zinc-800 bg-zinc-950/40 p-4 sm:grid-cols-4">
             <p className="text-xs text-zinc-500 sm:col-span-4">
-              Belge bitişleri yaklaşınca araç sorumlularına ve aracın zimmetli olduğu kişiye bildirim gider.
+              {t("inventory.itemModal.vehicleHint")}
             </p>
-            <FormField label="Trafik sigortası bitişi">
+            <FormField label={t("inventory.itemModal.insuranceExpires")}>
               <DatePicker value={form.insuranceExpires} onChange={(value) => set("insuranceExpires", value)} />
             </FormField>
-            <FormField label="Kasko bitişi">
+            <FormField label={t("inventory.itemModal.cascoExpires")}>
               <DatePicker value={form.cascoExpires} onChange={(value) => set("cascoExpires", value)} />
             </FormField>
-            <FormField label="Muayene bitişi">
+            <FormField label={t("inventory.itemModal.inspectionExpires")}>
               <DatePicker value={form.inspectionExpires} onChange={(value) => set("inspectionExpires", value)} />
             </FormField>
-            <FormField label="Kilometre">
+            <FormField label={t("inventory.itemModal.odometer")}>
               <Input
                 type="number"
                 min={0}
@@ -180,7 +182,7 @@ export function InventoryItemModal({
             </FormField>
           </div>
         )}
-        <FormField label="Not">
+        <FormField label={t("inventory.itemModal.notes")}>
           <Textarea rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
         </FormField>
       </form>
@@ -203,6 +205,7 @@ export function AssignModal({
   onSubmit: (input: AssignmentInput) => void;
 }) {
   const formId = useId();
+  const { t, locale } = useI18n();
   const { users } = useAuth();
   const { stores } = useStores();
   const existing = item.assignment;
@@ -213,22 +216,22 @@ export function AssignModal({
   const [expectedReturn, setExpectedReturn] = useState(existing?.expectedReturn ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [error, setError] = useState("");
-  const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name, "tr"));
+  const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name, locale));
 
   return (
     <Modal
       open
       onClose={onClose}
       className="sm:max-w-xl"
-      title={existing ? "Zimmeti düzenle" : "Zimmetle"}
+      title={existing ? t("inventory.assignModal.editTitle") : t("inventory.assignModal.title")}
       description={`${item.code ? `${item.code} · ` : ""}${item.name}`}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Vazgeç
+            {t("common.cancel")}
           </Button>
           <Button type="submit" form={formId} loading={state.saving}>
-            {existing ? "Kaydet" : "Zimmetle"}
+            {existing ? t("inventory.assignModal.save") : t("inventory.assignModal.submit")}
           </Button>
         </>
       }
@@ -242,11 +245,11 @@ export function AssignModal({
           const member = users.find((u) => u.id === personId);
           const assigneeName = member ? member.name : otherName.trim();
           if (!assigneeName) {
-            setError("Zimmetlenecek kişiyi seçin ya da adını yazın");
+            setError(t("inventory.assignModal.personRequired"));
             return;
           }
           if (expectedReturn && expectedReturn < assignedAt) {
-            setError("Teslim tarihi zimmet tarihinden önce olamaz");
+            setError(t("inventory.assignModal.returnBeforeAssign"));
             return;
           }
           onSubmit({
@@ -260,24 +263,24 @@ export function AssignModal({
         }}
       >
         <ErrorText message={state.error || error} />
-        <FormField label="Kişi" required>
-          <Select value={personId} onChange={(e) => setPersonId(e.target.value)} placeholder="Kişi seçin">
+        <FormField label={t("inventory.assignModal.person")} required>
+          <Select value={personId} onChange={(e) => setPersonId(e.target.value)} placeholder={t("inventory.assignModal.personPlaceholder")}>
             {sortedUsers.map((member) => (
               <option key={member.id} value={member.id}>
                 {member.name}
               </option>
             ))}
-            <option value={OTHER_PERSON}>Listede yok (adını yaz)</option>
+            <option value={OTHER_PERSON}>{t("inventory.assignModal.otherPerson")}</option>
           </Select>
         </FormField>
         {personId === OTHER_PERSON && (
-          <FormField label="Ad soyad" required hint="Uygulamada hesabı olmayan kişi (ör. taşeron ustası).">
+          <FormField label={t("inventory.assignModal.fullName")} required hint={t("inventory.assignModal.fullNameHint")}>
             <Input value={otherName} onChange={(e) => setOtherName(e.target.value)} autoFocus />
           </FormField>
         )}
-        <FormField label="Kullanılacağı şantiye" hint="İsteğe bağlı">
-          <Select value={storeId} onChange={(e) => setStoreId(e.target.value)} placeholder="Şantiye seçin">
-            <option value="">Belirtilmedi</option>
+        <FormField label={t("inventory.assignModal.site")} hint={t("inventory.assignModal.optional")}>
+          <Select value={storeId} onChange={(e) => setStoreId(e.target.value)} placeholder={t("inventory.assignModal.sitePlaceholder")}>
+            <option value="">{t("inventory.assignModal.notSpecified")}</option>
             {stores.map((store) => (
               <option key={store.id} value={store.id}>
                 {store.name}
@@ -286,15 +289,15 @@ export function AssignModal({
           </Select>
         </FormField>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Zimmet tarihi" required>
+          <FormField label={t("inventory.assignModal.assignedAt")} required>
             <DatePicker value={assignedAt} onChange={setAssignedAt} />
           </FormField>
-          <FormField label="Planlanan teslim" hint="İsteğe bağlı">
+          <FormField label={t("inventory.assignModal.expectedReturn")} hint={t("inventory.assignModal.optional")}>
             <DatePicker value={expectedReturn} onChange={setExpectedReturn} min={assignedAt || undefined} />
           </FormField>
         </div>
-        <FormField label="Not">
-          <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ör. Şarj aleti ve 2 batarya ile verildi" />
+        <FormField label={t("inventory.assignModal.notes")}>
+          <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("inventory.assignModal.notesPlaceholder")} />
         </FormField>
       </form>
     </Modal>
@@ -314,6 +317,7 @@ export function ReturnModal({
   onSubmit: (input: ReturnInput, markMaintenance: boolean) => void;
 }) {
   const formId = useId();
+  const t = useT();
   const assignedAt = item.assignment?.assignedAt ?? "";
   const [returnedAt, setReturnedAt] = useState(today() < assignedAt ? assignedAt : today());
   const [condition, setCondition] = useState<ReturnCondition>("good");
@@ -324,15 +328,15 @@ export function ReturnModal({
     <Modal
       open
       onClose={onClose}
-      title="Teslim al"
+      title={t("inventory.returnModal.title")}
       description={`${item.name} · ${item.assignment?.assigneeName ?? ""}`}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Vazgeç
+            {t("common.cancel")}
           </Button>
           <Button type="submit" form={formId} loading={state.saving}>
-            Teslim al
+            {t("inventory.returnModal.submit")}
           </Button>
         </>
       }
@@ -348,10 +352,10 @@ export function ReturnModal({
       >
         <ErrorText message={state.error} />
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Teslim tarihi" required>
+          <FormField label={t("inventory.returnModal.returnedAt")} required>
             <DatePicker value={returnedAt} onChange={setReturnedAt} min={assignedAt || undefined} />
           </FormField>
-          <FormField label="Durumu">
+          <FormField label={t("inventory.returnModal.condition")}>
             <Select value={condition} onChange={(e) => setCondition(e.target.value as ReturnCondition)}>
               {Object.entries(CONDITION_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -369,16 +373,16 @@ export function ReturnModal({
               onChange={(e) => setMarkMaintenance(e.target.checked)}
               className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 accent-cyan-500"
             />
-            Eşyayı bakıma al
+            {t("inventory.returnModal.markMaintenance")}
           </label>
         )}
         {condition === "lost" && (
           <p className="text-xs text-amber-400/90">
-            Kayıp eşya envanterde kalır; gerekirse düzenleyerek “Hurdaya ayrıldı” yapabilirsiniz.
+            {t("inventory.returnModal.lostHint")}
           </p>
         )}
-        <FormField label="Not">
-          <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ör. Kablosu yıpranmış" />
+        <FormField label={t("inventory.returnModal.notes")}>
+          <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("inventory.returnModal.notesPlaceholder")} />
         </FormField>
       </form>
     </Modal>
@@ -391,6 +395,7 @@ export function HistoryModal({ item, onClose }: { item: InventoryItem; onClose: 
     status: "loading",
   });
   const { stores } = useStores();
+  const t = useT();
 
   useEffect(() => {
     let cancelled = false;
@@ -406,12 +411,12 @@ export function HistoryModal({ item, onClose }: { item: InventoryItem; onClose: 
   }, [item.id]);
 
   return (
-    <Modal open onClose={onClose} className="sm:max-w-2xl" title="Zimmet geçmişi" description={`${item.code ? `${item.code} · ` : ""}${item.name}`}>
-      {state.status === "loading" && <p className="py-6 text-center text-sm text-zinc-500">Yükleniyor…</p>}
-      {state.status === "error" && <p className="py-6 text-center text-sm text-red-400">Geçmiş yüklenemedi.</p>}
+    <Modal open onClose={onClose} className="sm:max-w-2xl" title={t("inventory.historyModal.title")} description={`${item.code ? `${item.code} · ` : ""}${item.name}`}>
+      {state.status === "loading" && <p className="py-6 text-center text-sm text-zinc-500">{t("inventory.historyModal.loading")}</p>}
+      {state.status === "error" && <p className="py-6 text-center text-sm text-red-400">{t("inventory.historyModal.error")}</p>}
       {state.status === "ready" &&
         (state.rows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-zinc-500">Bu eşya henüz kimseye zimmetlenmedi.</p>
+          <p className="py-6 text-center text-sm text-zinc-500">{t("inventory.historyModal.empty")}</p>
         ) : (
           <ol className="space-y-3">
             {state.rows.map((row) => {
@@ -431,20 +436,20 @@ export function HistoryModal({ item, onClose }: { item: InventoryItem; onClose: 
                               : "bg-red-500/10 text-red-400"
                         )}
                       >
-                        Teslim alındı · {CONDITION_LABELS[row.returnCondition ?? "good"]}
+                        {t("inventory.historyModal.returned", { condition: CONDITION_LABELS[row.returnCondition ?? "good"] })}
                       </span>
                     ) : (
-                      <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-300">Zimmette</span>
+                      <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-300">{t("inventory.historyModal.assigned")}</span>
                     )}
                   </div>
                   <p className="mt-1 text-xs text-zinc-500">
                     {formatDay(row.assignedAt)} → {row.returnedAt ? formatDay(row.returnedAt) : "…"}
                     {storeName && ` · ${storeName}`}
-                    {row.createdByName && ` · zimmetleyen ${row.createdByName}`}
-                    {row.returnedByName && ` · teslim alan ${row.returnedByName}`}
+                    {row.createdByName && t("inventory.historyModal.assignedBy", { name: row.createdByName })}
+                    {row.returnedByName && t("inventory.historyModal.returnedBy", { name: row.returnedByName })}
                   </p>
-                  {row.notes && <p className="mt-1.5 text-xs text-zinc-400">Not: {row.notes}</p>}
-                  {row.returnNotes && <p className="mt-1 text-xs text-zinc-400">Teslim notu: {row.returnNotes}</p>}
+                  {row.notes && <p className="mt-1.5 text-xs text-zinc-400">{t("inventory.historyModal.notes", { notes: row.notes })}</p>}
+                  {row.returnNotes && <p className="mt-1 text-xs text-zinc-400">{t("inventory.historyModal.returnNotes", { notes: row.returnNotes })}</p>}
                 </li>
               );
             })}

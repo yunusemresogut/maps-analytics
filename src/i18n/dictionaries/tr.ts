@@ -1,3 +1,6 @@
+import type { Translation } from "@/i18n/define";
+import { messages } from "@/i18n/messages";
+
 const trDict = {
   language: {
     label: "Dil",
@@ -250,9 +253,14 @@ const trDict = {
   },
 } as const;
 
-type DeepStringify<T> = {
-  [K in keyof T]: T[K] extends string ? string : DeepStringify<T[K]>;
-};
+type Messages = typeof messages;
 
-export type Dictionary = DeepStringify<typeof trDict>;
-export const tr: Dictionary = trDict;
+/** Çekirdek metinler + modül sözlükleri (src/i18n/messages) */
+export type Dictionary = Translation<typeof trDict> & { [N in keyof Messages]: Messages[N]["tr"] };
+
+export const tr: Dictionary = {
+  ...trDict,
+  ...(Object.fromEntries(Object.entries(messages).map(([name, value]) => [name, value.tr])) as {
+    [N in keyof Messages]: Messages[N]["tr"];
+  }),
+};
